@@ -1,9 +1,10 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, LogOut, Plus, FileText, Users, BarChart3 } from "lucide-react";
+import { BookOpen, LogOut, Plus, FileText, Users, BarChart3, Shield } from "lucide-react";
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
