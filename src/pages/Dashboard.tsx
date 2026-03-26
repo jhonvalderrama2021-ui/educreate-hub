@@ -1,17 +1,31 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, LogOut, Plus, FileText, Users, BarChart3 } from "lucide-react";
+import { BookOpen, LogOut, Plus, FileText, Users, BarChart3, Shield } from "lucide-react";
 
 export default function Dashboard() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .then(({ data }) => {
+        if (data && data.length > 0) setIsAdmin(true);
+      });
+  }, [user]);
 
   if (loading) {
     return (
@@ -38,9 +52,15 @@ export default function Dashboard() {
           <BookOpen className="h-6 w-6" />
           EduCrea
         </a>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/"); }}>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+                <Shield className="h-4 w-4 mr-1" />
+                Admin
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/"); }}>
             <LogOut className="h-4 w-4 mr-1" />
             Salir
           </Button>
