@@ -61,7 +61,6 @@ export default function Dashboard() {
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/"); }}>
-          <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/"); }}>
             <LogOut className="h-4 w-4 mr-1" />
             Salir
           </Button>
