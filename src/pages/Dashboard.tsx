@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-
+import { BookOpen, Plus, FileText, Users, BarChart3, Shield, ArrowRight } from "lucide-react";
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
