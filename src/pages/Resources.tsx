@@ -38,7 +38,8 @@ export default function Resources() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <AppHeader maxWidth="" />
+              <ThemeToggle />
+              <UserMenu />
             </div>
           </header>
 
