@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
-import { AppHeader } from "@/components/AppHeader";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 import { BookOpen, Lightbulb } from "lucide-react";
 
 export default function Resources() {
