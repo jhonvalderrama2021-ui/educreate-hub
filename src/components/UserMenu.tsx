@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut, ChevronDown } from "lucide-react";
+import { LogOut, ChevronDown, Home, LayoutDashboard, BookOpen } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +54,19 @@ export function UserMenu() {
             <p className="text-xs text-muted-foreground truncate">{email}</p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/")} className="cursor-pointer">
+          <Home className="h-4 w-4 mr-2" />
+          Inicio
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/dashboard")} className="cursor-pointer">
+          <LayoutDashboard className="h-4 w-4 mr-2" />
+          Dashboard
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/resources")} className="cursor-pointer">
+          <BookOpen className="h-4 w-4 mr-2" />
+          Recursos
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}
