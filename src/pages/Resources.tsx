@@ -1,11 +1,47 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-import { BookOpen, Lightbulb } from "lucide-react";
+import { Lightbulb } from "lucide-react";
+import LessonPlan from "@/pages/resources/LessonPlan";
+import Rubrics from "@/pages/resources/Rubrics";
+import IcfesExam from "@/pages/resources/IcfesExam";
+
+function ResourcesHome() {
+  return (
+    <div className="max-w-3xl mx-auto animate-fade-in">
+      <div className="text-center py-16">
+        <div className="mx-auto h-20 w-20 rounded-2xl gradient-primary flex items-center justify-center mb-6">
+          <Lightbulb className="h-10 w-10 text-primary-foreground" />
+        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-3">
+          Centro de Recursos
+        </h1>
+        <p className="text-muted-foreground max-w-md mx-auto mb-8">
+          Selecciona un módulo del menú lateral para comenzar a crear tus recursos pedagógicos.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+          {[
+            { icon: "📝", label: "Planes de clase" },
+            { icon: "📊", label: "Rúbricas" },
+            { icon: "📋", label: "Exámenes ICFES" },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer"
+            >
+              <span className="text-2xl block mb-2">{item.icon}</span>
+              <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Resources() {
   const { user, loading } = useAuth();
@@ -44,34 +80,12 @@ export default function Resources() {
           </header>
 
           <main className="flex-1 p-6 md:p-10 overflow-auto">
-            <div className="max-w-3xl mx-auto animate-fade-in">
-              <div className="text-center py-16">
-                <div className="mx-auto h-20 w-20 rounded-2xl gradient-primary flex items-center justify-center mb-6">
-                  <Lightbulb className="h-10 w-10 text-primary-foreground" />
-                </div>
-                <h1 className="text-3xl font-bold text-foreground mb-3">
-                  Centro de Recursos
-                </h1>
-                <p className="text-muted-foreground max-w-md mx-auto mb-8">
-                  Selecciona un módulo del menú lateral para comenzar a crear tus recursos pedagógicos.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
-                  {[
-                    { icon: "📝", label: "Planes de clase" },
-                    { icon: "📊", label: "Rúbricas" },
-                    { icon: "📋", label: "Exámenes ICFES" },
-                  ].map((item) => (
-                    <div
-                      key={item.label}
-                      className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer"
-                    >
-                      <span className="text-2xl block mb-2">{item.icon}</span>
-                      <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <Routes>
+              <Route index element={<ResourcesHome />} />
+              <Route path="lesson-plan" element={<LessonPlan />} />
+              <Route path="rubrics" element={<Rubrics />} />
+              <Route path="icfes" element={<IcfesExam />} />
+            </Routes>
           </main>
         </div>
       </div>
