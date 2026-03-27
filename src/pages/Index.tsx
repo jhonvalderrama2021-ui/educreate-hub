@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, Sparkles, Share2, Shield, ArrowRight } from "lucide-react";
+import { AppHeader } from "@/components/AppHeader";
+import { Sparkles, Share2, Shield, ArrowRight } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const features = [
   {
@@ -22,26 +23,12 @@ const features = [
 ];
 
 export default function Index() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
-        <div className="flex items-center gap-2 text-primary font-bold text-xl">
-          <BookOpen className="h-6 w-6" />
-          EduCrea
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Link to="/auth">
-            <Button variant="ghost" size="sm">Iniciar sesión</Button>
-          </Link>
-          <Link to="/auth">
-            <Button size="sm" className="gradient-primary">Registrarse</Button>
-          </Link>
-        </div>
-      </header>
+      <AppHeader />
 
-      {/* Hero */}
       <section className="gradient-hero">
         <div className="max-w-4xl mx-auto px-4 pt-20 pb-28 text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground mb-6 animate-fade-in">
@@ -57,7 +44,7 @@ export default function Index() {
             La herramienta perfecta para docentes y estudiantes.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
-            <Link to="/auth">
+            <Link to={user ? "/dashboard" : "/auth?mode=signup"}>
               <Button size="lg" className="gradient-primary text-base px-8">
                 Comenzar gratis
                 <ArrowRight className="h-4 w-4 ml-1" />
@@ -67,7 +54,6 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Features */}
       <section className="max-w-5xl mx-auto px-4 py-20">
         <h2 className="text-2xl font-bold text-foreground text-center mb-12">
           Todo lo que necesitas
@@ -89,7 +75,6 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
         © {new Date().getFullYear()} EduCrea. Todos los derechos reservados.
       </footer>

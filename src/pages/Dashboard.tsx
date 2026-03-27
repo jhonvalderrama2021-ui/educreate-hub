@@ -1,13 +1,13 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, LogOut, Plus, FileText, Users, BarChart3, Shield } from "lucide-react";
+import { AppHeader } from "@/components/AppHeader";
+import { Plus, FileText, Users, BarChart3, Shield, ArrowRight } from "lucide-react";
 
 export default function Dashboard() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -47,23 +47,21 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-6 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2 text-primary font-bold text-xl">
-          <BookOpen className="h-6 w-6" />
-          EduCrea
-        </a>
+      <header className="border-b border-border">
+        <div className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
+          <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-xl">
+            <FileText className="h-6 w-6" />
+            EduCrea
+          </Link>
           <div className="flex items-center gap-2">
-            <ThemeToggle />
             {isAdmin && (
               <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
                 <Shield className="h-4 w-4 mr-1" />
                 Admin
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => { signOut(); navigate("/"); }}>
-            <LogOut className="h-4 w-4 mr-1" />
-            Salir
-          </Button>
+            <AppHeader maxWidth="" />
+          </div>
         </div>
       </header>
 
@@ -104,10 +102,12 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-6 max-w-md mx-auto">
             Diseña presentaciones, cuestionarios, actividades y más para tus estudiantes.
           </p>
-          <Button className="gradient-primary" size="lg">
-            <Plus className="h-4 w-4 mr-1" />
-            Nuevo recurso
-          </Button>
+          <Link to="/resources">
+            <Button className="gradient-primary" size="lg">
+              <ArrowRight className="h-4 w-4 mr-1" />
+              Ir a Recursos
+            </Button>
+          </Link>
         </div>
       </main>
     </div>
