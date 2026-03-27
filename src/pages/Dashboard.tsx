@@ -60,7 +60,8 @@ export default function Dashboard() {
                 Admin
               </Button>
             )}
-            <AppHeader maxWidth="" />
+            <ThemeToggle />
+            <UserMenu />
           </div>
         </div>
       </header>
