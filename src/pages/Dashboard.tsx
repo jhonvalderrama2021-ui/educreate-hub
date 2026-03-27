@@ -3,8 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { AppHeader } from "@/components/AppHeader";
-import { Plus, FileText, Users, BarChart3, Shield, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
