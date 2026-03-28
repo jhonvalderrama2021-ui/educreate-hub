@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, Table2, FileCheck, FolderPlus } from "lucide-react";
+import { BookOpen, ClipboardList, Table2, FileCheck, Sparkles, History, HelpCircle, FileEdit } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -16,22 +16,55 @@ import {
 
 const modules = [
   {
+    title: "Generar con IA",
+    url: "/resources/generate",
+    icon: Sparkles,
+    description: "Genera recursos educativos con IA",
+  },
+  {
     title: "Plan de clase",
-    url: "/resources/lesson-plan",
+    url: "/resources/generate?type=lesson_plan",
     icon: ClipboardList,
-    description: "Diseña planes de clase estructurados",
+    description: "Genera planes de clase con IA",
   },
   {
     title: "Rúbricas",
-    url: "/resources/rubrics",
+    url: "/resources/generate?type=rubric",
     icon: Table2,
-    description: "Crea rúbricas de evaluación",
+    description: "Genera rúbricas de evaluación con IA",
   },
   {
     title: "Exámenes ICFES",
-    url: "/resources/icfes",
+    url: "/resources/generate?type=icfes",
     icon: FileCheck,
-    description: "Genera exámenes tipo ICFES",
+    description: "Genera exámenes tipo ICFES con IA",
+  },
+  {
+    title: "Cuestionarios",
+    url: "/resources/generate?type=quiz",
+    icon: HelpCircle,
+    description: "Genera cuestionarios con IA",
+  },
+  {
+    title: "Talleres",
+    url: "/resources/generate?type=workshop",
+    icon: FileEdit,
+    description: "Genera talleres educativos con IA",
+  },
+  {
+    title: "Guías educativas",
+    url: "/resources/generate?type=guide",
+    icon: BookOpen,
+    description: "Genera guías educativas con IA",
+  },
+];
+
+const managementModules = [
+  {
+    title: "Historial",
+    url: "/resources/history",
+    icon: History,
+    description: "Ver recursos generados anteriormente",
   },
 ];
 
@@ -50,10 +83,32 @@ export function ResourcesSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Módulos</SidebarGroupLabel>
+          <SidebarGroupLabel>Crear Recursos</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {modules.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={item.description}>
+                    <NavLink
+                      to={item.url}
+                      className="hover:bg-sidebar-accent/50"
+                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Gestión</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {managementModules.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink

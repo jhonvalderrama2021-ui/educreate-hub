@@ -14,6 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      generated_resources: {
+        Row: {
+          content: Json
+          created_at: string | null
+          id: string
+          is_public: boolean | null
+          resource_type: string
+          source_pdf_url: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          resource_type: string
+          source_pdf_url?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string | null
+          id?: string
+          is_public?: boolean | null
+          resource_type?: string
+          source_pdf_url?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -38,6 +95,33 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      user_ai_preferences: {
+        Row: {
+          id: string
+          ollama_model: string | null
+          ollama_url: string | null
+          provider: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          ollama_model?: string | null
+          ollama_url?: string | null
+          provider?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          ollama_model?: string | null
+          ollama_url?: string | null
+          provider?: string
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }

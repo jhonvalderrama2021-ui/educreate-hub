@@ -5,10 +5,10 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-import { Lightbulb } from "lucide-react";
-import LessonPlan from "@/pages/resources/LessonPlan";
-import Rubrics from "@/pages/resources/Rubrics";
-import IcfesExam from "@/pages/resources/IcfesExam";
+import { Lightbulb, Sparkles } from "lucide-react";
+import { NavLink } from "@/components/NavLink";
+import GenerateResource from "@/pages/resources/GenerateResource";
+import ResourceHistory from "@/pages/resources/ResourceHistory";
 
 function ResourcesHome() {
   return (
@@ -18,24 +18,33 @@ function ResourcesHome() {
           <Lightbulb className="h-10 w-10 text-primary-foreground" />
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-3">
-          Centro de Recursos
+          Centro de Recursos con IA
         </h1>
         <p className="text-muted-foreground max-w-md mx-auto mb-8">
-          Selecciona un módulo del menú lateral para comenzar a crear tus recursos pedagógicos.
+          Genera recursos educativos automáticamente con Inteligencia Artificial.
+          Selecciona un módulo del menú lateral o comienza rápidamente:
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto">
+        <NavLink to="/resources/generate">
+          <button className="gradient-primary text-primary-foreground px-6 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto hover:opacity-90 transition-opacity">
+            <Sparkles className="h-5 w-5" />
+            Generar recurso con IA
+          </button>
+        </NavLink>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-lg mx-auto mt-8">
           {[
-            { icon: "📝", label: "Planes de clase" },
-            { icon: "📊", label: "Rúbricas" },
-            { icon: "📋", label: "Exámenes ICFES" },
+            { icon: "📋", label: "Exámenes ICFES", type: "icfes" },
+            { icon: "❓", label: "Cuestionarios", type: "quiz" },
+            { icon: "🔧", label: "Talleres", type: "workshop" },
+            { icon: "📖", label: "Guías", type: "guide" },
+            { icon: "📝", label: "Planes de clase", type: "lesson_plan" },
+            { icon: "📊", label: "Rúbricas", type: "rubric" },
           ].map((item) => (
-            <div
-              key={item.label}
-              className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer"
-            >
-              <span className="text-2xl block mb-2">{item.icon}</span>
-              <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
-            </div>
+            <NavLink key={item.label} to={`/resources/generate?type=${item.type}`}>
+              <div className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer">
+                <span className="text-2xl block mb-2">{item.icon}</span>
+                <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+              </div>
+            </NavLink>
           ))}
         </div>
       </div>
@@ -82,9 +91,8 @@ export default function Resources() {
           <main className="flex-1 p-6 md:p-10 overflow-auto">
             <Routes>
               <Route index element={<ResourcesHome />} />
-              <Route path="lesson-plan" element={<LessonPlan />} />
-              <Route path="rubrics" element={<Rubrics />} />
-              <Route path="icfes" element={<IcfesExam />} />
+              <Route path="generate" element={<GenerateResource />} />
+              <Route path="history" element={<ResourceHistory />} />
             </Routes>
           </main>
         </div>

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Select,
@@ -11,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, LogOut, Shield, ArrowLeft } from "lucide-react";
+import { BookOpen, LogOut, Shield, ArrowLeft, Key, Eye, EyeOff, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type UserWithRole = {
@@ -29,13 +31,18 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
 
+  // AI Settings
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+  const [keyConfigured, setKeyConfigured] = useState(false);
+
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
   }, [user, loading, navigate]);
 
   useEffect(() => {
     if (!user) return;
-    // Check if current user is admin
     supabase
       .from("user_roles")
       .select("role")
@@ -45,6 +52,7 @@ export default function AdminPanel() {
         if (data && data.length > 0) {
           setIsAdmin(true);
           loadUsers();
+          loadAISettings();
         } else {
           toast.error("No tienes permisos de administrador");
           navigate("/dashboard");
@@ -64,7 +72,6 @@ export default function AdminPanel() {
       return;
     }
 
-    // Get roles for all users
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id, role");
@@ -81,11 +88,45 @@ export default function AdminPanel() {
     setLoadingUsers(false);
   };
 
+  const loadAISettings = async () => {
+    const { data } = await (supabase as any)
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "openai_api_key")
+      .single();
+
+    if (data?.value) {
+      setApiKey(data.value);
+      setKeyConfigured(true);
+    }
+  };
+
+  const saveApiKey = async () => {
+    if (!apiKey.trim()) {
+      toast.error("Ingresa una API Key válida");
+      return;
+    }
+    setSavingKey(true);
+
+    const { error } = await (supabase as any)
+      .from("platform_settings")
+      .upsert(
+        { key: "openai_api_key", value: apiKey.trim(), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      );
+
+    if (error) {
+      toast.error("Error al guardar la API Key");
+    } else {
+      toast.success("API Key de OpenAI guardada correctamente");
+      setKeyConfigured(true);
+    }
+    setSavingKey(false);
+  };
+
   const changeRole = async (userId: string, newRole: string) => {
-    // Delete existing role
     await supabase.from("user_roles").delete().eq("user_id", userId);
 
-    // Insert new role
     const { error } = await supabase
       .from("user_roles")
       .insert([{ user_id: userId, role: newRole as "admin" | "docente" | "estudiante" }]);
@@ -125,8 +166,8 @@ export default function AdminPanel() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-10">
-        <div className="flex items-center gap-3 mb-8">
+      <main className="max-w-4xl mx-auto px-4 py-10 space-y-8">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -136,6 +177,59 @@ export default function AdminPanel() {
           </div>
         </div>
 
+        {/* AI Configuration */}
+        <div className="glass-card rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Key className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold text-foreground">Configuración de IA</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Configura la API Key de OpenAI para habilitar la generación de recursos con IA
+            </p>
+          </div>
+          <div className="p-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key">API Key de OpenAI</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    id="api-key"
+                    type={showKey ? "text" : "password"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowKey(!showKey)}
+                  >
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <Button onClick={saveApiKey} disabled={savingKey}>
+                  <Save className="h-4 w-4 mr-1" />
+                  {savingKey ? "Guardando..." : "Guardar"}
+                </Button>
+              </div>
+              {keyConfigured && (
+                <p className="text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3" /> API Key configurada
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Obtén tu API Key en{" "}
+                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" className="text-primary underline">
+                  platform.openai.com/api-keys
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* User Management */}
         <div className="glass-card rounded-xl overflow-hidden">
           <div className="p-4 border-b border-border">
             <h2 className="font-semibold text-foreground">Gestión de Usuarios y Roles</h2>
