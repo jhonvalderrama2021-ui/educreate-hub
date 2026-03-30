@@ -1,4 +1,10 @@
-import { NavLink as RouterNavLink, NavLinkProps } from "react-router-dom";
+import {
+  NavLink as RouterNavLink,
+  NavLinkProps,
+  useLocation,
+  useMatch,
+  useResolvedPath,
+} from "react-router-dom";
 import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,12 +16,17 @@ interface NavLinkCompatProps extends Omit<NavLinkProps, "className"> {
 
 const NavLink = forwardRef<HTMLAnchorElement, NavLinkCompatProps>(
   ({ className, activeClassName, pendingClassName, to, ...props }, ref) => {
+    const location = useLocation();
+    const resolved = useResolvedPath(to);
+    const match = useMatch({ path: resolved.pathname, end: props.end ?? false });
+    const isActiveWithSearch = Boolean(match) && location.search === resolved.search;
+
     return (
       <RouterNavLink
         ref={ref}
         to={to}
-        className={({ isActive, isPending }) =>
-          cn(className, isActive && activeClassName, isPending && pendingClassName)
+        className={({ isPending }) =>
+          cn(className, isActiveWithSearch && activeClassName, isPending && pendingClassName)
         }
         {...props}
       />

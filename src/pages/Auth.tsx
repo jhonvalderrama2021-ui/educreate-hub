@@ -97,7 +97,7 @@ export default function Auth() {
       <header className="flex items-center justify-between px-6 py-4">
         <Link to="/" className="flex items-center gap-2 text-primary font-bold text-xl">
           <FileText className="h-6 w-6" />
-          EduCrea
+          NexProfe
         </Link>
         <ThemeToggle />
       </header>

@@ -46,7 +46,7 @@ export default function Index() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in" style={{ animationDelay: "0.3s" }}>
             <Link to={user ? "/dashboard" : "/auth?mode=signup"}>
               <Button size="lg" className="gradient-primary text-base px-8">
-                Comenzar gratis
+                Comenzar
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </Link>
@@ -76,7 +76,7 @@ export default function Index() {
       </section>
 
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
-        © {new Date().getFullYear()} EduCrea. Todos los derechos reservados.
+        © {new Date().getFullYear()} NexProfe. Todos los derechos reservados.
       </footer>
     </div>
   );

@@ -28,7 +28,7 @@ const RESOURCE_TYPES = [
 
 export default function GenerateResource() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
 
   const [resourceType, setResourceType] = useState(typeParam || "icfes");
@@ -66,6 +66,12 @@ export default function GenerateResource() {
         }
       });
   }, [user]);
+
+  // Keep resource type in sync with the URL (?type=...)
+  useEffect(() => {
+    setResourceType(typeParam || "icfes");
+    setGeneratedContent(null);
+  }, [typeParam]);
 
   // Detect Ollama models when selected
   useEffect(() => {
@@ -191,7 +197,12 @@ export default function GenerateResource() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Tipo de recurso</Label>
-            <Select value={resourceType} onValueChange={setResourceType}>
+            <Select
+              value={resourceType}
+              onValueChange={(value) => {
+                setSearchParams({ type: value }, { replace: true });
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

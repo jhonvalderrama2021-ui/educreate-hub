@@ -1,6 +1,5 @@
-import { BookOpen, ClipboardList, Table2, FileCheck, Sparkles, History, HelpCircle, FileEdit } from "lucide-react";
+import { BookOpen, ClipboardList, Table2, FileCheck, History, HelpCircle, FileEdit, ChevronLeft, ChevronRight } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -15,12 +14,6 @@ import {
 } from "@/components/ui/sidebar";
 
 const modules = [
-  {
-    title: "Generar con IA",
-    url: "/resources/generate",
-    icon: Sparkles,
-    description: "Genera recursos educativos con IA",
-  },
   {
     title: "Plan de clase",
     url: "/resources/generate?type=lesson_plan",
@@ -69,21 +62,43 @@ const managementModules = [
 ];
 
 export function ResourcesSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
-  const location = useLocation();
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
-        <NavLink to="/resources" className="flex items-center gap-2 text-sidebar-primary font-bold">
-          <BookOpen className="h-5 w-5 shrink-0" />
-          {!collapsed && <span className="text-sm">Recursos Educativos</span>}
-        </NavLink>
+    <Sidebar
+      collapsible="icon"
+      className={[
+        "[&_[data-sidebar=sidebar]]:bg-white",
+        "[&_[data-sidebar=sidebar]]:border-r",
+        "[&_[data-sidebar=sidebar]]:border-gray-200",
+        "[&_[data-sidebar=sidebar]]:overflow-hidden",
+      ].join(" ")}
+    >
+      <SidebarHeader className="px-4 py-4 bg-white">
+        <div className="flex items-center justify-between gap-2">
+          <NavLink to="/resources" className="flex items-center gap-2 text-purple-700 font-bold min-w-0">
+            <BookOpen className="h-5 w-5 shrink-0 text-purple-700" />
+            {!collapsed && <span className="text-sm truncate">Recursos Educativos</span>}
+          </NavLink>
+
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="h-8 w-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition-colors shrink-0"
+            aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
+            title={collapsed ? "Expandir" : "Contraer"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        </div>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Crear Recursos</SidebarGroupLabel>
+
+      <SidebarContent className="bg-white">
+        <SidebarGroup className="px-2 py-3">
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-gray-500">
+            Crear Recursos
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {modules.map((item) => (
@@ -91,8 +106,8 @@ export function ResourcesSidebar() {
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink
                       to={item.url}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                      activeClassName="bg-purple-50 text-purple-700"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -104,8 +119,10 @@ export function ResourcesSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Gestión</SidebarGroupLabel>
+        <SidebarGroup className="px-2 py-3">
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-gray-500">
+            Gestión
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {managementModules.map((item) => (
@@ -113,8 +130,8 @@ export function ResourcesSidebar() {
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink
                       to={item.url}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
+                      activeClassName="bg-purple-50 text-purple-700"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}

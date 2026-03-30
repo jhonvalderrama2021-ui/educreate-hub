@@ -1,11 +1,11 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-import { Lightbulb, Sparkles } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import GenerateResource from "@/pages/resources/GenerateResource";
 import ResourceHistory from "@/pages/resources/ResourceHistory";
@@ -24,12 +24,6 @@ function ResourcesHome() {
           Genera recursos educativos automáticamente con Inteligencia Artificial.
           Selecciona un módulo del menú lateral o comienza rápidamente:
         </p>
-        <NavLink to="/resources/generate">
-          <button className="gradient-primary text-primary-foreground px-6 py-3 rounded-lg font-medium flex items-center gap-2 mx-auto hover:opacity-90 transition-opacity">
-            <Sparkles className="h-5 w-5" />
-            Generar recurso con IA
-          </button>
-        </NavLink>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-lg mx-auto mt-8">
           {[
             { icon: "📋", label: "Exámenes ICFES", type: "icfes" },
@@ -72,19 +66,18 @@ export default function Resources() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="min-h-screen flex w-full bg-slate-50 overflow-x-hidden">
         <ResourcesSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 flex items-center justify-between border-b border-border px-4">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger />
-              <span className="text-sm font-medium text-muted-foreground hidden sm:inline">
-                Recursos Educativos
-              </span>
-            </div>
+          <header className="h-14 bg-white/90 backdrop-blur px-4">
+            <div className="h-full flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {/* Sidebar toggle moved into the sidebar header */}
+              </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <UserMenu />
+            </div>
             </div>
           </header>
 

@@ -184,7 +184,7 @@ export default function AdminPanel() {
         <div className="flex items-center justify-between px-6 py-3 max-w-6xl mx-auto">
           <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-xl">
             <FileText className="h-6 w-6" />
-            EduCrea
+            NexProfe
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
