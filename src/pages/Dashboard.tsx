@@ -1,15 +1,43 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
-import { BookOpen, Plus, FileText, Users, BarChart3, Shield, ArrowRight } from "lucide-react";
+import {
+  FileText, Plus, Users, BarChart3, Shield, ArrowRight, Sparkles,
+  BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, TrendingUp
+} from "lucide-react";
+
+const RECENT_TYPE_ICONS: Record<string, any> = {
+  icfes: FileCheck,
+  quiz: HelpCircle,
+  workshop: FileEdit,
+  guide: BookOpen,
+  lesson_plan: ClipboardList,
+  rubric: Table2,
+};
+
+const RECENT_TYPE_LABELS: Record<string, string> = {
+  icfes: "Examen ICFES",
+  quiz: "Cuestionario",
+  workshop: "Taller",
+  guide: "Guía",
+  lesson_plan: "Plan de clase",
+  rubric: "Rúbrica",
+};
+
 export default function Dashboard() {
   const { user, loading } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [totalResources, setTotalResources] = useState(0);
+  const [publicResources, setPublicResources] = useState(0);
+  const [recentResources, setRecentResources] = useState<any[]>([]);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) navigate("/auth");
@@ -17,14 +45,38 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .then(({ data }) => {
-        if (data && data.length > 0) setIsAdmin(true);
-      });
+
+    const fetchStats = async () => {
+      setStatsLoading(true);
+
+      // Total resources
+      const { count: total } = await supabase
+        .from("generated_resources")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      // Public resources
+      const { count: pub } = await supabase
+        .from("generated_resources")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_public", true);
+
+      // Recent resources (last 5)
+      const { data: recent } = await supabase
+        .from("generated_resources")
+        .select("id, title, resource_type, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      setTotalResources(total || 0);
+      setPublicResources(pub || 0);
+      setRecentResources(recent || []);
+      setStatsLoading(false);
+    };
+
+    fetchStats();
   }, [user]);
 
   if (loading) {
@@ -40,22 +92,22 @@ export default function Dashboard() {
   const displayName = user.user_metadata?.full_name || user.email;
 
   const stats = [
-    { label: "Recursos creados", value: "0", icon: FileText },
-    { label: "Compartidos", value: "0", icon: Users },
-    { label: "Vistas totales", value: "0", icon: BarChart3 },
+    { label: "Recursos creados", value: totalResources, icon: FileText, color: "from-primary to-primary/80" },
+    { label: "Compartidos", value: publicResources, icon: Users, color: "from-emerald-500 to-emerald-600" },
+    { label: "Privados", value: totalResources - publicResources, icon: BarChart3, color: "from-amber-500 to-amber-600" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
-        <div className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="flex items-center justify-between px-6 py-3 max-w-6xl mx-auto">
           <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-xl">
             <FileText className="h-6 w-6" />
             EduCrea
           </Link>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")}>
+              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")} className="text-primary">
                 <Shield className="h-4 w-4 mr-1" />
                 Admin
               </Button>
@@ -66,49 +118,136 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-10">
-        <div className="mb-10 animate-fade-in">
+      <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {/* Welcome */}
+        <div className="animate-fade-in">
           <h1 className="text-3xl font-bold text-foreground">
-            ¡Hola, {displayName}!
+            ¡Hola, {displayName}! 👋
           </h1>
           <p className="text-muted-foreground mt-1">
-            Bienvenido a tu espacio de creación educativa.
+            Aquí tienes un resumen de tu actividad educativa.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
-          {stats.map((s) => (
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {stats.map((s, i) => (
             <div
               key={s.label}
-              className="glass-card rounded-xl p-6 flex items-center gap-4 animate-fade-in"
+              className="relative overflow-hidden rounded-xl border border-border bg-card p-6 shadow-sm hover:shadow-md transition-shadow animate-fade-in"
+              style={{ animationDelay: `${0.05 * i}s` }}
             >
-              <div className="h-12 w-12 rounded-lg gradient-primary flex items-center justify-center">
-                <s.icon className="h-6 w-6 text-primary-foreground" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{s.label}</p>
+                  <p className="text-3xl font-bold text-foreground mt-1">
+                    {statsLoading ? (
+                      <span className="inline-block h-8 w-12 bg-muted animate-pulse rounded" />
+                    ) : (
+                      s.value
+                    )}
+                  </p>
+                </div>
+                <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center shadow-lg`}>
+                  <s.icon className="h-6 w-6 text-white" />
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{s.value}</p>
-                <p className="text-sm text-muted-foreground">{s.label}</p>
-              </div>
+              <div className="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-gradient-to-br from-primary/5 to-transparent" />
             </div>
           ))}
         </div>
 
-        <div className="glass-card rounded-xl p-10 text-center animate-fade-in">
-          <div className="mx-auto h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center mb-4">
-            <Plus className="h-8 w-8 text-primary-foreground" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Resources */}
+          <div className="lg:col-span-2 rounded-xl border border-border bg-card shadow-sm animate-fade-in" style={{ animationDelay: "0.15s" }}>
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                <h2 className="font-semibold text-foreground">Recursos recientes</h2>
+              </div>
+              <Link to="/resources/history">
+                <Button variant="ghost" size="sm" className="text-primary text-xs">
+                  Ver todos <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="divide-y divide-border">
+              {statsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-4 flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-muted animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-40 bg-muted animate-pulse rounded" />
+                      <div className="h-3 w-24 bg-muted animate-pulse rounded" />
+                    </div>
+                  </div>
+                ))
+              ) : recentResources.length === 0 ? (
+                <div className="p-10 text-center">
+                  <FileText className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">Aún no has creado recursos</p>
+                  <Link to="/resources/generate">
+                    <Button size="sm" className="mt-3 gradient-primary">
+                      <Sparkles className="h-3.5 w-3.5 mr-1" /> Crear primero
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                recentResources.map((r) => {
+                  const Icon = RECENT_TYPE_ICONS[r.resource_type] || FileText;
+                  return (
+                    <div key={r.id} className="p-4 flex items-center gap-3 hover:bg-muted/30 transition-colors">
+                      <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <Icon className="h-4.5 w-4.5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">{r.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {RECENT_TYPE_LABELS[r.resource_type] || r.resource_type} · {new Date(r.created_at).toLocaleDateString("es-CO")}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2">
-            Crea tu primer recurso
-          </h2>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Diseña presentaciones, cuestionarios, actividades y más para tus estudiantes.
-          </p>
-          <Link to="/resources">
-            <Button className="gradient-primary" size="lg">
-              <ArrowRight className="h-4 w-4 mr-1" />
-              Ir a Recursos
-            </Button>
-          </Link>
+
+          {/* Quick Actions */}
+          <div className="space-y-4 animate-fade-in" style={{ animationDelay: "0.2s" }}>
+            <div className="rounded-xl border border-border bg-card shadow-sm p-5">
+              <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Plus className="h-4 w-4 text-primary" />
+                Acciones rápidas
+              </h3>
+              <div className="space-y-2">
+                {[
+                  { label: "Generar con IA", icon: Sparkles, to: "/resources/generate" },
+                  { label: "Examen ICFES", icon: FileCheck, to: "/resources/generate?type=icfes" },
+                  { label: "Plan de clase", icon: ClipboardList, to: "/resources/generate?type=lesson_plan" },
+                  { label: "Rúbrica", icon: Table2, to: "/resources/generate?type=rubric" },
+                  { label: "Cuestionario", icon: HelpCircle, to: "/resources/generate?type=quiz" },
+                ].map((action) => (
+                  <Link key={action.label} to={action.to}>
+                    <Button variant="ghost" className="w-full justify-start h-10 text-sm font-normal hover:bg-primary/5 hover:text-primary">
+                      <action.icon className="h-4 w-4 mr-2.5 text-primary" />
+                      {action.label}
+                    </Button>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <Link to="/resources" className="block">
+              <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 text-center hover:shadow-md transition-shadow cursor-pointer">
+                <div className="h-12 w-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-3 shadow-lg">
+                  <ArrowRight className="h-6 w-6 text-primary-foreground" />
+                </div>
+                <p className="font-semibold text-foreground text-sm">Centro de Recursos</p>
+                <p className="text-xs text-muted-foreground mt-1">Explora todos los módulos disponibles</p>
+              </div>
+            </Link>
+          </div>
         </div>
       </main>
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BookOpen, Loader2 } from "lucide-react";
+import { FileText, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -95,20 +95,26 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="flex items-center justify-between px-6 py-4">
-        <a href="/" className="flex items-center gap-2 text-primary font-bold text-xl">
-          <BookOpen className="h-6 w-6" />
+        <Link to="/" className="flex items-center gap-2 text-primary font-bold text-xl">
+          <FileText className="h-6 w-6" />
           EduCrea
-        </a>
+        </Link>
         <ThemeToggle />
       </header>
 
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md animate-fade-in">
-          <div className="glass-card rounded-2xl p-8 shadow-lg">
-            <h1 className="text-2xl font-bold text-foreground text-center mb-2">
+          <div className="rounded-2xl border border-border bg-card p-8 shadow-xl">
+            {/* Back link */}
+            <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Volver al inicio
+            </Link>
+
+            <h1 className="text-2xl font-bold text-foreground mb-1">
               {isLogin ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
-            <p className="text-muted-foreground text-center mb-6 text-sm">
+            <p className="text-muted-foreground mb-6 text-sm">
               {isLogin
                 ? "Ingresa a tu cuenta para continuar"
                 : "Únete y comienza a crear recursos educativos"}
@@ -190,18 +196,14 @@ export default function Auth() {
                       onValueChange={(v) => setRole(v as "docente" | "estudiante")}
                       className="flex gap-4"
                     >
-                      <div className="flex items-center space-x-2">
+                      <label htmlFor="role-docente" className="flex items-center gap-2 rounded-lg border border-border p-3 flex-1 cursor-pointer hover:border-primary/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                         <RadioGroupItem value="docente" id="role-docente" />
-                        <Label htmlFor="role-docente" className="cursor-pointer font-normal">
-                          Docente
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-medium">Docente</span>
+                      </label>
+                      <label htmlFor="role-estudiante" className="flex items-center gap-2 rounded-lg border border-border p-3 flex-1 cursor-pointer hover:border-primary/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary/5">
                         <RadioGroupItem value="estudiante" id="role-estudiante" />
-                        <Label htmlFor="role-estudiante" className="cursor-pointer font-normal">
-                          Estudiante
-                        </Label>
-                      </div>
+                        <span className="text-sm font-medium">Estudiante</span>
+                      </label>
                     </RadioGroup>
                   </div>
 
@@ -211,7 +213,7 @@ export default function Auth() {
                       checked={dataConsent}
                       onCheckedChange={(checked) => setDataConsent(checked === true)}
                     />
-                    <Label htmlFor="dataConsent" className="text-sm font-normal leading-snug cursor-pointer">
+                    <Label htmlFor="dataConsent" className="text-sm font-normal leading-snug cursor-pointer text-muted-foreground">
                       Autorizo el manejo de mis datos personales de acuerdo con la política de privacidad.
                     </Label>
                   </div>
@@ -219,7 +221,7 @@ export default function Auth() {
               )}
 
               <Button type="submit" className="w-full gradient-primary" size="lg" disabled={loading}>
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                 {isLogin ? "Iniciar sesión" : "Crear cuenta"}
               </Button>
             </form>

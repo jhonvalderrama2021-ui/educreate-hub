@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate } from "react-router-dom";
-import { LogOut, ChevronDown, Home, LayoutDashboard, BookOpen } from "lucide-react";
+import { LogOut, ChevronDown, Home, LayoutDashboard, BookOpen, Shield, Settings } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -67,6 +69,15 @@ export function UserMenu() {
           <BookOpen className="h-4 w-4 mr-2" />
           Recursos
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/admin")} className="cursor-pointer">
+              <Shield className="h-4 w-4 mr-2" />
+              Panel de Administración
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}
