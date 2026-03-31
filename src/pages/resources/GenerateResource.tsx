@@ -430,11 +430,7 @@ export default function GenerateResource() {
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              !pdfFile && validationErrors.includes("Debes cargar un archivo PDF")
-                ? "border-destructive/50 bg-destructive/5"
-                : "border-border hover:border-primary/50"
-            }`}
+            className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer border-border hover:border-primary/50"
             onClick={() => document.getElementById("pdf-input")?.click()}
           >
             <input
