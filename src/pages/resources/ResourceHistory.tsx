@@ -11,6 +11,7 @@ import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2,
 } from "lucide-react";
+import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
