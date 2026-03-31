@@ -11,6 +11,7 @@ import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2,
 } from "lucide-react";
+import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -165,9 +166,9 @@ export default function ResourceHistory() {
                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
                       </Button>
                     </div>
-                    <pre className="text-xs bg-muted/30 p-3 rounded-lg overflow-auto max-h-60">
-                      {JSON.stringify(r.content, null, 2)}
-                    </pre>
+                    <div className="bg-muted/10 p-4 rounded-lg overflow-auto max-h-[500px]">
+                      <ResourceContentViewer type={r.resource_type} content={r.content} />
+                    </div>
                   </div>
                 )}
               </div>
