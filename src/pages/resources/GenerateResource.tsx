@@ -144,7 +144,7 @@ export default function GenerateResource() {
     if (!tema.trim()) errors.push("El tema es obligatorio");
     if (!subject) errors.push("La asignatura es obligatoria");
     if (subject === "Otras" && !customSubject.trim()) errors.push("Escribe la asignatura personalizada");
-    if (!pdfFile) errors.push("Debes cargar un archivo PDF");
+    
     if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
       errors.push("Escribe la metodología personalizada");
     }
@@ -268,31 +268,6 @@ export default function GenerateResource() {
           <p className="text-sm text-muted-foreground">
             Completa el formulario y genera con IA
           </p>
-        </div>
-      </div>
-
-      {/* Resource Type Selector */}
-      <div className="glass-card rounded-xl p-4">
-        <Label className="text-sm font-semibold mb-3 block">Tipo de recurso</Label>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {RESOURCE_TYPES.map((t) => {
-            const Icon = t.icon;
-            const isActive = resourceType === t.value;
-            return (
-              <button
-                key={t.value}
-                onClick={() => setSearchParams({ type: t.value }, { replace: true })}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs font-medium transition-all ${
-                  isActive
-                    ? "border-primary bg-primary/10 text-primary shadow-sm"
-                    : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-center leading-tight">{t.label}</span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
@@ -451,17 +426,11 @@ export default function GenerateResource() {
 
         {/* PDF Upload - required */}
         <div className="space-y-2">
-          <Label>
-            Archivo PDF fuente <span className="text-destructive">*</span>
-          </Label>
+          <Label>Archivo PDF fuente (opcional)</Label>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              !pdfFile && validationErrors.includes("Debes cargar un archivo PDF")
-                ? "border-destructive/50 bg-destructive/5"
-                : "border-border hover:border-primary/50"
-            }`}
+            className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer border-border hover:border-primary/50"
             onClick={() => document.getElementById("pdf-input")?.click()}
           >
             <input
