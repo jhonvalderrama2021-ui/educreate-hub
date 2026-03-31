@@ -596,12 +596,6 @@ export default function GenerateResource() {
 }
 
 // ResourceContentViewer moved to @/components/ResourceContentViewer
-  switch (type) {
-    case "icfes":
-    case "quiz":
-      return (
-        <div className="space-y-6">
-          {content.questions?.map((q: any) => (
             <div key={q.number} className="p-4 border border-border rounded-lg bg-muted/20">
               <p className="font-semibold text-foreground mb-2">
                 {q.number}. {q.question}
