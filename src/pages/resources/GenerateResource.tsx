@@ -426,9 +426,7 @@ export default function GenerateResource() {
 
         {/* PDF Upload - required */}
         <div className="space-y-2">
-          <Label>
-            Archivo PDF fuente <span className="text-destructive">*</span>
-          </Label>
+          <Label>Archivo PDF fuente (opcional)</Label>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
