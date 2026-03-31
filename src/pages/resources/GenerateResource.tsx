@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
   BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, Server, Cloud,
+  GraduationCap, BookMarked, Beaker, AlertCircle,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
@@ -26,12 +27,47 @@ const RESOURCE_TYPES = [
   { value: "rubric", label: "Rúbrica", icon: Table2 },
 ];
 
+const SUBJECTS = [
+  "Matemáticas",
+  "Ciencias Naturales",
+  "Biología",
+  "Lenguaje",
+  "Ciencias Sociales",
+];
+
+const METHODOLOGIES = [
+  "Aprendizaje Basado en Proyectos (ABP)",
+  "Aprendizaje colaborativo",
+  "Aprendizaje basado en problemas",
+  "Clase magistral",
+];
+
+// Which fields each resource type uses (all get tema, asignatura, nivel, pdf)
+const RESOURCE_FIELDS: Record<string, string[]> = {
+  icfes: ["numItems"],
+  quiz: ["numItems"],
+  workshop: ["methodology", "duration"],
+  guide: ["methodology"],
+  lesson_plan: ["methodology", "duration"],
+  rubric: ["methodology"],
+};
+
 export default function GenerateResource() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
 
   const [resourceType, setResourceType] = useState(typeParam || "icfes");
+
+  // Common fields
+  const [tema, setTema] = useState("");
+  const [subject, setSubject] = useState("");
+  const [customSubject, setCustomSubject] = useState("");
+  const [grade, setGrade] = useState("6");
+  const [methodology, setMethodology] = useState("");
+  const [customMethodology, setCustomMethodology] = useState("");
+  const [duration, setDuration] = useState("");
+
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [numItems, setNumItems] = useState(10);
@@ -50,6 +86,9 @@ export default function GenerateResource() {
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
   // Load user preferences
   useEffect(() => {
@@ -67,13 +106,11 @@ export default function GenerateResource() {
       });
   }, [user]);
 
-  // Keep resource type in sync with the URL (?type=...)
   useEffect(() => {
     setResourceType(typeParam || "icfes");
     setGeneratedContent(null);
   }, [typeParam]);
 
-  // Detect Ollama models when selected
   useEffect(() => {
     if (aiProvider === "ollama") {
       fetchOllamaModels(ollamaUrl).then(setOllamaModels);
@@ -102,8 +139,43 @@ export default function GenerateResource() {
     else toast.error("Solo se permiten archivos PDF");
   }, [handlePdfUpload]);
 
+  const validate = (): boolean => {
+    const errors: string[] = [];
+    if (!tema.trim()) errors.push("El tema es obligatorio");
+    if (!subject) errors.push("La asignatura es obligatoria");
+    if (subject === "Otras" && !customSubject.trim()) errors.push("Escribe la asignatura personalizada");
+    if (!pdfFile) errors.push("Debes cargar un archivo PDF");
+    if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
+      errors.push("Escribe la metodología personalizada");
+    }
+    setValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const buildInstructions = (): string => {
+    const resolvedSubject = subject === "Otras" ? customSubject : subject;
+    const resolvedMethodology = methodology === "Otras" ? customMethodology : methodology;
+
+    const parts: string[] = [];
+    parts.push(`Tema: ${tema}`);
+    parts.push(`Asignatura: ${resolvedSubject}`);
+    parts.push(`Grado: ${grade}`);
+    if (extraFields.includes("methodology") && resolvedMethodology) {
+      parts.push(`Metodología: ${resolvedMethodology}`);
+    }
+    if (extraFields.includes("duration") && duration) {
+      parts.push(`Duración: ${duration}`);
+    }
+    if (instructions.trim()) {
+      parts.push(`Instrucciones adicionales: ${instructions}`);
+    }
+    return parts.join("\n");
+  };
+
   const handleGenerate = async () => {
     if (!user) return;
+    if (!validate()) return;
+
     setGenerating(true);
     setGeneratedContent(null);
 
@@ -111,7 +183,7 @@ export default function GenerateResource() {
       const params = {
         resourceType,
         pdfContent: pdfText || undefined,
-        instructions: instructions || undefined,
+        instructions: buildInstructions(),
         numItems,
       };
 
@@ -179,52 +251,180 @@ export default function GenerateResource() {
     if (user) savePreferences();
   }, [aiProvider, ollamaUrl, ollamaModel]);
 
+  const currentType = RESOURCE_TYPES.find((t) => t.value === resourceType);
+  const TypeIcon = currentType?.icon || Sparkles;
+
   return (
     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
-          <Sparkles className="h-5 w-5 text-primary-foreground" />
+          <TypeIcon className="h-5 w-5 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Generar Recurso con IA</h1>
-          <p className="text-sm text-muted-foreground">Crea recursos educativos automáticamente</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {currentType?.label || "Generar Recurso"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Completa el formulario y genera con IA
+          </p>
         </div>
       </div>
 
-      {/* Config Card */}
+      {/* Resource Type Selector */}
+      <div className="glass-card rounded-xl p-4">
+        <Label className="text-sm font-semibold mb-3 block">Tipo de recurso</Label>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {RESOURCE_TYPES.map((t) => {
+            const Icon = t.icon;
+            const isActive = resourceType === t.value;
+            return (
+              <button
+                key={t.value}
+                onClick={() => setSearchParams({ type: t.value }, { replace: true })}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs font-medium transition-all ${
+                  isActive
+                    ? "border-primary bg-primary/10 text-primary shadow-sm"
+                    : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="text-center leading-tight">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main Form */}
       <div className="glass-card rounded-xl p-6 space-y-5">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <BookMarked className="h-5 w-5 text-primary" />
+          Información del recurso
+        </h2>
+
+        {/* Validation errors */}
+        {validationErrors.length > 0 && (
+          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
+            {validationErrors.map((err, i) => (
+              <p key={i} className="text-sm text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" /> {err}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Row 1: Tema + Título */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Tipo de recurso</Label>
-            <Select
-              value={resourceType}
-              onValueChange={(value) => {
-                setSearchParams({ type: value }, { replace: true });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RESOURCE_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>
+              Tema <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              value={tema}
+              onChange={(e) => setTema(e.target.value)}
+              placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..."
+            />
           </div>
-
           <div className="space-y-2">
             <Label>Título (opcional)</Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Se generará automáticamente si lo dejas vacío"
+              placeholder="Se generará automáticamente"
             />
           </div>
         </div>
 
-        {(resourceType === "icfes" || resourceType === "quiz") && (
+        {/* Row 2: Asignatura + Nivel */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>
+              Asignatura <span className="text-destructive">*</span>
+            </Label>
+            <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una asignatura" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUBJECTS.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+                <SelectItem value="Otras">Otras</SelectItem>
+              </SelectContent>
+            </Select>
+            {subject === "Otras" && (
+              <Input
+                value={customSubject}
+                onChange={(e) => setCustomSubject(e.target.value)}
+                placeholder="Escribe la asignatura"
+                className="mt-2"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              Nivel educativo <span className="text-destructive">*</span>
+            </Label>
+            <div className="flex items-center gap-3">
+              <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
+              <Select value={grade} onValueChange={setGrade}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
+                    <SelectItem key={g} value={String(g)}>
+                      Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
+        {/* Conditional: Methodology */}
+        {extraFields.includes("methodology") && (
+          <div className="space-y-2">
+            <Label>Metodología</Label>
+            <Select value={methodology} onValueChange={(v) => { setMethodology(v); if (v !== "Otras") setCustomMethodology(""); }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona una metodología" />
+              </SelectTrigger>
+              <SelectContent>
+                {METHODOLOGIES.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+                <SelectItem value="Otras">Otras</SelectItem>
+              </SelectContent>
+            </Select>
+            {methodology === "Otras" && (
+              <Input
+                value={customMethodology}
+                onChange={(e) => setCustomMethodology(e.target.value)}
+                placeholder="Escribe la metodología"
+                className="mt-2"
+              />
+            )}
+          </div>
+        )}
+
+        {/* Conditional: Duration */}
+        {extraFields.includes("duration") && (
+          <div className="space-y-2">
+            <Label>Duración</Label>
+            <Input
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="Ej: 2 horas, 45 minutos"
+            />
+          </div>
+        )}
+
+        {/* Conditional: Number of items */}
+        {extraFields.includes("numItems") && (
           <div className="space-y-2">
             <Label>Número de preguntas</Label>
             <Input
@@ -238,23 +438,30 @@ export default function GenerateResource() {
           </div>
         )}
 
+        {/* Additional instructions */}
         <div className="space-y-2">
           <Label>Instrucciones adicionales (opcional)</Label>
           <Textarea
             value={instructions}
             onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Ej: Enfócate en el tema de fotosíntesis, nivel grado 10, incluye preguntas de análisis..."
+            placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..."
             rows={3}
           />
         </div>
 
-        {/* PDF Upload */}
+        {/* PDF Upload - required */}
         <div className="space-y-2">
-          <Label>Archivo PDF fuente (opcional)</Label>
+          <Label>
+            Archivo PDF fuente <span className="text-destructive">*</span>
+          </Label>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer"
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+              !pdfFile && validationErrors.includes("Debes cargar un archivo PDF")
+                ? "border-destructive/50 bg-destructive/5"
+                : "border-border hover:border-primary/50"
+            }`}
             onClick={() => document.getElementById("pdf-input")?.click()}
           >
             <input
@@ -294,7 +501,10 @@ export default function GenerateResource() {
 
         {/* AI Engine */}
         <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
-          <Label className="text-sm font-semibold">Motor de IA</Label>
+          <Label className="text-sm font-semibold flex items-center gap-2">
+            <Beaker className="h-4 w-4 text-primary" />
+            Motor de IA
+          </Label>
           <div className="flex gap-3">
             <Button
               variant={aiProvider === "openai" ? "default" : "outline"}
