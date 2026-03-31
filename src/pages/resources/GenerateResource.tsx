@@ -595,7 +595,7 @@ export default function GenerateResource() {
   );
 }
 
-function ResourceContentViewer({ type, content }: { type: string; content: any }) {
+// ResourceContentViewer moved to @/components/ResourceContentViewer
   switch (type) {
     case "icfes":
     case "quiz":
