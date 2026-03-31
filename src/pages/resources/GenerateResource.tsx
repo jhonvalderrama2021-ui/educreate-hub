@@ -144,7 +144,7 @@ export default function GenerateResource() {
     if (!tema.trim()) errors.push("El tema es obligatorio");
     if (!subject) errors.push("La asignatura es obligatoria");
     if (subject === "Otras" && !customSubject.trim()) errors.push("Escribe la asignatura personalizada");
-    if (!pdfFile) errors.push("Debes cargar un archivo PDF");
+    
     if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
       errors.push("Escribe la metodología personalizada");
     }
