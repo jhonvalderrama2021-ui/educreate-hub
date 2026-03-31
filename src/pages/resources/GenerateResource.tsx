@@ -271,31 +271,6 @@ export default function GenerateResource() {
         </div>
       </div>
 
-      {/* Resource Type Selector */}
-      <div className="glass-card rounded-xl p-4">
-        <Label className="text-sm font-semibold mb-3 block">Tipo de recurso</Label>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {RESOURCE_TYPES.map((t) => {
-            const Icon = t.icon;
-            const isActive = resourceType === t.value;
-            return (
-              <button
-                key={t.value}
-                onClick={() => setSearchParams({ type: t.value }, { replace: true })}
-                className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs font-medium transition-all ${
-                  isActive
-                    ? "border-primary bg-primary/10 text-primary shadow-sm"
-                    : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-center leading-tight">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Main Form */}
       <div className="glass-card rounded-xl p-6 space-y-5">
         <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
