@@ -21,7 +21,6 @@ import {
 
 const RESOURCE_TYPES = [
   { value: "icfes", label: "Examen tipo ICFES", icon: FileCheck },
-  { value: "quiz", label: "Cuestionario", icon: HelpCircle },
   { value: "workshop", label: "Taller", icon: FileEdit },
   { value: "guide", label: "Guía educativa", icon: BookOpen },
   { value: "lesson_plan", label: "Plan de clase", icon: ClipboardList },
@@ -46,7 +45,6 @@ const METHODOLOGIES = [
 // Which fields each resource type uses (all get tema, asignatura, nivel, pdf)
 const RESOURCE_FIELDS: Record<string, string[]> = {
   icfes: ["numItems"],
-  quiz: ["numItems"],
   workshop: ["methodology", "duration"],
   guide: ["methodology"],
   lesson_plan: ["methodology", "duration"],
