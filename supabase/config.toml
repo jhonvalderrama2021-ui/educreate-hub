@@ -1,1 +1,4 @@
 project_id = "ogxwjeftskdudevxfmdq"
+
+[functions.chat-bot]
+verify_jwt = false
