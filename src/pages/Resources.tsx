@@ -9,6 +9,8 @@ import { Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import GenerateResource from "@/pages/resources/GenerateResource";
 import ResourceHistory from "@/pages/resources/ResourceHistory";
+import BotList from "@/pages/resources/BotList";
+import BotChat from "@/pages/resources/BotChat";
 
 function ResourcesHome() {
   return (
@@ -27,13 +29,16 @@ function ResourcesHome() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-lg mx-auto mt-8">
           {[
             { icon: "📋", label: "Exámenes ICFES", type: "icfes" },
-            { icon: "❓", label: "Cuestionarios", type: "quiz" },
             { icon: "🔧", label: "Talleres", type: "workshop" },
             { icon: "📖", label: "Guías", type: "guide" },
             { icon: "📝", label: "Planes de clase", type: "lesson_plan" },
             { icon: "📊", label: "Rúbricas", type: "rubric" },
+            { icon: "🤖", label: "Crear Bot", type: "bot" },
           ].map((item) => (
-            <NavLink key={item.label} to={`/resources/generate?type=${item.type}`}>
+            <NavLink
+              key={item.label}
+              to={item.type === "bot" ? "/resources/bots" : `/resources/generate?type=${item.type}`}
+            >
               <div className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer">
                 <span className="text-2xl block mb-2">{item.icon}</span>
                 <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
@@ -66,18 +71,16 @@ export default function Resources() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-slate-50 overflow-x-hidden">
+      <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
         <ResourcesSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 bg-white/90 backdrop-blur px-4">
+          <header className="h-14 bg-card/90 backdrop-blur border-b border-border px-4">
             <div className="h-full flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2" />
               <div className="flex items-center gap-2">
-                {/* Sidebar toggle moved into the sidebar header */}
+                <ThemeToggle />
+                <UserMenu />
               </div>
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-              <UserMenu />
-            </div>
             </div>
           </header>
 
@@ -86,6 +89,8 @@ export default function Resources() {
               <Route index element={<ResourcesHome />} />
               <Route path="generate" element={<GenerateResource />} />
               <Route path="history" element={<ResourceHistory />} />
+              <Route path="bots" element={<BotList />} />
+              <Route path="bot-chat/:botId" element={<BotChat />} />
             </Routes>
           </main>
         </div>

@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, Table2, FileCheck, History, HelpCircle, FileEdit, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar,
@@ -33,12 +33,6 @@ const modules = [
     description: "Genera exámenes tipo ICFES con IA",
   },
   {
-    title: "Cuestionarios",
-    url: "/resources/generate?type=quiz",
-    icon: HelpCircle,
-    description: "Genera cuestionarios con IA",
-  },
-  {
     title: "Talleres",
     url: "/resources/generate?type=workshop",
     icon: FileEdit,
@@ -49,6 +43,12 @@ const modules = [
     url: "/resources/generate?type=guide",
     icon: BookOpen,
     description: "Genera guías educativas con IA",
+  },
+  {
+    title: "Crear Bot",
+    url: "/resources/bots",
+    icon: Bot,
+    description: "Crea bots educativos especializados",
   },
 ];
 
@@ -69,23 +69,23 @@ export function ResourcesSidebar() {
     <Sidebar
       collapsible="icon"
       className={[
-        "[&_[data-sidebar=sidebar]]:bg-white",
+        "[&_[data-sidebar=sidebar]]:bg-sidebar-background",
         "[&_[data-sidebar=sidebar]]:border-r",
-        "[&_[data-sidebar=sidebar]]:border-gray-200",
+        "[&_[data-sidebar=sidebar]]:border-sidebar-border",
         "[&_[data-sidebar=sidebar]]:overflow-hidden",
       ].join(" ")}
     >
-      <SidebarHeader className="px-4 py-4 bg-white">
+      <SidebarHeader className="px-4 py-4 bg-sidebar-background">
         <div className="flex items-center justify-between gap-2">
-          <NavLink to="/resources" className="flex items-center gap-2 text-purple-700 font-bold min-w-0">
-            <BookOpen className="h-5 w-5 shrink-0 text-purple-700" />
+          <NavLink to="/resources" className="flex items-center gap-2 text-primary font-bold min-w-0">
+            <BookOpen className="h-5 w-5 shrink-0 text-primary" />
             {!collapsed && <span className="text-sm truncate">Recursos Educativos</span>}
           </NavLink>
 
           <button
             type="button"
             onClick={toggleSidebar}
-            className="h-8 w-8 rounded-md flex items-center justify-center text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition-colors shrink-0"
+            className="h-8 w-8 rounded-md flex items-center justify-center text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors shrink-0"
             aria-label={collapsed ? "Expandir menú" : "Contraer menú"}
             title={collapsed ? "Expandir" : "Contraer"}
           >
@@ -94,9 +94,9 @@ export function ResourcesSidebar() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="bg-white">
+      <SidebarContent className="bg-sidebar-background">
         <SidebarGroup className="px-2 py-3">
-          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-gray-500">
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-muted-foreground">
             Crear Recursos
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -106,8 +106,8 @@ export function ResourcesSidebar() {
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink
                       to={item.url}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                      activeClassName="bg-purple-50 text-purple-700"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
@@ -120,7 +120,7 @@ export function ResourcesSidebar() {
         </SidebarGroup>
 
         <SidebarGroup className="px-2 py-3">
-          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-gray-500">
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-muted-foreground">
             Gestión
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -130,8 +130,8 @@ export function ResourcesSidebar() {
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink
                       to={item.url}
-                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors"
-                      activeClassName="bg-purple-50 text-purple-700"
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
                     >
                       <item.icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span>{item.title}</span>}
