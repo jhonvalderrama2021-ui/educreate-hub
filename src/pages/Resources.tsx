@@ -19,26 +19,21 @@ function ResourcesHome() {
         <div className="mx-auto h-20 w-20 rounded-2xl gradient-primary flex items-center justify-center mb-6">
           <Lightbulb className="h-10 w-10 text-primary-foreground" />
         </div>
-        <h1 className="text-3xl font-bold text-foreground mb-3">
-          Centro de Recursos con IA
-        </h1>
+        <h1 className="text-3xl font-bold text-foreground mb-3">Centro de Recursos con IA</h1>
         <p className="text-muted-foreground max-w-md mx-auto mb-8">
           Genera recursos educativos automáticamente con Inteligencia Artificial.
           Selecciona un módulo del menú lateral o comienza rápidamente:
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-lg mx-auto mt-8">
           {[
-            { icon: "📋", label: "Exámenes ICFES", type: "icfes" },
+            { icon: "📋", label: "Exámenes", type: "icfes" },
             { icon: "🔧", label: "Talleres", type: "workshop" },
             { icon: "📖", label: "Guías", type: "guide" },
             { icon: "📝", label: "Planes de clase", type: "lesson_plan" },
             { icon: "📊", label: "Rúbricas", type: "rubric" },
             { icon: "🤖", label: "Crear Bot", type: "bot" },
           ].map((item) => (
-            <NavLink
-              key={item.label}
-              to={item.type === "bot" ? "/resources/bots" : `/resources/generate?type=${item.type}`}
-            >
+            <NavLink key={item.label} to={item.type === "bot" ? "/resources/bots" : `/resources/generate?type=${item.type}`}>
               <div className="glass-card rounded-xl p-4 text-center hover:border-primary/30 transition-colors cursor-pointer">
                 <span className="text-2xl block mb-2">{item.icon}</span>
                 <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
@@ -83,7 +78,6 @@ export default function Resources() {
               </div>
             </div>
           </header>
-
           <main className="flex-1 p-6 md:p-10 overflow-auto">
             <Routes>
               <Route index element={<ResourcesHome />} />
