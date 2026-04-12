@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Bot, ArrowLeft, Send, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   id: string;
@@ -75,7 +76,6 @@ export default function BotChat() {
     setInput("");
     setSending(true);
 
-    // Optimistic UI
     const tempUserMsg: Message = {
       id: `temp-${Date.now()}`,
       role: "user",
@@ -101,7 +101,6 @@ export default function BotChat() {
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
       toast.error(e.message || "Error al enviar mensaje");
-      // Remove optimistic message on error
       setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
     } finally {
       setSending(false);
@@ -145,13 +144,19 @@ export default function BotChat() {
               className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
+                className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
                   msg.role === "user"
                     ? "bg-primary text-primary-foreground rounded-br-md"
                     : "bg-muted text-foreground rounded-bl-md"
                 }`}
               >
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none [&>p]:mb-2 [&>p:last-child]:mb-0 [&>h1]:text-base [&>h2]:text-sm [&>h3]:text-sm [&>ul]:my-1 [&>ol]:my-1 [&>li]:my-0.5">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : (
+                  msg.content
+                )}
               </div>
             </div>
           ))

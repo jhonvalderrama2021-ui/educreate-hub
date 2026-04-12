@@ -15,12 +15,12 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
-  BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, Server, Cloud,
-  GraduationCap, BookMarked, Beaker, AlertCircle,
+  BookOpen, ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
+  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
-  { value: "icfes", label: "Examen tipo ICFES", icon: FileCheck },
+  { value: "icfes", label: "Exámenes", icon: FileCheck },
   { value: "workshop", label: "Taller", icon: FileEdit },
   { value: "guide", label: "Guía educativa", icon: BookOpen },
   { value: "lesson_plan", label: "Plan de clase", icon: ClipboardList },
@@ -37,18 +37,37 @@ const SUBJECTS = [
 
 const METHODOLOGIES = [
   "Aprendizaje Basado en Proyectos (ABP)",
+  "Aprendizaje Basado en Problemas",
+  "Aula Invertida (Flipped Classroom)",
+  "Aprendizaje Cooperativo",
+  "Gamificación",
+  "Design Thinking aplicado a la educación",
+  "Método Socrático",
+  "Aprendizaje Experiencial (Kolb)",
+  "Aprendizaje Basado en Competencias",
+  "Método Montessori (adaptado)",
+  "Aprendizaje Servicio",
+  "Enseñanza Explícita",
+  "Pensamiento Visible (Visible Thinking)",
+  "Aprendizaje Multimodal",
+  "STEM / STEAM",
+  "Aprendizaje Personalizado",
   "Aprendizaje colaborativo",
-  "Aprendizaje basado en problemas",
   "Clase magistral",
 ];
 
-// Which fields each resource type uses (all get tema, asignatura, nivel, pdf)
+const EXAM_TYPES = [
+  { value: "icfes", label: "Tipo ICFES", desc: "Selección múltiple con única respuesta" },
+  { value: "true_false", label: "Falso y Verdadero", desc: "Preguntas con opción V/F" },
+  { value: "mixed", label: "Mixto", desc: "Combina ICFES y Falso/Verdadero" },
+];
+
 const RESOURCE_FIELDS: Record<string, string[]> = {
-  icfes: ["numItems"],
+  icfes: ["numItems", "examType"],
   workshop: ["methodology", "duration"],
   guide: ["methodology"],
   lesson_plan: ["methodology", "duration"],
-  rubric: ["methodology"],
+  rubric: ["methodology", "rubricObjective"],
 };
 
 export default function GenerateResource() {
@@ -70,9 +89,11 @@ export default function GenerateResource() {
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
   const [numItems, setNumItems] = useState(10);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfText, setPdfText] = useState("");
-  const [extractingPdf, setExtractingPdf] = useState(false);
+  const [examType, setExamType] = useState("icfes");
+  const [rubricObjective, setRubricObjective] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [fileText, setFileText] = useState("");
+  const [extractingFile, setExtractingFile] = useState(false);
 
   // AI engine
   const [aiProvider, setAiProvider] = useState<"openai" | "ollama">("openai");
@@ -83,13 +104,14 @@ export default function GenerateResource() {
   // Generation state
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editableContent, setEditableContent] = useState<any>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
-  // Load user preferences
   useEffect(() => {
     if (!user) return;
     (supabase as any).from("user_ai_preferences")
@@ -108,6 +130,8 @@ export default function GenerateResource() {
   useEffect(() => {
     setResourceType(typeParam || "icfes");
     setGeneratedContent(null);
+    setEditableContent(null);
+    setIsEditing(false);
   }, [typeParam]);
 
   useEffect(() => {
@@ -116,34 +140,62 @@ export default function GenerateResource() {
     }
   }, [aiProvider, ollamaUrl]);
 
-  const handlePdfUpload = useCallback(async (file: File) => {
-    setPdfFile(file);
-    setExtractingPdf(true);
+  const extractTextFromFile = async (file: File): Promise<string> => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext === "pdf") {
+      return await extractTextFromPDF(file);
+    } else if (ext === "txt") {
+      return await file.text();
+    } else if (ext === "docx" || ext === "doc") {
+      // For docx, read as text (basic extraction)
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      // Try to extract text from docx XML
+      try {
+        const text = await file.text();
+        // If it's readable text, return it
+        if (text && !text.includes('\0')) return text;
+      } catch {}
+      // Fallback: notify user
+      toast.info("Para archivos Word, se recomienda usar formato .txt o .pdf para mejores resultados");
+      return await file.text();
+    }
+    return await file.text();
+  };
+
+  const handleFileUpload = useCallback(async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const allowed = ["pdf", "txt", "docx", "doc"];
+    if (!allowed.includes(ext || "")) {
+      toast.error("Solo se permiten archivos PDF, Word (.docx) o texto (.txt)");
+      return;
+    }
+
+    setUploadedFile(file);
+    setExtractingFile(true);
     try {
-      const text = await extractTextFromPDF(file);
-      setPdfText(text);
-      toast.success(`PDF procesado: ${text.length} caracteres extraídos`);
+      const text = await extractTextFromFile(file);
+      setFileText(text);
+      toast.success(`Archivo procesado: ${text.length} caracteres extraídos`);
     } catch (e: any) {
-      toast.error("Error al procesar el PDF: " + e.message);
-      setPdfText("");
+      toast.error("Error al procesar el archivo: " + e.message);
+      setFileText("");
     } finally {
-      setExtractingPdf(false);
+      setExtractingFile(false);
     }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file?.type === "application/pdf") handlePdfUpload(file);
-    else toast.error("Solo se permiten archivos PDF");
-  }, [handlePdfUpload]);
+    if (file) handleFileUpload(file);
+  }, [handleFileUpload]);
 
   const validate = (): boolean => {
     const errors: string[] = [];
     if (!tema.trim()) errors.push("El tema es obligatorio");
     if (!subject) errors.push("La asignatura es obligatoria");
     if (subject === "Otras" && !customSubject.trim()) errors.push("Escribe la asignatura personalizada");
-    
     if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
       errors.push("Escribe la metodología personalizada");
     }
@@ -165,10 +217,24 @@ export default function GenerateResource() {
     if (extraFields.includes("duration") && duration) {
       parts.push(`Duración: ${duration}`);
     }
+    if (resourceType === "icfes" && examType) {
+      const examLabel = EXAM_TYPES.find(t => t.value === examType)?.label || examType;
+      parts.push(`Tipo de examen: ${examLabel}`);
+    }
+    if (resourceType === "rubric" && rubricObjective) {
+      parts.push(`Objetivo/Competencia a evaluar: ${rubricObjective}`);
+    }
     if (instructions.trim()) {
       parts.push(`Instrucciones adicionales: ${instructions}`);
     }
     return parts.join("\n");
+  };
+
+  const getEffectiveResourceType = (): string => {
+    if (resourceType === "icfes") {
+      return examType === "true_false" ? "true_false" : examType === "mixed" ? "mixed" : "icfes";
+    }
+    return resourceType;
   };
 
   const handleGenerate = async () => {
@@ -177,11 +243,14 @@ export default function GenerateResource() {
 
     setGenerating(true);
     setGeneratedContent(null);
+    setEditableContent(null);
+    setIsEditing(false);
 
     try {
+      const effectiveType = getEffectiveResourceType();
       const params = {
-        resourceType,
-        pdfContent: pdfText || undefined,
+        resourceType: effectiveType,
+        pdfContent: fileText || undefined,
         instructions: buildInstructions(),
         numItems,
       };
@@ -195,6 +264,7 @@ export default function GenerateResource() {
 
       if (!title && result.title) setTitle(result.title);
       setGeneratedContent(result);
+      setEditableContent(JSON.parse(JSON.stringify(result)));
       toast.success("¡Recurso generado exitosamente!");
     } catch (e: any) {
       toast.error(e.message || "Error al generar el recurso");
@@ -207,21 +277,23 @@ export default function GenerateResource() {
     if (!user || !generatedContent) return;
     setSaving(true);
 
+    const contentToSave = isEditing ? editableContent : generatedContent;
+
     try {
       let sourcePdfUrl = null;
-      if (pdfFile) {
-        const filePath = `${user.id}/${Date.now()}_${pdfFile.name}`;
+      if (uploadedFile) {
+        const filePath = `${user.id}/${Date.now()}_${uploadedFile.name}`;
         const { error: uploadError } = await supabase.storage
           .from("resource-pdfs")
-          .upload(filePath, pdfFile);
+          .upload(filePath, uploadedFile);
         if (!uploadError) sourcePdfUrl = filePath;
       }
 
       const { error } = await (supabase as any).from("generated_resources").insert({
         user_id: user.id,
-        title: title || generatedContent.title || "Recurso sin título",
+        title: title || contentToSave.title || "Recurso sin título",
         resource_type: resourceType,
-        content: generatedContent,
+        content: contentToSave,
         source_pdf_url: sourcePdfUrl,
         is_public: isPublic,
       });
@@ -235,7 +307,6 @@ export default function GenerateResource() {
     }
   };
 
-  // Save AI preferences
   const savePreferences = async () => {
     if (!user) return;
     await (supabase as any).from("user_ai_preferences").upsert({
@@ -252,6 +323,8 @@ export default function GenerateResource() {
 
   const currentType = RESOURCE_TYPES.find((t) => t.value === resourceType);
   const TypeIcon = currentType?.icon || Sparkles;
+
+  const displayContent = isEditing ? editableContent : generatedContent;
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
@@ -277,7 +350,6 @@ export default function GenerateResource() {
           Información del recurso
         </h2>
 
-        {/* Validation errors */}
         {validationErrors.length > 0 && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
             {validationErrors.map((err, i) => (
@@ -291,67 +363,39 @@ export default function GenerateResource() {
         {/* Row 1: Tema + Título */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>
-              Tema <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              value={tema}
-              onChange={(e) => setTema(e.target.value)}
-              placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..."
-            />
+            <Label>Tema <span className="text-destructive">*</span></Label>
+            <Input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
           </div>
           <div className="space-y-2">
             <Label>Título (opcional)</Label>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Se generará automáticamente"
-            />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Se generará automáticamente" />
           </div>
         </div>
 
         {/* Row 2: Asignatura + Nivel */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>
-              Asignatura <span className="text-destructive">*</span>
-            </Label>
+            <Label>Asignatura <span className="text-destructive">*</span></Label>
             <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona una asignatura" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
               <SelectContent>
-                {SUBJECTS.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
+                {SUBJECTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                 <SelectItem value="Otras">Otras</SelectItem>
               </SelectContent>
             </Select>
             {subject === "Otras" && (
-              <Input
-                value={customSubject}
-                onChange={(e) => setCustomSubject(e.target.value)}
-                placeholder="Escribe la asignatura"
-                className="mt-2"
-              />
+              <Input value={customSubject} onChange={(e) => setCustomSubject(e.target.value)} placeholder="Escribe la asignatura" className="mt-2" />
             )}
           </div>
-
           <div className="space-y-2">
-            <Label>
-              Nivel educativo <span className="text-destructive">*</span>
-            </Label>
+            <Label>Nivel educativo <span className="text-destructive">*</span></Label>
             <div className="flex items-center gap-3">
               <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
-                    <SelectItem key={g} value={String(g)}>
-                      Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}
-                    </SelectItem>
+                    <SelectItem key={g} value={String(g)}>Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -359,109 +403,105 @@ export default function GenerateResource() {
           </div>
         </div>
 
-        {/* Conditional: Methodology */}
+        {/* Exam Type */}
+        {resourceType === "icfes" && (
+          <div className="space-y-2">
+            <Label>Tipo de examen <span className="text-destructive">*</span></Label>
+            <Select value={examType} onValueChange={setExamType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {EXAM_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label} — {t.desc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Rubric objective */}
+        {resourceType === "rubric" && (
+          <div className="space-y-2">
+            <Label>Objetivo o competencia a evaluar</Label>
+            <Textarea value={rubricObjective} onChange={(e) => setRubricObjective(e.target.value)} placeholder="Describe el objetivo o competencia que se evaluará con esta rúbrica..." rows={2} />
+          </div>
+        )}
+
+        {/* Methodology */}
         {extraFields.includes("methodology") && (
           <div className="space-y-2">
             <Label>Metodología</Label>
             <Select value={methodology} onValueChange={(v) => { setMethodology(v); if (v !== "Otras") setCustomMethodology(""); }}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona una metodología" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecciona una metodología" /></SelectTrigger>
               <SelectContent>
-                {METHODOLOGIES.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
+                {METHODOLOGIES.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
                 <SelectItem value="Otras">Otras</SelectItem>
               </SelectContent>
             </Select>
             {methodology === "Otras" && (
-              <Input
-                value={customMethodology}
-                onChange={(e) => setCustomMethodology(e.target.value)}
-                placeholder="Escribe la metodología"
-                className="mt-2"
-              />
+              <Input value={customMethodology} onChange={(e) => setCustomMethodology(e.target.value)} placeholder="Escribe la metodología" className="mt-2" />
             )}
           </div>
         )}
 
-        {/* Conditional: Duration */}
+        {/* Duration */}
         {extraFields.includes("duration") && (
           <div className="space-y-2">
             <Label>Duración</Label>
-            <Input
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="Ej: 2 horas, 45 minutos"
-            />
+            <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ej: 2 horas, 45 minutos" />
           </div>
         )}
 
-        {/* Conditional: Number of items */}
+        {/* Number of items */}
         {extraFields.includes("numItems") && (
           <div className="space-y-2">
             <Label>Número de preguntas</Label>
-            <Input
-              type="number"
-              min={1}
-              max={50}
-              value={numItems}
-              onChange={(e) => setNumItems(parseInt(e.target.value) || 10)}
-              className="w-32"
-            />
+            <Input type="number" min={1} max={50} value={numItems} onChange={(e) => setNumItems(parseInt(e.target.value) || 10)} className="w-32" />
           </div>
         )}
 
         {/* Additional instructions */}
         <div className="space-y-2">
           <Label>Instrucciones adicionales (opcional)</Label>
-          <Textarea
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..."
-            rows={3}
-          />
+          <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
         </div>
 
-        {/* PDF Upload - required */}
+        {/* File Upload */}
         <div className="space-y-2">
-          <Label>Archivo PDF fuente (opcional)</Label>
+          <Label>Archivo fuente (opcional) — PDF, Word o TXT</Label>
           <div
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer border-border hover:border-primary/50"
-            onClick={() => document.getElementById("pdf-input")?.click()}
+            onClick={() => document.getElementById("file-input")?.click()}
           >
             <input
-              id="pdf-input"
+              id="file-input"
               type="file"
-              accept=".pdf"
+              accept=".pdf,.docx,.doc,.txt"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) handlePdfUpload(file);
+                if (file) handleFileUpload(file);
               }}
             />
-            {extractingPdf ? (
+            {extractingFile ? (
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Procesando PDF...</span>
+                <span>Procesando archivo...</span>
               </div>
-            ) : pdfFile ? (
+            ) : uploadedFile ? (
               <div className="flex items-center justify-center gap-2 text-primary">
                 <FileText className="h-5 w-5" />
-                <span className="font-medium">{pdfFile.name}</span>
-                <span className="text-xs text-muted-foreground">({pdfText.length} caracteres)</span>
+                <span className="font-medium">{uploadedFile.name}</span>
+                <span className="text-xs text-muted-foreground">({fileText.length} caracteres)</span>
               </div>
             ) : (
               <div className="space-y-1">
                 <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Arrastra un PDF aquí o haz clic para seleccionar
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  La IA generará el contenido basado en el PDF
-                </p>
+                <p className="text-sm text-muted-foreground">Arrastra un archivo aquí o haz clic para seleccionar</p>
+                <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.docx), Texto (.txt)</p>
               </div>
             )}
           </div>
@@ -474,20 +514,10 @@ export default function GenerateResource() {
             Motor de IA
           </Label>
           <div className="flex gap-3">
-            <Button
-              variant={aiProvider === "openai" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiProvider("openai")}
-              className={aiProvider === "openai" ? "gradient-primary" : ""}
-            >
+            <Button variant={aiProvider === "openai" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("openai")} className={aiProvider === "openai" ? "gradient-primary" : ""}>
               <Cloud className="h-4 w-4 mr-1" /> OpenAI
             </Button>
-            <Button
-              variant={aiProvider === "ollama" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setAiProvider("ollama")}
-              className={aiProvider === "ollama" ? "gradient-primary" : ""}
-            >
+            <Button variant={aiProvider === "ollama" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("ollama")} className={aiProvider === "ollama" ? "gradient-primary" : ""}>
               <Server className="h-4 w-4 mr-1" /> Ollama (Local)
             </Button>
           </div>
@@ -496,33 +526,17 @@ export default function GenerateResource() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
               <div className="space-y-1">
                 <Label className="text-xs">URL de Ollama</Label>
-                <Input
-                  value={ollamaUrl}
-                  onChange={(e) => setOllamaUrl(e.target.value)}
-                  placeholder="http://localhost:11434"
-                  className="text-sm"
-                />
+                <Input value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" className="text-sm" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Modelo</Label>
                 {ollamaModels.length > 0 ? (
                   <Select value={ollamaModel} onValueChange={setOllamaModel}>
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ollamaModels.map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
+                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>{ollamaModels.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}</SelectContent>
                   </Select>
                 ) : (
-                  <Input
-                    value={ollamaModel}
-                    onChange={(e) => setOllamaModel(e.target.value)}
-                    placeholder="llama3"
-                    className="text-sm"
-                  />
+                  <Input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} placeholder="llama3" className="text-sm" />
                 )}
               </div>
             </div>
@@ -530,21 +544,11 @@ export default function GenerateResource() {
         </div>
 
         {/* Generate Button */}
-        <Button
-          className="w-full gradient-primary text-lg py-6"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
+        <Button className="w-full gradient-primary text-lg py-6" onClick={handleGenerate} disabled={generating}>
           {generating ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Generando recurso...
-            </>
+            <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generando recurso...</>
           ) : (
-            <>
-              <Sparkles className="h-5 w-5 mr-2" />
-              Generar con IA
-            </>
+            <><Sparkles className="h-5 w-5 mr-2" />Generar con IA</>
           )}
         </Button>
       </div>
@@ -554,43 +558,49 @@ export default function GenerateResource() {
         <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
           <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
             <h2 className="font-semibold text-foreground text-lg">
-              {generatedContent.title || title || "Recurso generado"}
+              {displayContent?.title || title || "Recurso generado"}
             </h2>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-2 mr-3">
                 {isPublic ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                <Label className="text-xs cursor-pointer" htmlFor="public-toggle">
-                  {isPublic ? "Público" : "Privado"}
-                </Label>
+                <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
                 <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
-              <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="h-4 w-4 mr-1" />
-                {saving ? "Guardando..." : "Guardar"}
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (!isEditing) {
+                    setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
+                  }
+                  setIsEditing(!isEditing);
+                }}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                {isEditing ? "Viendo edición" : "Editar"}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => exportToDocx(
-                generatedContent.title || title || "Recurso",
-                resourceType,
-                generatedContent
-              )}>
+              <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+                <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportToDocx(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
                 <Download className="h-4 w-4 mr-1" /> Word
               </Button>
-              <Button variant="outline" size="sm" onClick={() => exportToPdf(
-                generatedContent.title || title || "Recurso",
-                resourceType,
-                generatedContent
-              )}>
+              <Button variant="outline" size="sm" onClick={() => exportToPdf(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
                 <Download className="h-4 w-4 mr-1" /> PDF
               </Button>
             </div>
           </div>
 
           <div className="p-6">
-            <ResourceContentViewer type={resourceType} content={generatedContent} />
+            <ResourceContentViewer
+              type={resourceType}
+              content={displayContent}
+              editable={isEditing}
+              onContentChange={isEditing ? setEditableContent : undefined}
+            />
           </div>
         </div>
       )}
     </div>
   );
 }
-
