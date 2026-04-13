@@ -158,25 +158,6 @@ Formato JSON requerido:
   ]
 }`;
 
-    case "quiz":
-      return `${base}
-Genera un cuestionario educativo con ${numItems} preguntas variadas.
-Formato JSON requerido:
-{
-  "title": "Título del cuestionario",
-  "subject": "Área o asignatura",
-  "questions": [
-    {
-      "number": 1,
-      "type": "multiple_choice",
-      "question": "Pregunta",
-      "options": ["opción 1", "opción 2", "opción 3", "opción 4"],
-      "correct": "respuesta correcta",
-      "explanation": "Explicación"
-    }
-  ]
-}`;
-
     case "workshop":
       return `${base}
 Genera un taller educativo completo con actividades prácticas.
@@ -199,27 +180,50 @@ Formato JSON requerido:
   "evaluation": "Criterios de evaluación"
 }`;
 
-    case "guide":
+    case "slides":
       return `${base}
-Genera una guía educativa completa y bien estructurada.
+Genera una presentación educativa con exactamente ${numItems} diapositivas visualmente atractivas.
+Cada diapositiva debe tener un diseño profesional con contenido claro y conciso.
+Usa colores de fondo variados y atractivos (en formato hexadecimal de 6 caracteres SIN #).
+La primera diapositiva debe ser de tipo "title".
+Alterna entre layouts: "title", "content", "two_columns".
+Para cada diapositiva, incluye un campo "imageQuery" con una descripción corta en inglés de una imagen relevante que ilustre el contenido.
+
 Formato JSON requerido:
 {
-  "title": "Título de la guía",
+  "title": "Título de la presentación",
   "subject": "Área o asignatura",
-  "introduction": "Introducción al tema",
-  "objectives": ["objetivo 1", "objetivo 2"],
-  "sections": [
+  "slides": [
     {
-      "number": 1,
-      "title": "Título de la sección",
-      "content": "Contenido explicativo detallado",
-      "examples": ["ejemplo 1"],
-      "keyPoints": ["punto clave 1"]
+      "title": "Título de la diapositiva",
+      "subtitle": "Subtítulo (solo para layout title)",
+      "layout": "title",
+      "bgColor": "1a1a2e",
+      "imageQuery": "photosynthesis process diagram"
+    },
+    {
+      "title": "Conceptos clave",
+      "points": ["Punto 1 con información relevante", "Punto 2 con dato importante", "Punto 3 con explicación clara"],
+      "layout": "content",
+      "bgColor": "16213e",
+      "imageQuery": "science education illustration"
+    },
+    {
+      "title": "Comparación",
+      "leftContent": "Texto columna izquierda con explicación detallada",
+      "rightContent": "Texto columna derecha con comparación",
+      "layout": "two_columns",
+      "bgColor": "0f3460",
+      "imageQuery": "comparison chart education"
     }
-  ],
-  "summary": "Resumen final",
-  "bibliography": ["referencia 1"]
-}`;
+  ]
+}
+
+Paleta de colores sugerida (usa variaciones):
+- Tonos oscuros elegantes: 1a1a2e, 16213e, 0f3460, 533483, 2c003e
+- Tonos cálidos: 7b2d26, 1b4332, 3c1642, 4a0e4e
+- Tonos claros (usa texto oscuro): e8f4f8, f0e6ef, fef9ef, e8f5e9
+Varía los colores entre diapositivas para crear una presentación visualmente dinámica.`;
 
     case "lesson_plan":
       return `${base}
@@ -246,21 +250,29 @@ Formato JSON requerido:
 
     case "rubric":
       return `${base}
-Genera una rúbrica de evaluación completa y detallada.
+Genera una rúbrica de evaluación completa y detallada según el tipo y niveles especificados en las instrucciones.
+Los niveles de desempeño que aparecen en las instrucciones deben usarse exactamente como se indican.
+El tipo de rúbrica especificado debe determinar la estructura:
+- Rúbrica Analítica: evalúa cada criterio por separado con descripciones por nivel
+- Rúbrica Holística: evalúa de forma global con una descripción general por nivel
+- Lista de Verificación: criterios con cumple/no cumple
+- Rúbrica Escalar: escala numérica con descriptores
+- Rúbrica de Puntos: puntaje por criterio
+
 Formato JSON requerido:
 {
   "title": "Título de la rúbrica",
   "subject": "Asignatura",
+  "rubricType": "Tipo de rúbrica",
   "objective": "Objetivo o competencia a evaluar",
-  "levels": ["Excelente", "Bueno", "Aceptable", "Insuficiente"],
+  "levels": ["Nivel1", "Nivel2", "Nivel3"],
   "criteria": [
     {
       "name": "Criterio de evaluación",
       "descriptions": {
-        "Excelente": "Descripción detallada del nivel excelente",
-        "Bueno": "Descripción detallada del nivel bueno",
-        "Aceptable": "Descripción detallada del nivel aceptable",
-        "Insuficiente": "Descripción detallada del nivel insuficiente"
+        "Nivel1": "Descripción detallada",
+        "Nivel2": "Descripción detallada",
+        "Nivel3": "Descripción detallada"
       },
       "weight": 25
     }

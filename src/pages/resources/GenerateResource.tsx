@@ -6,6 +6,7 @@ import { extractTextFromPDF } from "@/lib/pdf-extract";
 import { generateWithOpenAI, generateWithOllama, fetchOllamaModels } from "@/lib/ai-service";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
+import { SlideViewer } from "@/components/SlideViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,14 +16,14 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
-  BookOpen, ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
-  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil,
+  ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
+  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
   { value: "icfes", label: "Exámenes", icon: FileCheck },
   { value: "workshop", label: "Taller", icon: FileEdit },
-  { value: "guide", label: "Guía educativa", icon: BookOpen },
+  { value: "slides", label: "Diapositivas", icon: Presentation },
   { value: "lesson_plan", label: "Plan de clase", icon: ClipboardList },
   { value: "rubric", label: "Rúbrica", icon: Table2 },
 ];
@@ -62,12 +63,28 @@ const EXAM_TYPES = [
   { value: "mixed", label: "Mixto", desc: "Combina ICFES y Falso/Verdadero" },
 ];
 
+const RUBRIC_TYPES = [
+  { value: "analitica", label: "Rúbrica Analítica" },
+  { value: "holistica", label: "Rúbrica Holística" },
+  { value: "verificacion", label: "Lista de Verificación" },
+  { value: "escalar", label: "Rúbrica Escalar" },
+  { value: "puntos", label: "Rúbrica de Puntos" },
+  { value: "otro", label: "Otro" },
+];
+
+const PERFORMANCE_LEVELS = [
+  { value: "3", label: "3 niveles" },
+  { value: "4", label: "4 niveles" },
+  { value: "5", label: "5 niveles" },
+  { value: "custom", label: "Personalizado" },
+];
+
 const RESOURCE_FIELDS: Record<string, string[]> = {
   icfes: ["numItems", "examType"],
   workshop: ["methodology", "duration"],
-  guide: ["methodology"],
+  slides: ["numSlides"],
   lesson_plan: ["methodology", "duration"],
-  rubric: ["methodology", "rubricObjective"],
+  rubric: ["rubricType", "performanceLevels", "rubricObjective"],
 };
 
 export default function GenerateResource() {
@@ -90,7 +107,16 @@ export default function GenerateResource() {
   const [instructions, setInstructions] = useState("");
   const [numItems, setNumItems] = useState(10);
   const [examType, setExamType] = useState("icfes");
+  const [numSlides, setNumSlides] = useState(8);
+
+  // Rubric fields
+  const [rubricType, setRubricType] = useState("analitica");
+  const [customRubricType, setCustomRubricType] = useState("");
+  const [performanceLevels, setPerformanceLevels] = useState("4");
+  const [customLevelCount, setCustomLevelCount] = useState(4);
+  const [customLevelNames, setCustomLevelNames] = useState<string[]>([]);
   const [rubricObjective, setRubricObjective] = useState("");
+
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileText, setFileText] = useState("");
   const [extractingFile, setExtractingFile] = useState(false);
@@ -140,6 +166,17 @@ export default function GenerateResource() {
     }
   }, [aiProvider, ollamaUrl]);
 
+  // Custom level names management
+  useEffect(() => {
+    if (performanceLevels === "custom") {
+      setCustomLevelNames(prev => {
+        const arr = [...prev];
+        while (arr.length < customLevelCount) arr.push("");
+        return arr.slice(0, customLevelCount);
+      });
+    }
+  }, [customLevelCount, performanceLevels]);
+
   const extractTextFromFile = async (file: File): Promise<string> => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "pdf") {
@@ -147,16 +184,10 @@ export default function GenerateResource() {
     } else if (ext === "txt") {
       return await file.text();
     } else if (ext === "docx" || ext === "doc") {
-      // For docx, read as text (basic extraction)
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8 = new Uint8Array(arrayBuffer);
-      // Try to extract text from docx XML
       try {
         const text = await file.text();
-        // If it's readable text, return it
         if (text && !text.includes('\0')) return text;
       } catch {}
-      // Fallback: notify user
       toast.info("Para archivos Word, se recomienda usar formato .txt o .pdf para mejores resultados");
       return await file.text();
     }
@@ -199,8 +230,19 @@ export default function GenerateResource() {
     if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
       errors.push("Escribe la metodología personalizada");
     }
+    if (resourceType === "rubric" && rubricType === "otro" && !customRubricType.trim()) {
+      errors.push("Escribe el tipo de rúbrica personalizado");
+    }
     setValidationErrors(errors);
     return errors.length === 0;
+  };
+
+  const getResolvedLevels = (): string[] => {
+    if (performanceLevels === "3") return ["Excelente", "Aceptable", "Insuficiente"];
+    if (performanceLevels === "4") return ["Excelente", "Bueno", "Aceptable", "Insuficiente"];
+    if (performanceLevels === "5") return ["Excelente", "Sobresaliente", "Bueno", "Aceptable", "Insuficiente"];
+    if (performanceLevels === "custom") return customLevelNames.filter(n => n.trim());
+    return ["Excelente", "Bueno", "Aceptable", "Insuficiente"];
   };
 
   const buildInstructions = (): string => {
@@ -221,8 +263,15 @@ export default function GenerateResource() {
       const examLabel = EXAM_TYPES.find(t => t.value === examType)?.label || examType;
       parts.push(`Tipo de examen: ${examLabel}`);
     }
-    if (resourceType === "rubric" && rubricObjective) {
-      parts.push(`Objetivo/Competencia a evaluar: ${rubricObjective}`);
+    if (resourceType === "rubric") {
+      const resolvedRubricType = rubricType === "otro" ? customRubricType : RUBRIC_TYPES.find(r => r.value === rubricType)?.label || rubricType;
+      parts.push(`Tipo de rúbrica: ${resolvedRubricType}`);
+      const levels = getResolvedLevels();
+      parts.push(`Niveles de desempeño: ${levels.join(", ")}`);
+      if (rubricObjective) parts.push(`Objetivo/Competencia a evaluar: ${rubricObjective}`);
+    }
+    if (resourceType === "slides") {
+      parts.push(`Número de diapositivas: ${numSlides}`);
     }
     if (instructions.trim()) {
       parts.push(`Instrucciones adicionales: ${instructions}`);
@@ -252,7 +301,7 @@ export default function GenerateResource() {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
         instructions: buildInstructions(),
-        numItems,
+        numItems: resourceType === "slides" ? numSlides : numItems,
       };
 
       let result;
@@ -420,11 +469,79 @@ export default function GenerateResource() {
           </div>
         )}
 
-        {/* Rubric objective */}
+        {/* Rubric-specific fields */}
         {resourceType === "rubric" && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de rúbrica <span className="text-destructive">*</span></Label>
+                <Select value={rubricType} onValueChange={setRubricType}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {RUBRIC_TYPES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {rubricType === "otro" && (
+                  <Input value={customRubricType} onChange={(e) => setCustomRubricType(e.target.value)} placeholder="Describe el tipo de rúbrica" className="mt-2" />
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label>Niveles de desempeño</Label>
+                <Select value={performanceLevels} onValueChange={setPerformanceLevels}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PERFORMANCE_LEVELS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {performanceLevels === "custom" && (
+              <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm">Cantidad de niveles:</Label>
+                  <Input
+                    type="number"
+                    min={2}
+                    max={10}
+                    value={customLevelCount}
+                    onChange={(e) => setCustomLevelCount(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
+                    className="w-20"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {Array.from({ length: customLevelCount }, (_, i) => (
+                    <Input
+                      key={i}
+                      value={customLevelNames[i] || ""}
+                      onChange={(e) => {
+                        const updated = [...customLevelNames];
+                        updated[i] = e.target.value;
+                        setCustomLevelNames(updated);
+                      }}
+                      placeholder={`Nivel ${i + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Objetivo o criterios específicos (opcional)</Label>
+              <Textarea value={rubricObjective} onChange={(e) => setRubricObjective(e.target.value)} placeholder="Describe el objetivo de aprendizaje o criterios particulares que debe considerar la rúbrica..." rows={2} />
+            </div>
+          </>
+        )}
+
+        {/* Slides: number of slides */}
+        {resourceType === "slides" && (
           <div className="space-y-2">
-            <Label>Objetivo o competencia a evaluar</Label>
-            <Textarea value={rubricObjective} onChange={(e) => setRubricObjective(e.target.value)} placeholder="Describe el objetivo o competencia que se evaluará con esta rúbrica..." rows={2} />
+            <Label>Número de diapositivas</Label>
+            <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
           </div>
         )}
 
@@ -566,41 +683,224 @@ export default function GenerateResource() {
                 <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
                 <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
-              <Button
-                variant={isEditing ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  if (!isEditing) {
-                    setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
-                  }
-                  setIsEditing(!isEditing);
-                }}
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                {isEditing ? "Viendo edición" : "Editar"}
-              </Button>
+              {resourceType !== "slides" && (
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    if (!isEditing) {
+                      setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
+                    }
+                    setIsEditing(!isEditing);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  {isEditing ? "Viendo edición" : "Editar"}
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => exportToDocx(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
-                <Download className="h-4 w-4 mr-1" /> Word
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => exportToPdf(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
-                <Download className="h-4 w-4 mr-1" /> PDF
-              </Button>
+              {resourceType === "slides" ? (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => exportSlidesToPptx(displayContent)}>
+                    <Download className="h-4 w-4 mr-1" /> PPTX
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => exportSlidesToPdf(displayContent)}>
+                    <Download className="h-4 w-4 mr-1" /> PDF
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => exportToDocx(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                    <Download className="h-4 w-4 mr-1" /> Word
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => exportToPdf(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                    <Download className="h-4 w-4 mr-1" /> PDF
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
           <div className="p-6">
-            <ResourceContentViewer
-              type={resourceType}
-              content={displayContent}
-              editable={isEditing}
-              onContentChange={isEditing ? setEditableContent : undefined}
-            />
+            {resourceType === "slides" ? (
+              <SlideViewer slides={displayContent?.slides || []} title={displayContent?.title} />
+            ) : (
+              <ResourceContentViewer
+                type={resourceType}
+                content={displayContent}
+                editable={isEditing}
+                onContentChange={isEditing ? setEditableContent : undefined}
+              />
+            )}
           </div>
         </div>
       )}
     </div>
   );
+}
+
+// Slide export helpers
+async function exportSlidesToPptx(content: any) {
+  try {
+    const pptxgenModule = await import("pptxgenjs");
+    const PptxGenJS = pptxgenModule.default;
+    const pres = new PptxGenJS();
+    pres.layout = "LAYOUT_WIDE";
+
+    const slides = content?.slides || [];
+    for (const slideData of slides) {
+      const slide = pres.addSlide();
+
+      // Background
+      const bgColor = slideData.bgColor || "1a1a2e";
+      slide.background = { color: bgColor };
+
+      const textColor = isLightColor(bgColor) ? "1a1a2e" : "FFFFFF";
+
+      if (slideData.layout === "title") {
+        slide.addText(slideData.title || "", {
+          x: 0.8, y: 1.5, w: 11.5, h: 2,
+          fontSize: 36, bold: true, color: textColor,
+          align: "center", valign: "middle",
+        });
+        if (slideData.subtitle) {
+          slide.addText(slideData.subtitle, {
+            x: 1.5, y: 3.8, w: 10, h: 1,
+            fontSize: 18, color: textColor, align: "center",
+          });
+        }
+      } else if (slideData.layout === "two_columns") {
+        slide.addText(slideData.title || "", {
+          x: 0.5, y: 0.3, w: 12, h: 0.8,
+          fontSize: 28, bold: true, color: textColor,
+        });
+        const leftContent = slideData.leftContent || "";
+        const rightContent = slideData.rightContent || "";
+        slide.addText(leftContent, {
+          x: 0.5, y: 1.3, w: 5.5, h: 5.5,
+          fontSize: 14, color: textColor, valign: "top",
+        });
+        slide.addText(rightContent, {
+          x: 6.5, y: 1.3, w: 5.5, h: 5.5,
+          fontSize: 14, color: textColor, valign: "top",
+        });
+      } else {
+        // Default content slide
+        slide.addText(slideData.title || "", {
+          x: 0.5, y: 0.3, w: 12, h: 0.8,
+          fontSize: 28, bold: true, color: textColor,
+        });
+        const points = slideData.points || [];
+        if (points.length > 0) {
+          const bulletText = points.map((p: string) => ({ text: p, options: { bullet: true, fontSize: 16, color: textColor, breakLine: true } }));
+          slide.addText(bulletText, {
+            x: 0.8, y: 1.4, w: 11, h: 5.5,
+            valign: "top",
+          });
+        }
+        if (slideData.content) {
+          slide.addText(slideData.content, {
+            x: 0.8, y: points.length > 0 ? 5 : 1.4, w: 11, h: 2,
+            fontSize: 14, color: textColor, valign: "top",
+          });
+        }
+      }
+
+      // Image placeholder note
+      if (slideData.imageQuery) {
+        slide.addText(`🖼 ${slideData.imageQuery}`, {
+          x: 9, y: 6.5, w: 3.5, h: 0.5,
+          fontSize: 9, italic: true, color: "888888",
+        });
+      }
+    }
+
+    const fileName = sanitizeFilename(content?.title || "Diapositivas");
+    await pres.writeFile({ fileName: `${fileName}.pptx` });
+    toast.success("Presentación PPTX descargada");
+  } catch (e: any) {
+    toast.error("Error al exportar PPTX: " + e.message);
+  }
+}
+
+function exportSlidesToPdf(content: any) {
+  try {
+    const jsPDFModule = import("jspdf");
+    jsPDFModule.then(({ default: jsPDF }) => {
+      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] });
+      const slides = content?.slides || [];
+
+      slides.forEach((slideData: any, idx: number) => {
+        if (idx > 0) doc.addPage();
+
+        const bgHex = slideData.bgColor || "1a1a2e";
+        const r = parseInt(bgHex.substring(0, 2), 16);
+        const g = parseInt(bgHex.substring(2, 4), 16);
+        const b = parseInt(bgHex.substring(4, 6), 16);
+        doc.setFillColor(r, g, b);
+        doc.rect(0, 0, 960, 540, "F");
+
+        const textR = isLightColor(bgHex) ? 26 : 255;
+        const textG = isLightColor(bgHex) ? 26 : 255;
+        const textB = isLightColor(bgHex) ? 46 : 255;
+        doc.setTextColor(textR, textG, textB);
+
+        if (slideData.layout === "title") {
+          doc.setFontSize(32);
+          doc.setFont("helvetica", "bold");
+          const titleLines = doc.splitTextToSize(slideData.title || "", 800);
+          doc.text(titleLines, 480, 200, { align: "center" });
+          if (slideData.subtitle) {
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "normal");
+            doc.text(slideData.subtitle, 480, 300, { align: "center" });
+          }
+        } else {
+          doc.setFontSize(24);
+          doc.setFont("helvetica", "bold");
+          doc.text(slideData.title || "", 40, 50);
+
+          doc.setFontSize(13);
+          doc.setFont("helvetica", "normal");
+          let y = 90;
+          const points = slideData.points || [];
+          points.forEach((p: string) => {
+            const lines = doc.splitTextToSize(`• ${p}`, 850);
+            lines.forEach((line: string) => {
+              if (y > 500) return;
+              doc.text(line, 60, y);
+              y += 20;
+            });
+            y += 5;
+          });
+          if (slideData.content) {
+            const lines = doc.splitTextToSize(slideData.content, 850);
+            lines.forEach((line: string) => {
+              if (y > 500) return;
+              doc.text(line, 60, y);
+              y += 18;
+            });
+          }
+        }
+      });
+
+      doc.save(`${sanitizeFilename(content?.title || "Diapositivas")}.pdf`);
+      toast.success("PDF descargado");
+    });
+  } catch (e: any) {
+    toast.error("Error al exportar PDF: " + e.message);
+  }
+}
+
+function isLightColor(hex: string): boolean {
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, "").trim().replace(/\s+/g, "_").substring(0, 50);
 }
