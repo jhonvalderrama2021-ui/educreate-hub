@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot } from "lucide-react";
+import { ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot, Presentation, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu,
@@ -10,7 +10,7 @@ const modules = [
   { title: "Rúbricas", url: "/resources/generate?type=rubric", icon: Table2, description: "Genera rúbricas de evaluación con IA" },
   { title: "Exámenes", url: "/resources/generate?type=icfes", icon: FileCheck, description: "Genera exámenes con IA" },
   { title: "Talleres", url: "/resources/generate?type=workshop", icon: FileEdit, description: "Genera talleres educativos con IA" },
-  { title: "Guías educativas", url: "/resources/generate?type=guide", icon: BookOpen, description: "Genera guías educativas con IA" },
+  { title: "Diapositivas", url: "/resources/generate?type=slides", icon: Presentation, description: "Genera presentaciones con IA" },
   { title: "Crear Bot", url: "/resources/bots", icon: Bot, description: "Crea bots educativos especializados" },
 ];
 
