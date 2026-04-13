@@ -88,11 +88,10 @@ function getOllamaPrompt(type: string, numItems: number): string {
     icfes: `Genera un examen tipo ICFES con ${numItems} preguntas. NO marques la respuesta correcta en las opciones. JSON: {"title":"","subject":"","questions":[{"number":1,"context":"","question":"","options":{"A":"","B":"","C":"","D":""},"correct":"A","explanation":""}]}`,
     true_false: `Genera un examen de Verdadero o Falso con ${numItems} preguntas. JSON: {"title":"","subject":"","questions":[{"number":1,"type":"true_false","question":"","correct":"Verdadero","explanation":""}]}`,
     mixed: `Genera un examen mixto con ${numItems} preguntas alternando selección múltiple y verdadero/falso. JSON: {"title":"","subject":"","questions":[{"number":1,"type":"multiple_choice","question":"","options":{"A":"","B":"","C":"","D":""},"correct":"A","explanation":""},{"number":2,"type":"true_false","question":"","correct":"Falso","explanation":""}]}`,
-    quiz: `Genera un cuestionario con ${numItems} preguntas. JSON: {"title":"","subject":"","questions":[{"number":1,"type":"multiple_choice","question":"","options":["","","",""],"correct":"","explanation":""}]}`,
     workshop: `Genera un taller educativo. JSON: {"title":"","subject":"","objective":"","duration":"","materials":[],"activities":[{"number":1,"title":"","description":"","instructions":"","duration":""}],"evaluation":""}`,
-    guide: `Genera una guía educativa. JSON: {"title":"","subject":"","introduction":"","objectives":[],"sections":[{"number":1,"title":"","content":"","examples":[],"keyPoints":[]}],"summary":"","bibliography":[]}`,
     lesson_plan: `Genera un plan de clase. JSON: {"title":"","subject":"","grade":"","duration":"","objective":"","competencies":[],"phases":[{"name":"","duration":"","activities":"","resources":""}],"evaluation":"","homework":""}`,
-    rubric: `Genera una rúbrica. JSON: {"title":"","subject":"","objective":"","levels":["Excelente","Bueno","Aceptable","Insuficiente"],"criteria":[{"name":"","descriptions":{"Excelente":"","Bueno":"","Aceptable":"","Insuficiente":""},"weight":25}],"observations":""}`,
+    rubric: `Genera una rúbrica según el tipo y niveles indicados en las instrucciones. JSON: {"title":"","subject":"","rubricType":"","objective":"","levels":[],"criteria":[{"name":"","descriptions":{},"weight":25}],"observations":""}`,
+    slides: `Genera ${numItems} diapositivas educativas. Usa colores hex variados sin #. Alterna layouts: title, content, two_columns. JSON: {"title":"","subject":"","slides":[{"title":"","subtitle":"","layout":"title","bgColor":"1a1a2e","points":[],"content":"","leftContent":"","rightContent":"","imageQuery":""}]}`,
   };
 
   return `${base}\n${formats[type] || ""}`;
