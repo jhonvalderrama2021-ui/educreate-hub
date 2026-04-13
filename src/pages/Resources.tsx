@@ -28,7 +28,7 @@ function ResourcesHome() {
           {[
             { icon: "📋", label: "Exámenes", type: "icfes" },
             { icon: "🔧", label: "Talleres", type: "workshop" },
-            { icon: "📖", label: "Guías", type: "guide" },
+            { icon: "🎞️", label: "Diapositivas", type: "slides" },
             { icon: "📝", label: "Planes de clase", type: "lesson_plan" },
             { icon: "📊", label: "Rúbricas", type: "rubric" },
             { icon: "🤖", label: "Crear Bot", type: "bot" },
