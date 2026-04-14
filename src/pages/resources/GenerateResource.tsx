@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
 import { generateWithOpenAI, generateWithOllama, fetchOllamaModels } from "@/lib/ai-service";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
+import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
 import { Button } from "@/components/ui/button";
@@ -741,8 +742,9 @@ export default function GenerateResource() {
   );
 }
 
-// Slide export helpers
-async function exportSlidesToPptx(content: any) {
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, "").trim().replace(/\s+/g, "_").substring(0, 50);
+}
   try {
     const pptxgenModule = await import("pptxgenjs");
     const PptxGenJS = pptxgenModule.default;
