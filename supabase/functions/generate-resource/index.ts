@@ -182,12 +182,22 @@ Formato JSON requerido:
 
     case "slides":
       return `${base}
-Genera una presentación educativa con exactamente ${numItems} diapositivas visualmente atractivas.
-Cada diapositiva debe tener un diseño profesional con contenido claro y conciso.
-Usa colores de fondo variados y atractivos (en formato hexadecimal de 6 caracteres SIN #).
-La primera diapositiva debe ser de tipo "title".
-Alterna entre layouts: "title", "content", "two_columns".
-Para cada diapositiva, incluye un campo "imageQuery" con una descripción corta en inglés de una imagen relevante que ilustre el contenido.
+Genera una presentación educativa con exactamente ${numItems} diapositivas.
+Cada diapositiva debe ser un bloque de HTML completo con estilos inline CSS profesionales.
+El HTML debe incluir:
+- Google Fonts (Inter y Space Grotesk) via link en cada slide
+- Google Material Icons via link
+- Estilos CSS inline y en un tag <style> dentro de cada slide
+- El slide debe tener dimensiones fijas: width: 1280px; height: 720px
+- Diseño profesional tipo presentación corporativa/tech (inspirado en Supabase, Stripe, Linear)
+- Fondo limpio (blanco o muy claro), con acentos de color en elementos decorativos
+- Iconos de Material Icons donde sea apropiado
+- Tarjetas con sombras suaves, bordes redondeados
+- Tipografía jerárquica clara (títulos grandes, subtítulos medianos, cuerpo pequeño)
+- Colores de acento profesionales (azul #0F172A, accent #3B82F6, textos grises)
+- Elementos visuales como diagramas de flujo con flechas, listas con iconos, grids de tarjetas
+- NO uses JavaScript, solo HTML y CSS
+- Cada slide debe ser autocontenido (incluir sus propios <style> y <link> tags)
 
 Formato JSON requerido:
 {
@@ -195,35 +205,15 @@ Formato JSON requerido:
   "subject": "Área o asignatura",
   "slides": [
     {
-      "title": "Título de la diapositiva",
-      "subtitle": "Subtítulo (solo para layout title)",
-      "layout": "title",
-      "bgColor": "1a1a2e",
-      "imageQuery": "photosynthesis process diagram"
-    },
-    {
-      "title": "Conceptos clave",
-      "points": ["Punto 1 con información relevante", "Punto 2 con dato importante", "Punto 3 con explicación clara"],
-      "layout": "content",
-      "bgColor": "16213e",
-      "imageQuery": "science education illustration"
-    },
-    {
-      "title": "Comparación",
-      "leftContent": "Texto columna izquierda con explicación detallada",
-      "rightContent": "Texto columna derecha con comparación",
-      "layout": "two_columns",
-      "bgColor": "0f3460",
-      "imageQuery": "comparison chart education"
+      "html": "<!DOCTYPE html><html>...<\\/html>"
     }
   ]
 }
 
-Paleta de colores sugerida (usa variaciones):
-- Tonos oscuros elegantes: 1a1a2e, 16213e, 0f3460, 533483, 2c003e
-- Tonos cálidos: 7b2d26, 1b4332, 3c1642, 4a0e4e
-- Tonos claros (usa texto oscuro): e8f4f8, f0e6ef, fef9ef, e8f5e9
-Varía los colores entre diapositivas para crear una presentación visualmente dinámica.`;
+IMPORTANTE: Cada slide.html debe ser un documento HTML completo y válido que se pueda renderizar independientemente en un iframe.
+Varía los diseños entre diapositivas: portada con título grande, contenido con bullets/cards, diagramas de flujo, comparaciones lado a lado, conclusiones.
+Usa una paleta de colores CONSISTENTE en todas las diapositivas.
+El resultado debe verse tan profesional como una presentación de Gamma.app o Pitch.com.`;
 
     case "lesson_plan":
       return `${base}

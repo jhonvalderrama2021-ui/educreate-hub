@@ -753,67 +753,71 @@ async function exportSlidesToPptx(content: any) {
     for (const slideData of slides) {
       const slide = pres.addSlide();
 
-      // Background
-      const bgColor = slideData.bgColor || "1a1a2e";
-      slide.background = { color: bgColor };
-
-      const textColor = isLightColor(bgColor) ? "1a1a2e" : "FFFFFF";
-
-      if (slideData.layout === "title") {
-        slide.addText(slideData.title || "", {
-          x: 0.8, y: 1.5, w: 11.5, h: 2,
-          fontSize: 36, bold: true, color: textColor,
-          align: "center", valign: "middle",
-        });
-        if (slideData.subtitle) {
-          slide.addText(slideData.subtitle, {
-            x: 1.5, y: 3.8, w: 10, h: 1,
-            fontSize: 18, color: textColor, align: "center",
+      if (slideData.html) {
+        // For HTML slides, extract text content and create a clean PPTX slide
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(slideData.html, "text/html");
+        const body = doc.body;
+        
+        slide.background = { color: "FFFFFF" };
+        
+        // Extract all text elements in order
+        const allText: { text: string; bold: boolean; size: number; y: number }[] = [];
+        const headings = body.querySelectorAll("h1, h2, h3, h4, h5, h6");
+        const paragraphs = body.querySelectorAll("p, li, span");
+        
+        let yPos = 0.5;
+        
+        headings.forEach((h) => {
+          const tag = h.tagName.toLowerCase();
+          const fontSize = tag === "h1" ? 32 : tag === "h2" ? 24 : tag === "h3" ? 20 : 16;
+          slide.addText(h.textContent?.trim() || "", {
+            x: 0.8, y: yPos, w: 11.5, h: 0.8,
+            fontSize, bold: true, color: "0F172A",
           });
-        }
-      } else if (slideData.layout === "two_columns") {
-        slide.addText(slideData.title || "", {
-          x: 0.5, y: 0.3, w: 12, h: 0.8,
-          fontSize: 28, bold: true, color: textColor,
+          yPos += 0.9;
         });
-        const leftContent = slideData.leftContent || "";
-        const rightContent = slideData.rightContent || "";
-        slide.addText(leftContent, {
-          x: 0.5, y: 1.3, w: 5.5, h: 5.5,
-          fontSize: 14, color: textColor, valign: "top",
-        });
-        slide.addText(rightContent, {
-          x: 6.5, y: 1.3, w: 5.5, h: 5.5,
-          fontSize: 14, color: textColor, valign: "top",
+
+        const textElements = body.querySelectorAll("p, li");
+        textElements.forEach((el) => {
+          const text = el.textContent?.trim();
+          if (!text || text.length < 3) return;
+          if (yPos > 6.5) return;
+          const isListItem = el.tagName === "LI";
+          slide.addText((isListItem ? "• " : "") + text, {
+            x: 1, y: yPos, w: 11, h: 0.5,
+            fontSize: 14, color: "334155",
+          });
+          yPos += 0.45;
         });
       } else {
-        // Default content slide
-        slide.addText(slideData.title || "", {
-          x: 0.5, y: 0.3, w: 12, h: 0.8,
-          fontSize: 28, bold: true, color: textColor,
-        });
-        const points = slideData.points || [];
-        if (points.length > 0) {
-          const bulletText = points.map((p: string) => ({ text: p, options: { bullet: true, fontSize: 16, color: textColor, breakLine: true } }));
-          slide.addText(bulletText, {
-            x: 0.8, y: 1.4, w: 11, h: 5.5,
-            valign: "top",
-          });
-        }
-        if (slideData.content) {
-          slide.addText(slideData.content, {
-            x: 0.8, y: points.length > 0 ? 5 : 1.4, w: 11, h: 2,
-            fontSize: 14, color: textColor, valign: "top",
-          });
-        }
-      }
+        // Legacy JSON-based slides
+        const bgColor = slideData.bgColor || "1a1a2e";
+        slide.background = { color: bgColor };
+        const textColor = isLightColor(bgColor) ? "1a1a2e" : "FFFFFF";
 
-      // Image placeholder note
-      if (slideData.imageQuery) {
-        slide.addText(`🖼 ${slideData.imageQuery}`, {
-          x: 9, y: 6.5, w: 3.5, h: 0.5,
-          fontSize: 9, italic: true, color: "888888",
-        });
+        if (slideData.layout === "title") {
+          slide.addText(slideData.title || "", {
+            x: 0.8, y: 1.5, w: 11.5, h: 2,
+            fontSize: 36, bold: true, color: textColor, align: "center", valign: "middle",
+          });
+          if (slideData.subtitle) {
+            slide.addText(slideData.subtitle, {
+              x: 1.5, y: 3.8, w: 10, h: 1,
+              fontSize: 18, color: textColor, align: "center",
+            });
+          }
+        } else {
+          slide.addText(slideData.title || "", {
+            x: 0.5, y: 0.3, w: 12, h: 0.8,
+            fontSize: 28, bold: true, color: textColor,
+          });
+          const points = slideData.points || [];
+          if (points.length > 0) {
+            const bulletText = points.map((p: string) => ({ text: p, options: { bullet: true, fontSize: 16, color: textColor, breakLine: true } }));
+            slide.addText(bulletText, { x: 0.8, y: 1.4, w: 11, h: 5.5, valign: "top" });
+          }
+        }
       }
     }
 
@@ -825,16 +829,59 @@ async function exportSlidesToPptx(content: any) {
   }
 }
 
-function exportSlidesToPdf(content: any) {
+async function exportSlidesToPdf(content: any) {
   try {
-    const jsPDFModule = import("jspdf");
-    jsPDFModule.then(({ default: jsPDF }) => {
-      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] });
-      const slides = content?.slides || [];
+    const { default: jsPDF } = await import("jspdf");
+    const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: [960, 540] });
+    const slides = content?.slides || [];
 
-      slides.forEach((slideData: any, idx: number) => {
-        if (idx > 0) doc.addPage();
+    for (let idx = 0; idx < slides.length; idx++) {
+      if (idx > 0) doc.addPage();
+      const slideData = slides[idx];
 
+      if (slideData.html) {
+        // Parse HTML and render text to PDF
+        const parser = new DOMParser();
+        const htmlDoc = parser.parseFromString(slideData.html, "text/html");
+        
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, 960, 540, "F");
+        
+        let y = 40;
+        const headings = htmlDoc.body.querySelectorAll("h1, h2, h3, h4, h5, h6");
+        headings.forEach((h) => {
+          const tag = h.tagName.toLowerCase();
+          const fontSize = tag === "h1" ? 28 : tag === "h2" ? 22 : tag === "h3" ? 18 : 14;
+          doc.setFontSize(fontSize);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(15, 23, 42);
+          const lines = doc.splitTextToSize(h.textContent?.trim() || "", 880);
+          lines.forEach((line: string) => {
+            if (y > 510) return;
+            doc.text(line, 40, y);
+            y += fontSize * 1.4;
+          });
+          y += 8;
+        });
+
+        const textEls = htmlDoc.body.querySelectorAll("p, li");
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(51, 65, 85);
+        textEls.forEach((el) => {
+          const text = el.textContent?.trim();
+          if (!text || text.length < 3) return;
+          const prefix = el.tagName === "LI" ? "• " : "";
+          const lines = doc.splitTextToSize(prefix + text, 860);
+          lines.forEach((line: string) => {
+            if (y > 510) return;
+            doc.text(line, 50, y);
+            y += 16;
+          });
+          y += 4;
+        });
+      } else {
+        // Legacy
         const bgHex = slideData.bgColor || "1a1a2e";
         const r = parseInt(bgHex.substring(0, 2), 16);
         const g = parseInt(bgHex.substring(2, 4), 16);
@@ -842,53 +889,26 @@ function exportSlidesToPdf(content: any) {
         doc.setFillColor(r, g, b);
         doc.rect(0, 0, 960, 540, "F");
 
-        const textR = isLightColor(bgHex) ? 26 : 255;
-        const textG = isLightColor(bgHex) ? 26 : 255;
-        const textB = isLightColor(bgHex) ? 46 : 255;
-        doc.setTextColor(textR, textG, textB);
+        const isLight = isLightColor(bgHex);
+        doc.setTextColor(isLight ? 26 : 255, isLight ? 26 : 255, isLight ? 46 : 255);
 
-        if (slideData.layout === "title") {
-          doc.setFontSize(32);
-          doc.setFont("helvetica", "bold");
-          const titleLines = doc.splitTextToSize(slideData.title || "", 800);
-          doc.text(titleLines, 480, 200, { align: "center" });
-          if (slideData.subtitle) {
-            doc.setFontSize(16);
-            doc.setFont("helvetica", "normal");
-            doc.text(slideData.subtitle, 480, 300, { align: "center" });
-          }
-        } else {
-          doc.setFontSize(24);
-          doc.setFont("helvetica", "bold");
-          doc.text(slideData.title || "", 40, 50);
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text(slideData.title || "", 40, 50);
+        
+        let y = 90;
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "normal");
+        (slideData.points || []).forEach((p: string) => {
+          const lines = doc.splitTextToSize(`• ${p}`, 850);
+          lines.forEach((line: string) => { if (y < 500) { doc.text(line, 60, y); y += 20; } });
+          y += 5;
+        });
+      }
+    }
 
-          doc.setFontSize(13);
-          doc.setFont("helvetica", "normal");
-          let y = 90;
-          const points = slideData.points || [];
-          points.forEach((p: string) => {
-            const lines = doc.splitTextToSize(`• ${p}`, 850);
-            lines.forEach((line: string) => {
-              if (y > 500) return;
-              doc.text(line, 60, y);
-              y += 20;
-            });
-            y += 5;
-          });
-          if (slideData.content) {
-            const lines = doc.splitTextToSize(slideData.content, 850);
-            lines.forEach((line: string) => {
-              if (y > 500) return;
-              doc.text(line, 60, y);
-              y += 18;
-            });
-          }
-        }
-      });
-
-      doc.save(`${sanitizeFilename(content?.title || "Diapositivas")}.pdf`);
-      toast.success("PDF descargado");
-    });
+    doc.save(`${sanitizeFilename(content?.title || "Diapositivas")}.pdf`);
+    toast.success("PDF descargado");
   } catch (e: any) {
     toast.error("Error al exportar PDF: " + e.message);
   }
