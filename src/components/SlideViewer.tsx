@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 
 interface SlideData {
   html: string;
-  // Legacy support
   title?: string;
   subtitle?: string;
   content?: string;
@@ -49,7 +48,7 @@ export function SlideViewer({ slides, title }: Props) {
         )}
 
         {/* Controls overlay */}
-        <div className="absolute bottom-3 left-4 text-xs text-muted-foreground/60 bg-black/20 px-2 py-1 rounded">
+        <div className="absolute bottom-3 left-4 text-xs text-white/80 bg-black/30 px-2 py-1 rounded">
           {currentSlide + 1} / {slides.length}
         </div>
 
@@ -141,22 +140,6 @@ export function SlideViewer({ slides, title }: Props) {
 function HtmlSlideRenderer({ html, fullscreen, thumbnail }: { html: string; fullscreen?: boolean; thumbnail?: boolean }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const handleLoad = useCallback(() => {
-    if (!iframeRef.current) return;
-    // Disable any links/interactions inside iframe
-    try {
-      const doc = iframeRef.current.contentDocument;
-      if (doc) {
-        const style = doc.createElement("style");
-        style.textContent = `
-          * { pointer-events: none !important; }
-          body { margin: 0; overflow: hidden; }
-        `;
-        doc.head.appendChild(style);
-      }
-    } catch { /* cross-origin, ignore */ }
-  }, []);
-
   if (thumbnail) {
     return (
       <div className="w-full h-full overflow-hidden bg-white">
@@ -171,8 +154,7 @@ function HtmlSlideRenderer({ html, fullscreen, thumbnail }: { html: string; full
             transformOrigin: "top left",
             pointerEvents: "none",
           }}
-          sandbox="allow-same-origin"
-          onLoad={handleLoad}
+          sandbox="allow-same-origin allow-scripts"
           title="Slide thumbnail"
         />
       </div>
@@ -186,8 +168,7 @@ function HtmlSlideRenderer({ html, fullscreen, thumbnail }: { html: string; full
           ref={iframeRef}
           srcDoc={html}
           className="absolute inset-0 w-full h-full border-0"
-          sandbox="allow-same-origin"
-          onLoad={handleLoad}
+          sandbox="allow-same-origin allow-scripts"
           title="Slide preview"
         />
       </div>
