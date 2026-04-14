@@ -183,21 +183,56 @@ Formato JSON requerido:
     case "slides":
       return `${base}
 Genera una presentación educativa con exactamente ${numItems} diapositivas.
-Cada diapositiva debe ser un bloque de HTML completo con estilos inline CSS profesionales.
-El HTML debe incluir:
-- Google Fonts (Inter y Space Grotesk) via link en cada slide
-- Google Material Icons via link
-- Estilos CSS inline y en un tag <style> dentro de cada slide
-- El slide debe tener dimensiones fijas: width: 1280px; height: 720px
-- Diseño profesional tipo presentación corporativa/tech (inspirado en Supabase, Stripe, Linear)
-- Fondo limpio (blanco o muy claro), con acentos de color en elementos decorativos
-- Iconos de Material Icons donde sea apropiado
-- Tarjetas con sombras suaves, bordes redondeados
-- Tipografía jerárquica clara (títulos grandes, subtítulos medianos, cuerpo pequeño)
-- Colores de acento profesionales (azul #0F172A, accent #3B82F6, textos grises)
-- Elementos visuales como diagramas de flujo con flechas, listas con iconos, grids de tarjetas
-- NO uses JavaScript, solo HTML y CSS
-- Cada slide debe ser autocontenido (incluir sus propios <style> y <link> tags)
+Cada diapositiva DEBE ser un documento HTML completo y autocontenido que se renderiza en un iframe a 1280x720px.
+
+ESTRUCTURA OBLIGATORIA de cada slide HTML:
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { width: 1280px; height: 720px; overflow: hidden; font-family: 'Inter', sans-serif; }
+    /* ... estilos del slide ... */
+  </style>
+</head>
+<body>
+  <!-- contenido del slide -->
+</body>
+</html>
+
+REGLAS DE DISEÑO OBLIGATORIAS:
+1. body DEBE tener width:1280px; height:720px; overflow:hidden
+2. TODOS los estilos deben estar en un <style> tag dentro de <head> o inline. NO uses clases CSS externas.
+3. USA la etiqueta <span class="material-icons">nombre_icono</span> para iconos (ej: "star", "school", "check_circle", "arrow_forward", "notifications_active", "verified_user", "settings_suggest", "lock_open", "account_tree")
+4. Usa colores de acento profesionales: primario #0F172A (azul oscuro), acento #3B82F6 (azul), secundario #6366F1 (indigo), texto #334155 (gris oscuro), fondo claro #F8FAFC
+5. Crea layouts visuales ricos: tarjetas con border-radius y box-shadow, grids con CSS grid o flexbox, diagramas de flujo con flechas, badges con colores, números grandes destacados
+6. Cada slide debe tener un diseño DIFERENTE: portada hero, contenido con cards, flujo de proceso con pasos numerados, comparación lado a lado, grid de iconos con texto, conclusión
+7. NO uses JavaScript
+8. Tipografía: títulos en 'Space Grotesk' 36-48px bold, subtítulos 20-24px, cuerpo 14-16px en 'Inter'
+9. Agrega elementos decorativos: líneas de acento, círculos de color detrás de iconos, gradientes sutiles en headers, bordes laterales de color
+10. Los iconos Material Icons deben tener un tamaño visible: font-size: 28-48px y deben estar dentro de contenedores con background-color y border-radius: 50% o border-radius: 12px
+
+EJEMPLO de un slide bien diseñado (NO copies este contenido, solo la estructura):
+<div style="display:flex;height:100%;background:#F8FAFC">
+  <div style="width:100%;padding:60px 80px;display:flex;flex-direction:column;gap:40px">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="background:linear-gradient(135deg,#3B82F6,#6366F1);border-radius:16px;padding:14px;display:flex">
+        <span class="material-icons" style="color:white;font-size:32px">school</span>
+      </div>
+      <h1 style="font-family:'Space Grotesk';font-size:42px;font-weight:700;color:#0F172A">Título</h1>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1">
+      <div style="background:white;border-radius:16px;padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.06);border:1px solid #E2E8F0">
+        <span class="material-icons" style="font-size:36px;color:#3B82F6">check_circle</span>
+        <h3 style="font-size:20px;font-weight:600;color:#0F172A;margin:12px 0 8px">Subtítulo</h3>
+        <p style="font-size:14px;color:#64748B;line-height:1.6">Contenido descriptivo aquí.</p>
+      </div>
+    </div>
+  </div>
+</div>
 
 Formato JSON requerido:
 {
@@ -210,10 +245,11 @@ Formato JSON requerido:
   ]
 }
 
-IMPORTANTE: Cada slide.html debe ser un documento HTML completo y válido que se pueda renderizar independientemente en un iframe.
-Varía los diseños entre diapositivas: portada con título grande, contenido con bullets/cards, diagramas de flujo, comparaciones lado a lado, conclusiones.
-Usa una paleta de colores CONSISTENTE en todas las diapositivas.
-El resultado debe verse tan profesional como una presentación de Gamma.app o Pitch.com.`;
+IMPORTANTE:
+- Cada slide.html DEBE ser un documento HTML completo y válido
+- Varía los diseños: portada, contenido con cards, diagrama de flujo, comparación, grid, conclusión
+- Usa una paleta de colores CONSISTENTE en todas las diapositivas
+- El resultado debe verse tan profesional como Gamma.app o Z.ai`;
 
     case "lesson_plan":
       return `${base}
