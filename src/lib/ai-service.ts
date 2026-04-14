@@ -91,7 +91,7 @@ function getOllamaPrompt(type: string, numItems: number): string {
     workshop: `Genera un taller educativo. JSON: {"title":"","subject":"","objective":"","duration":"","materials":[],"activities":[{"number":1,"title":"","description":"","instructions":"","duration":""}],"evaluation":""}`,
     lesson_plan: `Genera un plan de clase. JSON: {"title":"","subject":"","grade":"","duration":"","objective":"","competencies":[],"phases":[{"name":"","duration":"","activities":"","resources":""}],"evaluation":"","homework":""}`,
     rubric: `Genera una rúbrica según el tipo y niveles indicados en las instrucciones. JSON: {"title":"","subject":"","rubricType":"","objective":"","levels":[],"criteria":[{"name":"","descriptions":{},"weight":25}],"observations":""}`,
-    slides: `Genera ${numItems} diapositivas educativas. Usa colores hex variados sin #. Alterna layouts: title, content, two_columns. JSON: {"title":"","subject":"","slides":[{"title":"","subtitle":"","layout":"title","bgColor":"1a1a2e","points":[],"content":"","leftContent":"","rightContent":"","imageQuery":""}]}`,
+    slides: `Genera ${numItems} diapositivas educativas. Cada diapositiva debe ser un HTML completo con estilos inline CSS profesionales (1280x720px, Google Fonts Inter/Space Grotesk, Material Icons, fondo claro, diseño tipo Gamma.app). JSON: {"title":"","subject":"","slides":[{"html":"<!DOCTYPE html><html>...</html>"}]}`,
   };
 
   return `${base}\n${formats[type] || ""}`;
