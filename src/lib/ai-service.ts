@@ -91,7 +91,7 @@ function getOllamaPrompt(type: string, numItems: number): string {
     workshop: `Genera un taller educativo. JSON: {"title":"","subject":"","objective":"","duration":"","materials":[],"activities":[{"number":1,"title":"","description":"","instructions":"","duration":""}],"evaluation":""}`,
     lesson_plan: `Genera un plan de clase. JSON: {"title":"","subject":"","grade":"","duration":"","objective":"","competencies":[],"phases":[{"name":"","duration":"","activities":"","resources":""}],"evaluation":"","homework":""}`,
     rubric: `Genera una rúbrica según el tipo y niveles indicados en las instrucciones. JSON: {"title":"","subject":"","rubricType":"","objective":"","levels":[],"criteria":[{"name":"","descriptions":{},"weight":25}],"observations":""}`,
-    slides: `Genera ${numItems} diapositivas educativas. Cada diapositiva debe ser un HTML completo con estilos inline CSS profesionales (1280x720px, Google Fonts Inter/Space Grotesk, Material Icons, fondo claro, diseño tipo Gamma.app). JSON: {"title":"","subject":"","slides":[{"html":"<!DOCTYPE html><html>...</html>"}]}`,
+    slides: `Genera ${numItems} diapositivas educativas profesionales. Cada diapositiva DEBE ser un documento HTML completo autocontenido de 1280x720px con estilos inline, Google Fonts (Inter/Space Grotesk), Material Icons. USA layouts variados: portada hero con gradiente, tarjetas en grid, flujo de proceso con pasos numerados, comparación lado a lado, estadísticas con números grandes, lista con iconos. Paleta consistente. JSON: {"title":"","subject":"","slides":[{"html":"<!DOCTYPE html><html lang=\\"es\\"><head>...</head><body>...</body></html>"}]}`,
   };
 
   return `${base}\n${formats[type] || ""}`;
