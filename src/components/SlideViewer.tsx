@@ -1,19 +1,17 @@
-import { useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Maximize2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface SlideData {
-  html: string;
+  html?: string;
   title?: string;
   subtitle?: string;
   content?: string;
   points?: string[];
   leftContent?: string;
   rightContent?: string;
-  layout?: "title" | "content" | "two_columns" | "image_text";
+  layout?: string;
   bgColor?: string;
-  imageQuery?: string;
-  imageUrl?: string;
 }
 
 interface Props {
@@ -24,51 +22,94 @@ interface Props {
 export function SlideViewer({ slides, title }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setCurrentSlide((p) => Math.max(0, p - 1));
+      } else if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === " ") {
+        e.preventDefault();
+        setCurrentSlide((p) => Math.min(slides.length - 1, p + 1));
+      } else if (e.key === "Escape" && fullscreen) {
+        setFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [slides.length, fullscreen]);
 
   if (!slides || slides.length === 0) {
-    return <p className="text-muted-foreground text-center py-8">No se generaron diapositivas.</p>;
+    return (
+      <p className="text-muted-foreground text-center py-8">
+        No se generaron diapositivas.
+      </p>
+    );
   }
 
   const slide = slides[currentSlide];
-  const isHtmlSlide = !!slide.html;
 
   return (
     <div className="space-y-4">
       {/* Main Slide */}
       <div
-        className={`relative w-full rounded-xl overflow-hidden shadow-2xl border border-border bg-white ${
-          fullscreen ? "fixed inset-0 z-50 rounded-none border-none" : ""
+        ref={containerRef}
+        className={`relative bg-gray-900 ${
+          fullscreen
+            ? "fixed inset-0 z-50 flex items-center justify-center"
+            : "w-full rounded-xl overflow-hidden shadow-2xl border border-border"
         }`}
         style={fullscreen ? {} : { aspectRatio: "16/9" }}
       >
-        {isHtmlSlide ? (
-          <HtmlSlideRenderer html={slide.html} fullscreen={fullscreen} />
-        ) : (
-          <LegacySlideRenderer slide={slide} />
-        )}
+        <SlideIframe
+          html={slide.html || ""}
+          fullscreen={fullscreen}
+        />
 
         {/* Controls overlay */}
-        <div className="absolute bottom-3 left-4 text-xs text-white/80 bg-black/30 px-2 py-1 rounded">
+        <div className="absolute bottom-3 left-4 text-xs text-white/90 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-full font-medium z-10">
           {currentSlide + 1} / {slides.length}
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-2 right-2 h-8 w-8 bg-black/20 hover:bg-black/40 text-white"
-          onClick={() => setFullscreen(!fullscreen)}
-        >
-          <Maximize2 className="h-4 w-4" />
-        </Button>
+        <div className="absolute top-3 right-3 flex gap-2 z-10">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 bg-black/30 hover:bg-black/50 text-white backdrop-blur-sm"
+            onClick={() => setFullscreen(!fullscreen)}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+        </div>
 
         {fullscreen && (
           <Button
             variant="ghost"
-            className="absolute top-2 left-2 text-white bg-black/30 hover:bg-black/50"
+            className="absolute top-3 left-3 text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm z-10"
             onClick={() => setFullscreen(false)}
           >
             ✕ Cerrar
           </Button>
+        )}
+
+        {/* Side navigation arrows (only in fullscreen) */}
+        {fullscreen && currentSlide > 0 && (
+          <button
+            className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-3 backdrop-blur-sm z-10"
+            onClick={() => setCurrentSlide((p) => p - 1)}
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        )}
+        {fullscreen && currentSlide < slides.length - 1 && (
+          <button
+            className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-3 backdrop-blur-sm z-10"
+            onClick={() => setCurrentSlide((p) => p + 1)}
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
         )}
       </div>
 
@@ -89,7 +130,9 @@ export function SlideViewer({ slides, title }: Props) {
               key={i}
               onClick={() => setCurrentSlide(i)}
               className={`h-2 rounded-full transition-all ${
-                i === currentSlide ? "w-6 bg-primary" : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                i === currentSlide
+                  ? "w-6 bg-primary"
+                  : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
               }`}
             />
           ))}
@@ -106,30 +149,19 @@ export function SlideViewer({ slides, title }: Props) {
       </div>
 
       {/* Thumbnail strip */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="flex gap-2 overflow-x-auto pb-2 px-1">
         {slides.map((s, i) => (
           <button
             key={i}
             onClick={() => setCurrentSlide(i)}
-            className={`shrink-0 w-36 rounded-lg overflow-hidden border-2 transition-all ${
-              i === currentSlide ? "border-primary shadow-lg" : "border-border hover:border-primary/40"
+            className={`shrink-0 w-40 rounded-lg overflow-hidden border-2 transition-all ${
+              i === currentSlide
+                ? "border-primary shadow-lg ring-2 ring-primary/20"
+                : "border-border hover:border-primary/40"
             }`}
             style={{ aspectRatio: "16/9" }}
           >
-            {s.html ? (
-              <HtmlSlideRenderer html={s.html} thumbnail />
-            ) : (
-              <div
-                className="p-2 h-full flex flex-col justify-center"
-                style={{ backgroundColor: `#${s.bgColor || "1a1a2e"}` }}
-              >
-                <p className={`text-[7px] font-bold leading-tight truncate ${
-                  isLightBg(s.bgColor || "1a1a2e") ? "text-gray-900" : "text-white"
-                }`}>
-                  {s.title || `Diapositiva ${i + 1}`}
-                </p>
-              </div>
-            )}
+            <SlideIframe html={s.html || ""} thumbnail />
           </button>
         ))}
       </div>
@@ -137,91 +169,83 @@ export function SlideViewer({ slides, title }: Props) {
   );
 }
 
-function HtmlSlideRenderer({ html, fullscreen, thumbnail }: { html: string; fullscreen?: boolean; thumbnail?: boolean }) {
+/** Renders a slide HTML in an iframe with proper scaling */
+function SlideIframe({
+  html,
+  fullscreen,
+  thumbnail,
+}: {
+  html: string;
+  fullscreen?: boolean;
+  thumbnail?: boolean;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  const SLIDE_W = 1280;
+  const SLIDE_H = 720;
+
+  const updateScale = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    if (cw === 0 || ch === 0) return;
+    const s = Math.min(cw / SLIDE_W, ch / SLIDE_H);
+    setScale(s);
+  }, []);
+
+  useEffect(() => {
+    updateScale();
+    const obs = new ResizeObserver(updateScale);
+    if (containerRef.current) obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, [updateScale, fullscreen]);
 
   if (thumbnail) {
     return (
-      <div className="w-full h-full overflow-hidden bg-white">
+      <div className="w-full h-full overflow-hidden bg-white relative">
         <iframe
-          ref={iframeRef}
           srcDoc={html}
-          className="border-0"
+          className="border-0 pointer-events-none"
           style={{
-            width: "1280px",
-            height: "720px",
-            transform: "scale(0.112)",
+            width: `${SLIDE_W}px`,
+            height: `${SLIDE_H}px`,
+            transform: `scale(${160 / SLIDE_W})`,
             transformOrigin: "top left",
-            pointerEvents: "none",
+            position: "absolute",
+            top: 0,
+            left: 0,
           }}
           sandbox="allow-same-origin allow-scripts"
           title="Slide thumbnail"
+          loading="lazy"
         />
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full overflow-hidden flex items-center justify-center bg-gray-100">
-      <div className="relative w-full" style={{ paddingBottom: fullscreen ? "100vh" : "56.25%" }}>
-        <iframe
-          ref={iframeRef}
-          srcDoc={html}
-          className="absolute inset-0 w-full h-full border-0"
-          sandbox="allow-same-origin allow-scripts"
-          title="Slide preview"
-        />
-      </div>
+    <div
+      ref={containerRef}
+      className="w-full h-full flex items-center justify-center overflow-hidden"
+      style={{ background: "#111" }}
+    >
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        className="border-0"
+        style={{
+          width: `${SLIDE_W}px`,
+          height: `${SLIDE_H}px`,
+          transform: `scale(${scale})`,
+          transformOrigin: "center center",
+          flexShrink: 0,
+        }}
+        sandbox="allow-same-origin allow-scripts"
+        title="Slide preview"
+      />
     </div>
   );
-}
-
-function LegacySlideRenderer({ slide }: { slide: any }) {
-  const bgHex = slide.bgColor || "1a1a2e";
-  const isLight = isLightBg(bgHex);
-  const textClass = isLight ? "text-gray-900" : "text-white";
-  const subtextClass = isLight ? "text-gray-600" : "text-white/80";
-
-  return (
-    <div className="absolute inset-0 p-8 md:p-12 flex flex-col" style={{ backgroundColor: `#${bgHex}` }}>
-      {slide.layout === "title" ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <h2 className={`text-2xl md:text-4xl lg:text-5xl font-bold mb-4 leading-tight ${textClass}`}>
-            {slide.title}
-          </h2>
-          {slide.subtitle && (
-            <p className={`text-base md:text-xl ${subtextClass} max-w-2xl`}>{slide.subtitle}</p>
-          )}
-        </div>
-      ) : slide.layout === "two_columns" ? (
-        <>
-          <h2 className={`text-xl md:text-3xl font-bold mb-6 ${textClass}`}>{slide.title}</h2>
-          <div className="flex-1 grid grid-cols-2 gap-6">
-            <div className={`text-sm md:text-base ${subtextClass} whitespace-pre-line`}>{slide.leftContent}</div>
-            <div className={`text-sm md:text-base ${subtextClass} whitespace-pre-line`}>{slide.rightContent}</div>
-          </div>
-        </>
-      ) : (
-        <>
-          <h2 className={`text-xl md:text-3xl font-bold mb-6 ${textClass}`}>{slide.title}</h2>
-          <div className="flex-1 flex flex-col gap-3 overflow-auto">
-            {slide.points?.map((point: string, i: number) => (
-              <div key={i} className="flex items-start gap-3">
-                <span className="mt-1 h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: isLight ? "#6366f1" : "#818cf8" }} />
-                <p className={`text-sm md:text-base ${subtextClass}`}>{point}</p>
-              </div>
-            ))}
-            {slide.content && <p className={`text-sm md:text-base ${subtextClass} mt-2`}>{slide.content}</p>}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function isLightBg(hex: string): boolean {
-  const r = parseInt(hex.substring(0, 2), 16);
-  const g = parseInt(hex.substring(2, 4), 16);
-  const b = parseInt(hex.substring(4, 6), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
 }
