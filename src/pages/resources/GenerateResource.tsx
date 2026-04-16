@@ -726,7 +726,7 @@ export default function GenerateResource() {
 
           <div className="p-6">
             {resourceType === "slides" ? (
-              <SlideViewer slides={displayContent?.slides || []} title={displayContent?.title} />
+              <SlideViewer slides={displayContent?.slides || []} title={displayContent?.title} theme={displayContent?.theme} />
             ) : (
               <ResourceContentViewer
                 type={resourceType}
