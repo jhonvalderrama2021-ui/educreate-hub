@@ -1,14 +1,66 @@
 import html2canvas from "html2canvas";
 import { toast } from "sonner";
+import { StructuredPresentation, DEFAULT_THEME } from "@/lib/slide-types";
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
 
+function sanitizeFilename(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .substring(0, 50);
+}
+
+function isStructuredPresentation(content: any): boolean {
+  return content?.slides?.[0]?.layout !== undefined;
+}
+
 /**
- * Renders a single HTML slide to a canvas by creating a temporary iframe,
- * waiting for fonts/icons to load, then capturing with html2canvas.
+ * Captures a slide element from the DOM as a canvas.
+ * For structured slides, we render them in a hidden container and capture.
  */
-async function renderSlideToCanvas(html: string): Promise<HTMLCanvasElement> {
+async function captureSlideToCanvas(slideIndex: number): Promise<HTMLCanvasElement | null> {
+  // Find the slide thumbnail or main slide elements in the DOM
+  // We'll use a temporary render approach
+  const slideElements = document.querySelectorAll('[data-slide-export]');
+  
+  if (slideElements[slideIndex]) {
+    const el = slideElements[slideIndex] as HTMLElement;
+    
+    // Wait for images to load
+    const images = el.querySelectorAll('img');
+    await Promise.all(
+      Array.from(images).map(img =>
+        img.complete ? Promise.resolve() : new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        })
+      )
+    );
+    
+    // Wait for fonts
+    await document.fonts.ready;
+    
+    return html2canvas(el, {
+      width: SLIDE_W,
+      height: SLIDE_H,
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+  }
+  
+  return null;
+}
+
+/**
+ * Legacy: render HTML slide in iframe and capture
+ */
+async function renderHtmlSlideToCanvas(html: string): Promise<HTMLCanvasElement> {
   const container = document.createElement("div");
   container.style.cssText =
     `position:fixed;left:-9999px;top:0;width:${SLIDE_W}px;height:${SLIDE_H}px;overflow:hidden;z-index:-1;`;
@@ -17,6 +69,7 @@ async function renderSlideToCanvas(html: string): Promise<HTMLCanvasElement> {
   const iframe = document.createElement("iframe");
   iframe.style.cssText = `width:${SLIDE_W}px;height:${SLIDE_H}px;border:none;`;
   iframe.sandbox.add("allow-same-origin");
+  iframe.sandbox.add("allow-scripts");
   container.appendChild(iframe);
 
   await new Promise<void>((resolve) => {
@@ -47,12 +100,53 @@ async function renderSlideToCanvas(html: string): Promise<HTMLCanvasElement> {
   return canvas;
 }
 
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "_")
-    .substring(0, 50);
+/**
+ * For structured slides: create a temporary DOM element with the slide content,
+ * render it, and capture to canvas.
+ */
+async function renderStructuredSlideToCanvas(
+  slideData: any,
+  theme: any,
+  renderFn: (container: HTMLElement, slide: any, theme: any) => void
+): Promise<HTMLCanvasElement> {
+  const container = document.createElement("div");
+  container.style.cssText =
+    `position:fixed;left:-9999px;top:0;width:${SLIDE_W}px;height:${SLIDE_H}px;overflow:hidden;z-index:-1;`;
+  document.body.appendChild(container);
+
+  const slideEl = document.createElement("div");
+  slideEl.style.cssText = `width:${SLIDE_W}px;height:${SLIDE_H}px;`;
+  container.appendChild(slideEl);
+
+  // Use the render function to populate
+  renderFn(slideEl, slideData, theme);
+
+  await document.fonts.ready;
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Wait for images
+  const images = slideEl.querySelectorAll('img');
+  await Promise.all(
+    Array.from(images).map(img =>
+      img.complete ? Promise.resolve() : new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      })
+    )
+  );
+
+  const canvas = await html2canvas(slideEl, {
+    width: SLIDE_W,
+    height: SLIDE_H,
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+  });
+
+  document.body.removeChild(container);
+  return canvas;
 }
 
 export async function exportSlidesToPdf(content: any) {
@@ -62,6 +156,7 @@ export async function exportSlidesToPdf(content: any) {
     return;
   }
 
+  const isStructured = isStructuredPresentation(content);
   toast.info(`Generando PDF (${slides.length} diapositivas)... Esto puede tardar unos segundos.`);
 
   try {
@@ -72,18 +167,31 @@ export async function exportSlidesToPdf(content: any) {
       if (idx > 0) doc.addPage();
       const slideData = slides[idx];
 
-      if (slideData.html) {
-        try {
-          const canvas = await renderSlideToCanvas(slideData.html);
-          const imgData = canvas.toDataURL("image/jpeg", 0.92);
-          doc.addImage(imgData, "JPEG", 0, 0, SLIDE_W, SLIDE_H);
-        } catch (e) {
-          console.warn(`Slide ${idx + 1} render failed, using fallback`, e);
-          doc.setFillColor(255, 255, 255);
-          doc.rect(0, 0, SLIDE_W, SLIDE_H, "F");
-          doc.setFontSize(24);
-          doc.text(`Diapositiva ${idx + 1}`, 60, 80);
+      try {
+        let canvas: HTMLCanvasElement;
+        
+        if (isStructured) {
+          // For structured slides, capture from the active viewer DOM
+          const exported = await captureSlideFromViewer(idx, slides.length);
+          if (exported) {
+            canvas = exported;
+          } else {
+            throw new Error("Could not capture slide");
+          }
+        } else if (slideData.html) {
+          canvas = await renderHtmlSlideToCanvas(slideData.html);
+        } else {
+          throw new Error("No content");
         }
+        
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        doc.addImage(imgData, "JPEG", 0, 0, SLIDE_W, SLIDE_H);
+      } catch (e) {
+        console.warn(`Slide ${idx + 1} render failed, using fallback`, e);
+        doc.setFillColor(255, 255, 255);
+        doc.rect(0, 0, SLIDE_W, SLIDE_H, "F");
+        doc.setFontSize(24);
+        doc.text(`Diapositiva ${idx + 1}`, 60, 80);
       }
     }
 
@@ -102,6 +210,7 @@ export async function exportSlidesToPptx(content: any) {
     return;
   }
 
+  const isStructured = isStructuredPresentation(content);
   toast.info(`Generando PPTX (${slides.length} diapositivas)... Esto puede tardar unos segundos.`);
 
   try {
@@ -114,24 +223,36 @@ export async function exportSlidesToPptx(content: any) {
       const slideData = slides[idx];
       const slide = pres.addSlide();
 
-      if (slideData.html) {
-        try {
-          const canvas = await renderSlideToCanvas(slideData.html);
-          const imgData = canvas.toDataURL("image/png");
-          slide.addImage({
-            data: imgData,
-            x: 0,
-            y: 0,
-            w: "100%",
-            h: "100%",
-          });
-        } catch (e) {
-          console.warn(`Slide ${idx + 1} render failed`, e);
-          slide.addText(`Diapositiva ${idx + 1}`, {
-            x: 0.5, y: 2.5, w: 9, h: 1,
-            fontSize: 28, bold: true, color: "333333",
-          });
+      try {
+        let canvas: HTMLCanvasElement;
+        
+        if (isStructured) {
+          const exported = await captureSlideFromViewer(idx, slides.length);
+          if (exported) {
+            canvas = exported;
+          } else {
+            throw new Error("Could not capture slide");
+          }
+        } else if (slideData.html) {
+          canvas = await renderHtmlSlideToCanvas(slideData.html);
+        } else {
+          throw new Error("No content");
         }
+
+        const imgData = canvas.toDataURL("image/png");
+        slide.addImage({
+          data: imgData,
+          x: 0,
+          y: 0,
+          w: "100%",
+          h: "100%",
+        });
+      } catch (e) {
+        console.warn(`Slide ${idx + 1} render failed`, e);
+        slide.addText(`Diapositiva ${idx + 1}`, {
+          x: 0.5, y: 2.5, w: 9, h: 1,
+          fontSize: 28, bold: true, color: "333333",
+        });
       }
     }
 
@@ -142,4 +263,42 @@ export async function exportSlidesToPptx(content: any) {
     console.error("PPTX export error:", e);
     toast.error("Error al exportar PPTX: " + e.message);
   }
+}
+
+/**
+ * Captures a structured slide by temporarily navigating the viewer
+ * and capturing each slide from the DOM.
+ */
+async function captureSlideFromViewer(slideIndex: number, totalSlides: number): Promise<HTMLCanvasElement | null> {
+  // Look for the main slide render container
+  const slideContainer = document.querySelector('.slide-content');
+  if (!slideContainer) return null;
+  
+  const parent = slideContainer.parentElement;
+  if (!parent) return null;
+
+  // Wait for content to render
+  await document.fonts.ready;
+  await new Promise(r => setTimeout(r, 300));
+  
+  // Wait for images
+  const images = slideContainer.querySelectorAll('img');
+  await Promise.all(
+    Array.from(images).map(img =>
+      img.complete ? Promise.resolve() : new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      })
+    )
+  );
+
+  return html2canvas(slideContainer as HTMLElement, {
+    width: SLIDE_W,
+    height: SLIDE_H,
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: "#F0F4F8",
+    logging: false,
+  });
 }
