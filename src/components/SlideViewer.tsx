@@ -1,30 +1,30 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface SlideData {
-  html?: string;
-  title?: string;
-  subtitle?: string;
-  content?: string;
-  points?: string[];
-  leftContent?: string;
-  rightContent?: string;
-  layout?: string;
-  bgColor?: string;
-}
+import { SlideRenderer } from "@/components/slides/SlideRenderer";
+import { StructuredSlide, StructuredPresentation, SlideTheme, DEFAULT_THEME } from "@/lib/slide-types";
 
 interface Props {
-  slides: SlideData[];
+  slides: any[];
   title?: string;
+  theme?: SlideTheme;
 }
 
-export function SlideViewer({ slides, title }: Props) {
+const SLIDE_W = 1280;
+const SLIDE_H = 720;
+
+/**
+ * Detects if slides use the new structured format or legacy HTML format.
+ * Structured slides have a `layout` field; legacy slides have `html`.
+ */
+function isStructured(slides: any[]): boolean {
+  return slides.length > 0 && !!slides[0]?.layout;
+}
+
+export function SlideViewer({ slides, title, theme = DEFAULT_THEME }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
@@ -49,22 +49,23 @@ export function SlideViewer({ slides, title }: Props) {
     );
   }
 
-  const slide = slides[currentSlide];
+  const structured = isStructured(slides);
 
   return (
     <div className="space-y-4">
       {/* Main Slide */}
       <div
-        ref={containerRef}
-        className={`relative bg-gray-900 ${
+        className={`relative ${
           fullscreen
-            ? "fixed inset-0 z-50 flex items-center justify-center"
+            ? "fixed inset-0 z-50 flex items-center justify-center bg-black"
             : "w-full rounded-xl overflow-hidden shadow-2xl border border-border"
         }`}
         style={fullscreen ? {} : { aspectRatio: "16/9" }}
       >
-        <SlideIframe
-          html={slide.html || ""}
+        <ScaledSlide
+          slide={slides[currentSlide]}
+          structured={structured}
+          theme={theme}
           fullscreen={fullscreen}
         />
 
@@ -94,7 +95,6 @@ export function SlideViewer({ slides, title }: Props) {
           </Button>
         )}
 
-        {/* Side navigation arrows (only in fullscreen) */}
         {fullscreen && currentSlide > 0 && (
           <button
             className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full p-3 backdrop-blur-sm z-10"
@@ -161,7 +161,7 @@ export function SlideViewer({ slides, title }: Props) {
             }`}
             style={{ aspectRatio: "16/9" }}
           >
-            <SlideIframe html={s.html || ""} thumbnail />
+            <ScaledSlide slide={s} structured={structured} theme={theme} thumbnail />
           </button>
         ))}
       </div>
@@ -169,31 +169,30 @@ export function SlideViewer({ slides, title }: Props) {
   );
 }
 
-/** Renders a slide HTML in an iframe with proper scaling */
-function SlideIframe({
-  html,
+/** Renders a single slide at fixed 1280x720 and scales to fit container */
+function ScaledSlide({
+  slide,
+  structured,
+  theme,
   fullscreen,
   thumbnail,
 }: {
-  html: string;
+  slide: any;
+  structured: boolean;
+  theme: SlideTheme;
   fullscreen?: boolean;
   thumbnail?: boolean;
 }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
 
-  const SLIDE_W = 1280;
-  const SLIDE_H = 720;
-
   const updateScale = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
+    const el = containerRef.current;
+    if (!el) return;
+    const cw = el.clientWidth;
+    const ch = el.clientHeight;
     if (cw === 0 || ch === 0) return;
-    const s = Math.min(cw / SLIDE_W, ch / SLIDE_H);
-    setScale(s);
+    setScale(Math.min(cw / SLIDE_W, ch / SLIDE_H));
   }, []);
 
   useEffect(() => {
@@ -203,6 +202,37 @@ function SlideIframe({
     return () => obs.disconnect();
   }, [updateScale, fullscreen]);
 
+  if (structured) {
+    // React-rendered slide
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full overflow-hidden"
+        style={{ position: "relative", background: "#111" }}
+      >
+        <div
+          style={{
+            width: `${SLIDE_W}px`,
+            height: `${SLIDE_H}px`,
+            transform: `scale(${thumbnail ? 160 / SLIDE_W : scale})`,
+            transformOrigin: thumbnail ? "top left" : "center center",
+            position: "absolute",
+            top: thumbnail ? 0 : "50%",
+            left: thumbnail ? 0 : "50%",
+            marginTop: thumbnail ? 0 : -(SLIDE_H / 2),
+            marginLeft: thumbnail ? 0 : -(SLIDE_W / 2),
+            fontFamily: "'Inter', sans-serif",
+          }}
+          className="slide-content"
+        >
+          <SlideRenderer slide={slide as StructuredSlide} theme={theme} />
+        </div>
+      </div>
+    );
+  }
+
+  // Legacy HTML iframe rendering
+  const html = slide?.html || "";
   if (thumbnail) {
     return (
       <div className="w-full h-full overflow-hidden bg-white relative">
@@ -233,7 +263,6 @@ function SlideIframe({
       style={{ background: "#111" }}
     >
       <iframe
-        ref={iframeRef}
         srcDoc={html}
         className="border-0"
         style={{
