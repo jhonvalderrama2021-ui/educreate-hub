@@ -1,50 +1,156 @@
 
+Objetivo
 
-# Plan: Mejorar calidad visual de diapositivas y exportación
+Llevar el recurso “Diapositivas” de un generador HTML básico a un sistema de presentaciones con:
+- imágenes reales o generadas integradas de forma visual,
+- vista previa consistente,
+- exportación fiel a PDF/PPTX,
+- calidad visual cercana a Gamma/Z.ai.
 
-## Problema actual
+Diagnóstico: qué te falta hoy
 
-1. **Vista previa en la app (imagen 2):** Las diapositivas se renderizan como texto plano sin estilos — los iconos de Material Icons aparecen como texto ("star"), sin colores, sin tarjetas, sin estructura visual. Esto indica que el HTML generado por la IA no se está renderizando correctamente en el iframe, o que la IA está generando HTML pobre.
+1. Falta un pipeline real de imágenes
+- En tu código actual no existe búsqueda/descarga/inserción real de imágenes.
+- El prompt puede “pedir” imágenes, pero la app no tiene un proveedor que las resuelva.
 
-2. **Exportación PDF/PPTX (imagen 1):** Los exportadores actuales extraen solo texto plano del HTML con `DOMParser` y lo escriben como líneas de texto simples. Se pierde todo el diseño visual (colores, tarjetas, iconos, layout).
+2. El modelo genera HTML libre en vez de una diapositiva estructurada
+- Hoy la IA devuelve `html` completo por slide.
+- Eso hace que el resultado sea inconsistente, difícil de controlar y frágil para exportar.
 
-## Solución propuesta
+3. La exportación sigue siendo frágil
+- `slide-export.ts` captura el `iframe` con `html2canvas`, pero:
+  - usa espera fija de 2s,
+  - no valida `document.fonts.ready`,
+  - no espera imágenes cargadas,
+  - no resuelve CORS,
+  - el `iframe` de export aún no permite scripts.
+- Si la slide depende de recursos externos, PDF/PPTX sale mal.
 
-### 1. Mejorar el visor de iframe (SlideViewer)
-- Asegurar que el iframe permita cargar recursos externos (Google Fonts, Material Icons) cambiando el `sandbox` attribute para incluir `allow-scripts` (necesario para que las fuentes se carguen correctamente).
-- Verificar que el iframe tenga dimensiones correctas y el escalado funcione bien.
+4. No hay generación progresiva real
+- `GenerateResource.tsx` espera toda la respuesta completa.
+- No existe streaming slide-by-slide como Gamma/Tome/Z.ai.
 
-### 2. Mejorar la exportación a PDF usando html2canvas
-- Reemplazar la exportación actual (que extrae texto plano) por un enfoque basado en **html2canvas**: renderizar cada iframe como imagen y pegarla en el PDF.
-- Esto preserva el diseño visual exacto de cada diapositiva.
-- Instalar `html2canvas` como dependencia.
+5. El repositorio de referencia no es “copiar y pegar”
+- Ese repo usa una arquitectura distinta: slides estructuradas, temas, editor, escaneo DOM y exportador por elementos.
+- Además, su propio README indica que PPTX aún es parcial y PDF no está resuelto del todo.
+- Sí sirve como referencia de arquitectura, no como solución literal.
 
-### 3. Mejorar la exportación a PPTX
-- En vez de extraer texto plano, renderizar cada slide HTML a imagen con html2canvas y añadir cada imagen como fondo de slide en pptxgenjs.
-- El resultado será visualmente fiel al visor.
+Plan propuesto
 
-### 4. Mejorar el prompt de la IA (Edge Function)
-- Reforzar el prompt para que genere HTML autocontenido con estilos inline más robustos.
-- Asegurar que cada slide incluya los `<link>` correctos de Google Fonts y Material Icons.
-- Añadir ejemplos más específicos de layouts esperados.
+Fase 1 — Cambiar la arquitectura de generación
+- Dejar de depender de HTML libre generado por IA.
+- Cambiar a un esquema JSON de presentación:
+```text
+presentation
+  title
+  theme
+  outline[]
+  slides[]
+    - layout
+    - title
+    - subtitle
+    - sections/cards/steps/stats
+    - image: { query, alt, placement, style, url }
+    - accentColors
+```
+- La IA genera contenido estructurado; el frontend renderiza con componentes React controlados.
 
-## Archivos a modificar
+Fase 2 — Motor visual propio de diapositivas
+- Crear layouts reutilizables inspirados en el repo de referencia:
+  - portada hero
+  - split text + image
+  - grid de tarjetas
+  - proceso/flujo
+  - comparación
+  - estadísticas
+  - timeline
+  - cierre/conclusión
+- Aplicar una paleta consistente de la plataforma (blanco + azul-morado), no Gamma.
+- Esto garantiza que todas las slides se vean bien sin depender de HTML arbitrario.
 
-| Archivo | Cambio |
-|---------|--------|
-| `src/components/SlideViewer.tsx` | Ajustar sandbox del iframe, mejorar escalado |
-| `src/pages/resources/GenerateResource.tsx` | Reescribir `exportSlidesToPdf` y `exportSlidesToPptx` usando html2canvas |
-| `supabase/functions/generate-resource/index.ts` | Mejorar prompt de slides |
-| `package.json` | Agregar `html2canvas` |
+Fase 3 — Integrar imágenes de verdad
+- Añadir un proveedor real de imágenes:
+  - opción A: stock real (Unsplash o Pexels)
+  - opción B: generadas con OpenAI Images
+- La edge function debe resolver cada `image.query` y devolver una `image.url` válida.
+- Para exportar bien, las imágenes deben quedar:
+  - proxied,
+  - almacenadas,
+  - o convertidas a data URL/base64.
+- Sin esto, seguirás viendo slides “sin imagen” o exports rotos.
 
-## Detalle técnico
+Fase 4 — Generación progresiva
+- Separar el flujo en 2 pasos:
+  1. generar outline,
+  2. generar slides una por una.
+- Mostrar cada slide renderizada a medida que llega.
+- Esto replica la sensación del repo de referencia sin copiar todo su stack.
 
-**Exportación con html2canvas:**
-- Crear un iframe temporal oculto con el HTML del slide a 1280x720
-- Esperar a que cargue (incluyendo fuentes)
-- Usar html2canvas para capturar como imagen
-- Insertar en PDF (jsPDF) o PPTX (pptxgenjs como imagen de fondo)
+Fase 5 — Rehacer exportación
+- PDF:
+  - exportar desde el renderer React final,
+  - esperar fuentes + imágenes cargadas,
+  - usar assets ya embebidos/proxied,
+  - capturar a alta resolución.
+- PPTX:
+  - no depender solo de screenshot del HTML libre,
+  - tomar la idea del repo de referencia: escanear DOM/render y convertir texto, fondos, imágenes y formas a `pptxgenjs`,
+  - dejar fallback a imagen solo para elementos no soportados.
+- Resultado: PPT editable parcialmente y mucho más fiel.
 
-**Iframe sandbox:**
-- Cambiar de `sandbox="allow-same-origin"` a `sandbox="allow-same-origin allow-scripts"` para que Google Fonts y Material Icons se carguen correctamente.
+Fase 6 — Validación y control de calidad
+- Normalizar largos de texto para evitar overflow.
+- Reglas por layout para que no se rompa el diseño.
+- Fallback si una imagen no carga.
+- QA obligatorio con generación real + exportación PDF/PPTX.
 
+Qué necesitamos para lograrlo bien
+
+1. Una fuente real de imágenes
+- Si quieres fotos reales: necesitamos API de Unsplash o Pexels.
+- Si aceptas imágenes generadas: podemos usar OpenAI, pero debe tener acceso a generación de imágenes y asumir costo.
+
+2. Aprobar una refactorización real
+- No es un “ajuste menor”.
+- Lo correcto es reemplazar el modelo actual basado en `slide.html` por un sistema de slides estructuradas + renderer propio.
+
+3. Mantener el repo de referencia solo como guía
+- Sí replicaremos:
+  - motor de layouts,
+  - tema consistente,
+  - pipeline visual,
+  - idea de export DOM -> PPTX,
+  - generación progresiva.
+- No replicaremos:
+  - Next.js completo,
+  - Plate editor completo,
+  - todo su sistema de presentaciones.
+
+Archivos/zonas que tocaría
+
+- `supabase/functions/generate-resource/index.ts`
+  - nuevo contrato JSON para slides
+  - generación outline + slide specs
+  - integración con imágenes
+- `src/lib/ai-service.ts`
+  - soporte a nuevo formato y, si aplica, streaming
+- `src/pages/resources/GenerateResource.tsx`
+  - flujo progresivo
+  - controles de tema/layout/imágenes
+- `src/components/SlideViewer.tsx`
+  - render con componentes React, no `iframe` de HTML libre
+- nuevo módulo de render:
+  - `src/components/slides/*`
+- `src/lib/slide-export.ts`
+  - export PDF robusto
+  - export PPTX por DOM/elementos + fallback visual
+
+Conclusión
+
+Lo que te falta no es solo “mejorar el prompt”: te faltan 4 piezas clave para llegar al resultado que buscas:
+- un proveedor real de imágenes,
+- un renderer estructurado de diapositivas,
+- generación progresiva,
+- un exportador pensado para slides reales y no para HTML arbitrario.
+
+Si apruebas este enfoque, el siguiente paso correcto es implementar la Fase 1 a 3 primero (estructura + renderer + imágenes), y después cerrar exportación y streaming sobre esa nueva base.
