@@ -78,8 +78,11 @@ serve(async (req) => {
     const data = await response.json();
     let content = JSON.parse(data.choices[0].message.content);
 
-    // For slides: enforce exact slide count + resolve image queries + apply user-selected theme
+    // For slides: enforce variety, exact count, kill stats without source PDF, then resolve images
     if (resourceType === "slides" && content.slides) {
+      const hasSourcePdf = !!(pdfContent && pdfContent.trim().length > 100);
+      content = enforceLayoutVariety(content);
+      content = stripStatsWithoutSource(content, hasSourcePdf);
       content = enforceSlideCount(content, numItems || 8);
       if (theme) content.theme = theme;
       content = await resolveSlideImages(content);
@@ -98,17 +101,125 @@ serve(async (req) => {
 
 async function resolveSlideImages(presentation: any): Promise<any> {
   const slides = presentation.slides || [];
-  for (const slide of slides) {
-    if (slide.image?.query) {
-      try {
-        const url = await searchUnsplash(slide.image.query);
-        if (url) slide.image.url = url;
-      } catch (e) {
-        console.warn("Unsplash search failed for:", slide.image.query, e);
+  // Resolve in parallel for speed
+  await Promise.all(
+    slides.map(async (slide: any) => {
+      if (slide.image?.query) {
+        try {
+          const url = await searchPexels(slide.image.query);
+          if (url) slide.image.url = url;
+        } catch (e) {
+          console.warn("Pexels search failed for:", slide.image.query, e);
+        }
+      }
+    })
+  );
+  return presentation;
+}
+
+/**
+ * Force layout variety: no two consecutive same layouts, max 2 of any single layout.
+ * Replaces duplicates with under-used alternatives.
+ */
+function enforceLayoutVariety(presentation: any): any {
+  const slides = presentation.slides || [];
+  if (slides.length <= 2) return presentation;
+
+  const middleLayouts = [
+    "grid", "split", "process", "comparison", "list", "timeline",
+    "quote", "imageFull", "bigNumber", "twoColumnText",
+  ];
+  const counts: Record<string, number> = {};
+  slides.forEach((s: any) => {
+    counts[s.layout] = (counts[s.layout] || 0) + 1;
+  });
+
+  for (let i = 1; i < slides.length - 1; i++) {
+    const prev = slides[i - 1].layout;
+    const curr = slides[i].layout;
+    const isStatsWithoutCare = curr === "stats"; // handled later
+    if (curr === prev || counts[curr] > 2) {
+      // pick the least used layout that isn't prev
+      const candidate = middleLayouts
+        .filter((l) => l !== prev)
+        .sort((a, b) => (counts[a] || 0) - (counts[b] || 0))[0];
+      if (candidate) {
+        counts[curr]--;
+        counts[candidate] = (counts[candidate] || 0) + 1;
+        slides[i] = transformSlideLayout(slides[i], candidate);
       }
     }
   }
+  presentation.slides = slides;
   return presentation;
+}
+
+/**
+ * Remove "stats" slides when there is no source PDF (no real data to cite).
+ * Convert them into a "list" or "grid" using the existing labels as content.
+ */
+function stripStatsWithoutSource(presentation: any, hasSourcePdf: boolean): any {
+  if (hasSourcePdf) return presentation;
+  const slides = presentation.slides || [];
+  presentation.slides = slides.map((s: any) => {
+    if (s.layout !== "stats") return s;
+    const items = (s.stats || []).map((st: any, i: number) => ({
+      icon: ["insights", "trending_up", "lightbulb", "school"][i % 4],
+      title: st.label || `Aspecto ${i + 1}`,
+      description: `Concepto clave relacionado con ${presentation.title || "el tema"}.`,
+    }));
+    return { layout: "list", title: s.title, listItems: items };
+  });
+  return presentation;
+}
+
+/**
+ * Lightweight transform that swaps a slide's layout while preserving its title,
+ * and synthesising minimal content for the new layout type.
+ */
+function transformSlideLayout(slide: any, newLayout: string): any {
+  const title = slide.title || "Información clave";
+  const next: any = { layout: newLayout, title };
+  if (newLayout === "quote") {
+    next.content = slide.subtitle || slide.content || `Reflexión central sobre ${title.toLowerCase()}.`;
+    next.subtitle = "Reflexión";
+  } else if (newLayout === "imageFull") {
+    next.subtitle = slide.subtitle || slide.content?.slice(0, 120) || "";
+    next.image = slide.image || { query: title, alt: title, placement: "background" };
+  } else if (newLayout === "bigNumber") {
+    next.bigNumber = slide.stats?.[0]?.value || "1";
+    next.subtitle = slide.stats?.[0]?.label || slide.subtitle || title;
+    next.content = slide.content || `Detalle relevante sobre ${title.toLowerCase()}.`;
+  } else if (newLayout === "twoColumnText") {
+    next.columns = slide.columns || [
+      { title: "Aspecto 1", color: "#3B82F6", points: [slide.subtitle || "Punto destacado"] },
+      { title: "Aspecto 2", color: "#6366F1", points: [slide.content?.slice(0, 80) || "Punto complementario"] },
+    ];
+  } else if (newLayout === "list") {
+    next.listItems = slide.listItems || (slide.cards || []).slice(0, 4).map((c: any) => ({
+      icon: c.icon || "check_circle", title: c.title, description: c.description,
+    }));
+    if (!next.listItems.length) {
+      next.listItems = [{ icon: "check_circle", title, description: slide.content || slide.subtitle || "Detalle relevante." }];
+    }
+  } else if (newLayout === "grid") {
+    next.cards = slide.cards || (slide.listItems || []).slice(0, 4).map((l: any) => ({
+      icon: l.icon || "star", title: l.title, description: l.description, color: "#3B82F6",
+    }));
+    if (!next.cards.length) {
+      next.cards = [
+        { icon: "lightbulb", title, description: slide.content || slide.subtitle || "Concepto clave.", color: "#3B82F6" },
+      ];
+    }
+  } else if (newLayout === "split") {
+    next.subtitle = slide.subtitle || "";
+    next.content = slide.content || slide.subtitle || `Información relevante sobre ${title.toLowerCase()}.`;
+    next.image = slide.image || { query: title, alt: title, placement: "right" };
+  } else {
+    // fallback: keep original
+    return slide;
+  }
+  return next;
 }
 
 /**
@@ -177,23 +288,33 @@ function buildFillerSlide(layout: string, topic: string, idx: number, color: str
   return base;
 }
 
-async function searchUnsplash(query: string): Promise<string | null> {
-  // Use Unsplash Source for simple redirect-based image (no API key needed)
-  // This returns a 1280x720 image URL directly
-  const encoded = encodeURIComponent(query);
-  const url = `https://source.unsplash.com/1280x720/?${encoded}`;
-  
-  try {
-    // Follow redirect to get the actual image URL
-    const res = await fetch(url, { redirect: "follow" });
-    if (res.ok) {
-      return res.url;
-    }
-  } catch {
-    // Fallback: use direct URL (browser will follow redirect)
+async function searchPexels(query: string): Promise<string | null> {
+  const apiKey = Deno.env.get("PEXELS_API_KEY");
+  if (!apiKey) {
+    console.warn("PEXELS_API_KEY not configured");
+    return null;
   }
-  
-  return `https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1280&h=720&fit=crop&q=80`;
+  try {
+    const encoded = encodeURIComponent(query);
+    const res = await fetch(
+      `https://api.pexels.com/v1/search?query=${encoded}&per_page=5&orientation=landscape`,
+      { headers: { Authorization: apiKey } }
+    );
+    if (!res.ok) {
+      console.warn("Pexels API error:", res.status);
+      return null;
+    }
+    const data = await res.json();
+    const photos = data.photos || [];
+    if (photos.length === 0) return null;
+    // Pick a random image from top 5 to vary results between slides
+    const pick = photos[Math.floor(Math.random() * photos.length)];
+    // src.large is ~940px, src.large2x is ~1880px — best for 1280x720 slides
+    return pick?.src?.large2x || pick?.src?.large || pick?.src?.original || null;
+  } catch (e) {
+    console.warn("Pexels search exception:", e);
+    return null;
+  }
 }
 
 function getSystemPrompt(type: string, numItems: number): string {
