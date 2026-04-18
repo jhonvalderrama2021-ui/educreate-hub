@@ -343,6 +343,127 @@ export async function exportToPdf(
         y += 3;
       });
       break;
+
+    case "crossword": {
+      // Render crossword grid
+      const rows: number = content.rows;
+      const cols: number = content.cols;
+      const grid: string[][] = content.grid;
+      const numbered: { row: number; col: number; n: number }[] = content.numbered || [];
+      const cellSize = Math.min(10, (maxWidth - 4) / cols);
+      const gridStartX = margin + (maxWidth - cellSize * cols) / 2;
+      let gridStartY = y;
+      const gridHeight = cellSize * rows;
+      if (gridStartY + gridHeight > pageHeight - 20) {
+        newPage();
+        gridStartY = y;
+      }
+
+      const numMap = new Map<string, number>();
+      numbered.forEach((n) => numMap.set(`${n.row}-${n.col}`, n.n));
+
+      doc.setLineWidth(0.2);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = gridStartX + c * cellSize;
+          const yy = gridStartY + r * cellSize;
+          const letter = grid[r][c];
+          if (!letter) {
+            doc.setFillColor(40, 40, 40);
+            doc.rect(x, yy, cellSize, cellSize, "F");
+          } else {
+            doc.setDrawColor(0);
+            doc.rect(x, yy, cellSize, cellSize);
+            const num = numMap.get(`${r}-${c}`);
+            if (num !== undefined) {
+              doc.setFontSize(Math.max(4, cellSize * 0.3));
+              doc.setFont("helvetica", "normal");
+              doc.text(String(num), x + 0.5, yy + cellSize * 0.32);
+            }
+          }
+        }
+      }
+      y = gridStartY + gridHeight + 6;
+
+      // Clues
+      const drawClues = (heading: string, list: any[]) => {
+        if (y > pageHeight - 30) newPage();
+        addText(heading, 12, true);
+        list.forEach((c) => addText(`${c.number}. ${c.clue}`, 9, false, 4));
+        y += 2;
+      };
+      drawClues("Horizontales", content.across || []);
+      drawClues("Verticales", content.down || []);
+
+      // Solution sheet on its own page
+      newPage();
+      addText("SOLUCIÓN — USO DEL DOCENTE", 14, true);
+      y += 2;
+      let sgY = y;
+      if (sgY + gridHeight > pageHeight - 20) { newPage(); sgY = y; }
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = gridStartX + c * cellSize;
+          const yy = sgY + r * cellSize;
+          const letter = grid[r][c];
+          if (!letter) {
+            doc.setFillColor(40, 40, 40);
+            doc.rect(x, yy, cellSize, cellSize, "F");
+          } else {
+            doc.setDrawColor(0);
+            doc.rect(x, yy, cellSize, cellSize);
+            doc.setFontSize(Math.max(5, cellSize * 0.55));
+            doc.setFont("helvetica", "bold");
+            doc.text(letter, x + cellSize / 2, yy + cellSize * 0.7, { align: "center" });
+          }
+        }
+      }
+      y = sgY + gridHeight + 6;
+      break;
+    }
+
+    case "story": {
+      // Cover image
+      if (content.coverImageUrl) {
+        try {
+          const cover = await urlToDataUrl(content.coverImageUrl);
+          const dims = await getImageDims(cover);
+          const w = maxWidth * 0.85;
+          const h = (dims.h / dims.w) * w;
+          if (y + h > pageHeight - 20) newPage();
+          doc.addImage(cover, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
+          y += h + 5;
+        } catch { /* ignore */ }
+      }
+      if (content.character) {
+        addText(`Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, 10, false);
+        y += 2;
+      }
+      for (let i = 0; i < (content.chapters || []).length; i++) {
+        const ch = content.chapters[i];
+        if (y > pageHeight - 40) newPage();
+        addText(`${i + 1}. ${ch.title}`, 13, true);
+        if (ch.imageUrl) {
+          try {
+            const img = await urlToDataUrl(ch.imageUrl);
+            const dims = await getImageDims(img);
+            const w = maxWidth * 0.7;
+            const h = (dims.h / dims.w) * w;
+            if (y + h > pageHeight - 20) newPage();
+            doc.addImage(img, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
+            y += h + 4;
+          } catch { /* ignore */ }
+        }
+        addText(ch.text, 11, false);
+        y += 4;
+      }
+      if (content.moral) {
+        if (y > pageHeight - 30) newPage();
+        addText("Moraleja", 12, true);
+        addText(content.moral, 11, false);
+      }
+      break;
+    }
   }
 
   doc.save(`${sanitizeFilename(title)}.pdf`);
