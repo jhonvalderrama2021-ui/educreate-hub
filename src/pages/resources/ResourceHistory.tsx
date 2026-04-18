@@ -47,14 +47,25 @@ export default function ResourceHistory() {
   useEffect(() => {
     if (!user) return;
     loadResources();
+    // Refresh when user returns to this tab/route
+    const onFocus = () => loadResources();
+    const onVisible = () => { if (document.visibilityState === "visible") loadResources(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, filter]);
 
   const loadResources = async () => {
+    if (!user) return;
     setLoading(true);
     let query = (supabase as any)
       .from("generated_resources")
       .select("*")
-      .eq("user_id", user!.id)
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (filter !== "all") query = query.eq("resource_type", filter);
