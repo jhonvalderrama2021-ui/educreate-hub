@@ -158,17 +158,30 @@ export default function ResourceHistory() {
                 {isExpanded && (
                   <div className="border-t border-border p-4 space-y-3">
                     <div className="flex gap-2 flex-wrap">
-                      <Button variant="outline" size="sm" onClick={() => exportToDocx(r.title, r.resource_type, r.content)}>
-                        <Download className="h-3.5 w-3.5 mr-1" /> Word
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => exportToPdf(r.title, r.resource_type, r.content)}>
-                        <Download className="h-3.5 w-3.5 mr-1" /> PDF
-                      </Button>
+                      {r.resource_type === "slides" ? (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => exportSlidesToPptx(r.content)}>
+                            <Download className="h-3.5 w-3.5 mr-1" /> PPTX
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => exportSlidesToPdf(r.content)}>
+                            <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => exportToDocx(r.title, r.resource_type, r.content)}>
+                            <Download className="h-3.5 w-3.5 mr-1" /> Word
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => exportToPdf(r.title, r.resource_type, r.content)}>
+                            <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                          </Button>
+                        </>
+                      )}
                       <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteResource(r.id)}>
                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
                       </Button>
                     </div>
-                    <div className="bg-muted/10 p-4 rounded-lg overflow-auto max-h-[500px]">
+                    <div className={r.resource_type === "slides" ? "" : "bg-muted/10 p-4 rounded-lg overflow-auto max-h-[500px]"}>
                       <ResourceContentViewer type={r.resource_type} content={r.content} />
                     </div>
                   </div>
