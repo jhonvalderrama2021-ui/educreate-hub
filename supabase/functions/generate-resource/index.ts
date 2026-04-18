@@ -132,7 +132,10 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("OpenAI error:", response.status, errText);
-      return new Response(JSON.stringify({ error: `Error de OpenAI (${response.status}): ${errText}` }), {
+      const clientMsg = response.status === 401
+        ? "Servicio de IA no disponible. Contacta al administrador para verificar la configuración."
+        : "Error al generar el recurso. Intenta nuevamente.";
+      return new Response(JSON.stringify({ error: clientMsg }), {
         status: response.status === 401 ? 401 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
