@@ -542,11 +542,22 @@ export async function exportToPdf(
 }
 
 async function buildDocxContent(title: string, resourceType: string, content: any): Promise<(Paragraph | Table)[]> {
+  const isStory = resourceType === "story";
+  const STORY_FONT = "Georgia";
   const children: (Paragraph | Table)[] = [
-    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: title, bold: true })] }),
+    new Paragraph({
+      alignment: isStory ? AlignmentType.CENTER : AlignmentType.LEFT,
+      spacing: isStory ? { before: 400, after: 400 } : undefined,
+      heading: isStory ? undefined : HeadingLevel.HEADING_1,
+      children: [new TextRun(
+        isStory
+          ? { text: content.title || title, bold: true, font: STORY_FONT, size: 56 }
+          : { text: title, bold: true },
+      )],
+    }),
   ];
 
-  if (content.subject) {
+  if (content.subject && !isStory) {
     children.push(new Paragraph({ children: [new TextRun({ text: `Área: ${content.subject}`, italics: true, size: 22 })] }));
   }
 
@@ -563,7 +574,7 @@ async function buildDocxContent(title: string, resourceType: string, content: an
     }));
   }
 
-  children.push(new Paragraph({ children: [] }));
+  if (!isStory) children.push(new Paragraph({ children: [] }));
 
   switch (resourceType) {
     case "icfes":
