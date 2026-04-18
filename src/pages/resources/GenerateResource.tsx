@@ -109,6 +109,7 @@ export default function GenerateResource() {
   const [numItems, setNumItems] = useState(10);
   const [examType, setExamType] = useState("icfes");
   const [numSlides, setNumSlides] = useState(8);
+  const [slidePalette, setSlidePalette] = useState<string>("academic");
 
   // Rubric fields
   const [rubricType, setRubricType] = useState("analitica");
