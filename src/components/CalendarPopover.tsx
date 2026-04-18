@@ -181,7 +181,7 @@ export function CalendarPopover() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div
-          ref={setScrollerEl}
+          ref={scrollerRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
@@ -193,7 +193,7 @@ export function CalendarPopover() {
           className={cn(
             "group flex items-stretch gap-1 w-full overflow-x-auto py-1.5 px-2 rounded-xl",
             "hover:bg-muted/40 transition-colors select-none cursor-grab",
-            drag.active && "cursor-grabbing bg-muted/40",
+            isDragging && "cursor-grabbing bg-muted/40",
             "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
           )}
         >
