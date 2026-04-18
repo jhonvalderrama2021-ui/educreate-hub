@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
@@ -118,7 +119,10 @@ export default function Crossword() {
       content,
     });
     if (error) toast.error("Error al guardar");
-    else toast.success("Guardado en historial");
+    else {
+      queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
+      toast.success("Guardado en historial");
+    }
   };
 
   return (

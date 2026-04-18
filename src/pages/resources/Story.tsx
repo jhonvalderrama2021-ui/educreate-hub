@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
@@ -69,7 +70,10 @@ export default function Story() {
       content,
     });
     if (error) toast.error("Error al guardar");
-    else toast.success("Guardado en historial");
+    else {
+      queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
+      toast.success("Guardado en historial");
+    }
   };
 
   return (
