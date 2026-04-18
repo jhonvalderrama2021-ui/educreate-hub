@@ -315,6 +315,16 @@ export function CalendarPopover() {
             locale={es}
             modifiers={{ marked: markedDates }}
             modifiersClassNames={{ marked: "calendar-day-marked" }}
+            classNames={{
+              months: "flex flex-col w-full",
+              month: "space-y-4 w-full",
+              table: "w-full border-collapse",
+              head_row: "flex w-full",
+              head_cell: "text-muted-foreground font-normal text-[0.8rem] flex-1 text-center",
+              row: "flex w-full mt-2",
+              cell: "flex-1 aspect-square text-center text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+              day: "h-full w-full p-0 font-normal aria-selected:opacity-100 inline-flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground",
+            }}
             components={{
               DayContent: ({ date }) => {
                 const key = format(date, "yyyy-MM-dd");
@@ -334,7 +344,7 @@ export function CalendarPopover() {
                 );
               },
             }}
-            className={cn("p-3 pointer-events-auto w-full [&_table]:w-full [&_.rdp-month]:w-full [&_.rdp-cell]:w-[14.28%] [&_.rdp-head_cell]:w-[14.28%]")}
+            className={cn("p-3 pointer-events-auto w-full")}
           />
 
           <div className="border-t border-border p-3 space-y-3 bg-card">
