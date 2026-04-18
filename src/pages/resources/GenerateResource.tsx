@@ -107,9 +107,9 @@ export default function GenerateResource() {
 
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [numItems, setNumItems] = useState(10);
+  const [numItems, setNumItems] = useState<number | "">(10);
   const [examType, setExamType] = useState("icfes");
-  const [numSlides, setNumSlides] = useState(8);
+  const [numSlides, setNumSlides] = useState<number | "">(8);
   const [slidePalette, setSlidePalette] = useState<string>("academic");
 
   // Rubric fields
@@ -274,7 +274,7 @@ export default function GenerateResource() {
       if (rubricObjective) parts.push(`Objetivo/Competencia a evaluar: ${rubricObjective}`);
     }
     if (resourceType === "slides") {
-      parts.push(`Número de diapositivas: ${numSlides}`);
+      parts.push(`Número de diapositivas: ${numSlides || 8}`);
     }
     if (instructions.trim()) {
       parts.push(`Instrucciones adicionales: ${instructions}`);
@@ -305,7 +305,7 @@ export default function GenerateResource() {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
         instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
-        numItems: resourceType === "slides" ? numSlides : numItems,
+        numItems: resourceType === "slides" ? (numSlides || 8) : (numItems || 10),
       };
       if (palette) params.theme = palette.theme;
 
@@ -547,7 +547,24 @@ export default function GenerateResource() {
           <>
             <div className="space-y-2">
               <Label>Número de diapositivas</Label>
-              <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
+              <Input
+                type="number"
+                min={3}
+                max={20}
+                value={numSlides}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") return setNumSlides("");
+                  const n = parseInt(v);
+                  if (!Number.isNaN(n)) setNumSlides(n);
+                }}
+                onBlur={() => {
+                  if (numSlides === "" || (typeof numSlides === "number" && numSlides < 3)) setNumSlides(8);
+                  else if (typeof numSlides === "number" && numSlides > 20) setNumSlides(20);
+                }}
+                placeholder="8"
+                className="w-32"
+              />
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
@@ -608,7 +625,24 @@ export default function GenerateResource() {
         {extraFields.includes("numItems") && (
           <div className="space-y-2">
             <Label>Número de preguntas</Label>
-            <Input type="number" min={1} max={50} value={numItems} onChange={(e) => setNumItems(parseInt(e.target.value) || 10)} className="w-32" />
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={numItems}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") return setNumItems("");
+                const n = parseInt(v);
+                if (!Number.isNaN(n)) setNumItems(n);
+              }}
+              onBlur={() => {
+                if (numItems === "" || (typeof numItems === "number" && numItems < 1)) setNumItems(10);
+                else if (typeof numItems === "number" && numItems > 50) setNumItems(50);
+              }}
+              placeholder="10"
+              className="w-32"
+            />
           </div>
         )}
 

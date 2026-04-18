@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import {
-  FileText, Plus, Users, BarChart3, Shield, ArrowRight, Sparkles,
+  FileText, Plus, Users, BarChart3, ArrowRight, Sparkles,
   BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, TrendingUp
 } from "lucide-react";
+import { CalendarPopover } from "@/components/CalendarPopover";
 
 const RECENT_TYPE_ICONS: Record<string, any> = {
   icfes: FileCheck,
@@ -31,7 +31,6 @@ const RECENT_TYPE_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
-  const { isAdmin } = useUserRole();
   const navigate = useNavigate();
 
   const [totalResources, setTotalResources] = useState(0);
@@ -106,12 +105,7 @@ export default function Dashboard() {
             NexProfe
           </Link>
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button variant="ghost" size="sm" onClick={() => navigate("/admin")} className="text-primary">
-                <Shield className="h-4 w-4 mr-1" />
-                Admin
-              </Button>
-            )}
+            <CalendarPopover />
             <ThemeToggle />
             <UserMenu />
           </div>
