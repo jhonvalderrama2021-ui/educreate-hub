@@ -160,6 +160,7 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
                         data-cell={`${r}-${c}`}
                         value={userGrid[r][c]}
                         onChange={(e) => handleChange(r, c, e.target.value)}
+                        onKeyDown={(e) => handleKeyDown(r, c, e)}
                         maxLength={1}
                         className={cn(
                           "w-full h-full text-center font-bold uppercase bg-transparent outline-none focus:bg-primary/10",
