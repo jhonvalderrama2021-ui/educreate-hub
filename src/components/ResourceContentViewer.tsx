@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SlideViewer } from "@/components/SlideViewer";
 
 interface Props {
   type: string;
