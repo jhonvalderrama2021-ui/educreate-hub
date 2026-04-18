@@ -628,6 +628,130 @@ async function buildDocxContent(title: string, resourceType: string, content: an
         });
       });
       break;
+
+    case "crossword": {
+      const rows: number = content.rows;
+      const cols: number = content.cols;
+      const grid: string[][] = content.grid;
+      const numbered: { row: number; col: number; n: number }[] = content.numbered || [];
+      const numMap = new Map<string, number>();
+      numbered.forEach((n) => numMap.set(`${n.row}-${n.col}`, n.n));
+
+      const cellWidth = Math.max(360, Math.floor(9000 / cols));
+      const buildGridTable = (showLetters: boolean) => {
+        const tableRows: TableRow[] = [];
+        for (let r = 0; r < rows; r++) {
+          const cells: TableCell[] = [];
+          for (let c = 0; c < cols; c++) {
+            const letter = grid[r][c];
+            const num = numMap.get(`${r}-${c}`);
+            const isBlack = !letter;
+            const para: Paragraph[] = [];
+            if (!isBlack) {
+              const runs: TextRun[] = [];
+              if (num !== undefined) runs.push(new TextRun({ text: String(num), size: 12, superScript: true }));
+              if (showLetters) runs.push(new TextRun({ text: letter, bold: true, size: 22 }));
+              para.push(new Paragraph({ alignment: AlignmentType.CENTER, children: runs }));
+            } else {
+              para.push(new Paragraph({ children: [] }));
+            }
+            cells.push(new TableCell({
+              width: { size: cellWidth, type: WidthType.DXA },
+              shading: isBlack ? { fill: "222222", type: ShadingType.CLEAR, color: "auto" } : undefined,
+              verticalAlign: VerticalAlign.CENTER,
+              children: para,
+            }));
+          }
+          tableRows.push(new TableRow({ height: { value: cellWidth, rule: "exact" } as any, children: cells }));
+        }
+        return new Table({
+          width: { size: cellWidth * cols, type: WidthType.DXA },
+          columnWidths: Array(cols).fill(cellWidth),
+          rows: tableRows,
+        });
+      };
+
+      children.push(buildGridTable(false));
+      children.push(new Paragraph({ children: [] }));
+
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Horizontales")] }));
+      (content.across || []).forEach((c: any) => children.push(
+        new Paragraph({ children: [new TextRun({ text: `${c.number}. `, bold: true }), new TextRun(c.clue)] }),
+      ));
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Verticales")] }));
+      (content.down || []).forEach((c: any) => children.push(
+        new Paragraph({ children: [new TextRun({ text: `${c.number}. `, bold: true }), new TextRun(c.clue)] }),
+      ));
+
+      // Solution page
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: "Solución — Uso del docente", bold: true })],
+      }));
+      children.push(new Paragraph({ children: [] }));
+      children.push(buildGridTable(true));
+      break;
+    }
+
+    case "story": {
+      if (content.coverImageUrl) {
+        try {
+          const cover = await urlToDataUrl(content.coverImageUrl);
+          const { bytes, type } = dataUrlToUint8(cover);
+          const dims = await getImageDims(cover);
+          const w = 480;
+          const h = (dims.h / dims.w) * w;
+          children.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+          }));
+        } catch { /* ignore */ }
+      }
+      if (content.character) {
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: `Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, italics: true })],
+        }));
+      }
+      const chapters = content.chapters || [];
+      for (let i = 0; i < chapters.length; i++) {
+        const ch = chapters[i];
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: `${i + 1}. ${ch.title}`, bold: true })],
+        }));
+        if (ch.imageUrl) {
+          try {
+            const img = await urlToDataUrl(ch.imageUrl);
+            const { bytes, type } = dataUrlToUint8(img);
+            const dims = await getImageDims(img);
+            const w = 420;
+            const h = (dims.h / dims.w) * w;
+            children.push(new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+            }));
+          } catch { /* ignore */ }
+        }
+        ch.text.split(/\n\n+/).forEach((p: string) => {
+          children.push(new Paragraph({ children: [new TextRun(p)], spacing: { after: 120 } }));
+        });
+      }
+      if (content.moral) {
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: "Moraleja", bold: true })],
+        }));
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: content.moral, italics: true })],
+        }));
+      }
+      break;
+    }
   }
 
   return children;
