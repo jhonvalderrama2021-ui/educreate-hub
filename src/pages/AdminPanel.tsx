@@ -100,37 +100,29 @@ export default function AdminPanel() {
   };
 
   const loadAISettings = async () => {
-    const { data } = await (supabase as any)
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "openai_api_key")
-      .single();
-
-    if (data?.value) {
-      setApiKey(data.value);
-      setKeyConfigured(true);
-    }
+    // Never fetch the raw key into the browser. Use a server-side check that returns only a boolean.
+    const { data, error } = await (supabase as any).rpc("admin_has_openai_key");
+    if (!error && data === true) setKeyConfigured(true);
   };
 
   const saveApiKey = async () => {
-    if (!apiKey.trim()) {
+    const trimmed = apiKey.trim();
+    if (trimmed.length < 20) {
       toast.error("Ingresa una API Key válida");
       return;
     }
     setSavingKey(true);
 
-    const { error } = await (supabase as any)
-      .from("platform_settings")
-      .upsert(
-        { key: "openai_api_key", value: apiKey.trim(), updated_at: new Date().toISOString() },
-        { onConflict: "key" }
-      );
+    const { data, error } = await supabase.functions.invoke("set-openai-key", {
+      body: { apiKey: trimmed },
+    });
 
-    if (error) {
+    if (error || (data as any)?.error) {
       toast.error("Error al guardar la API Key");
     } else {
       toast.success("API Key de OpenAI guardada correctamente");
       setKeyConfigured(true);
+      setApiKey(""); // clear from memory after save
     }
     setSavingKey(false);
   };
