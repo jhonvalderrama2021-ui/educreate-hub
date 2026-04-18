@@ -60,9 +60,27 @@ export async function generateWithOllama(
     const data = await response.json();
     return JSON.parse(data.message.content);
   } catch (e: any) {
-    if (e.message?.includes("Failed to fetch") || e.message?.includes("NetworkError")) {
+    const msg = e?.message || "";
+    if (
+      msg.includes("Failed to fetch") ||
+      msg.includes("NetworkError") ||
+      msg.includes("loopback") ||
+      msg.includes("CORS")
+    ) {
       throw new Error(
-        "No se pudo conectar con Ollama. Verifica que esté ejecutándose y que OLLAMA_ORIGINS=* esté configurado."
+        "No se pudo conectar con Ollama desde el navegador (HTTPS → localhost está bloqueado por seguridad).\n\n" +
+        "Para usar Ollama local debes configurar DOS variables de entorno y reiniciar Ollama:\n\n" +
+        "1) OLLAMA_ORIGINS=* (permite CORS desde cualquier origen)\n" +
+        "2) OLLAMA_HOST=0.0.0.0:11434 (escucha en todas las interfaces)\n\n" +
+        "Windows (PowerShell como Admin):\n" +
+        "  setx OLLAMA_ORIGINS \"*\" /M\n" +
+        "  setx OLLAMA_HOST \"0.0.0.0:11434\" /M\n" +
+        "  Luego cierra Ollama desde la bandeja y vuelve a abrirlo.\n\n" +
+        "macOS/Linux:\n" +
+        "  launchctl setenv OLLAMA_ORIGINS \"*\"\n" +
+        "  launchctl setenv OLLAMA_HOST \"0.0.0.0:11434\"\n" +
+        "  Reinicia Ollama.\n\n" +
+        "Nota: Chrome bloquea peticiones HTTPS hacia localhost. Si el problema persiste, usa la app en http://localhost (modo desarrollo) o usa el proveedor OpenAI."
       );
     }
     throw e;
