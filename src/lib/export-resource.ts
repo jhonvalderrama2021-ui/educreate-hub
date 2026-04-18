@@ -344,6 +344,19 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
     children.push(new Paragraph({ children: [new TextRun({ text: `Área: ${content.subject}`, italics: true, size: 22 })] }));
   }
 
+  // Student name + date for exam-type resources
+  if (["icfes", "quiz", "true_false", "mixed"].includes(resourceType)) {
+    children.push(new Paragraph({
+      spacing: { before: 200, after: 100 },
+      children: [
+        new TextRun({ text: "Nombre: ", bold: true }),
+        new TextRun({ text: "______________________________________     " }),
+        new TextRun({ text: "Fecha: ", bold: true }),
+        new TextRun({ text: "____________________" }),
+      ],
+    }));
+  }
+
   children.push(new Paragraph({ children: [] }));
 
   switch (resourceType) {
