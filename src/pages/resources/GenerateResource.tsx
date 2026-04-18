@@ -845,6 +845,19 @@ export default function GenerateResource() {
           </div>
         </div>
       )}
+
+      {exportDialog && resourceType !== "slides" && (
+        <ExportOptionsDialog
+          open={!!exportDialog}
+          onOpenChange={(o) => !o && setExportDialog(null)}
+          format={exportDialog}
+          onConfirm={async (opts) => {
+            const name = displayContent?.title || title || "Recurso";
+            if (exportDialog === "docx") await exportToDocx(name, resourceType, displayContent, opts);
+            else await exportToPdf(name, resourceType, displayContent, opts);
+          }}
+        />
+      )}
     </div>
   );
 }
