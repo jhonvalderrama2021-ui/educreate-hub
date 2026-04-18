@@ -294,6 +294,25 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
         </div>
       );
 
+    case "slides":
+      return (
+        <SlideViewer
+          slides={content?.slides || []}
+          title={content?.title}
+          theme={content?.theme}
+          editable={editable}
+          onSlideChange={
+            onContentChange
+              ? (index, updatedSlide) => {
+                  const copy = JSON.parse(JSON.stringify(content));
+                  copy.slides[index] = updatedSlide;
+                  onContentChange(copy);
+                }
+              : undefined
+          }
+        />
+      );
+
     default:
       return <pre className="text-xs overflow-auto">{JSON.stringify(content, null, 2)}</pre>;
   }
