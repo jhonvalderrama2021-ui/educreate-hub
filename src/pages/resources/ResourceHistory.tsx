@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
+import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
-  FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2,
+  FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 
@@ -20,6 +21,7 @@ const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   guide: { label: "Guía", icon: BookOpen },
   lesson_plan: { label: "Plan de clase", icon: ClipboardList },
   rubric: { label: "Rúbrica", icon: Table2 },
+  slides: { label: "Diapositivas", icon: Presentation },
 };
 
 interface Resource {
