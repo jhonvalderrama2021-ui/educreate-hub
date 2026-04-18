@@ -8,11 +8,39 @@ interface Props {
   onFieldChange?: (path: string, value: any) => void;
 }
 
+/**
+ * SPLIT — text + image with rounded asymmetric image frame and number badge.
+ */
 export function SplitLayout({ slide, theme, editable, onFieldChange }: Props) {
   const imgRight = !slide.image?.placement || slide.image.placement === "right";
+  const slideNum = slide.slideNumber;
 
   const textBlock = (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "60px" }}>
+    <div
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: "60px 70px",
+        background: theme.background,
+        position: "relative",
+      }}
+    >
+      {slideNum && (
+        <div
+          style={{
+            fontFamily: theme.fontHeading,
+            fontSize: "14px",
+            fontWeight: 700,
+            color: theme.secondary,
+            letterSpacing: "2px",
+            marginBottom: "10px",
+          }}
+        >
+          {String(slideNum).padStart(2, "0")} —
+        </div>
+      )}
       <EditableText
         as="h2"
         value={slide.title}
@@ -21,11 +49,21 @@ export function SplitLayout({ slide, theme, editable, onFieldChange }: Props) {
         placeholder="Título"
         style={{
           fontFamily: theme.fontHeading,
-          fontSize: "36px",
-          fontWeight: 700,
+          fontSize: "40px",
+          fontWeight: 800,
           color: theme.text,
           marginBottom: "20px",
-          lineHeight: 1.2,
+          lineHeight: 1.15,
+          display: "block",
+        }}
+      />
+      <div
+        style={{
+          width: 50,
+          height: 4,
+          background: theme.accent,
+          borderRadius: 2,
+          marginBottom: "24px",
         }}
       />
       {(slide.subtitle || editable) && (
@@ -36,7 +74,15 @@ export function SplitLayout({ slide, theme, editable, onFieldChange }: Props) {
           onChange={(v) => onFieldChange?.("subtitle", v)}
           placeholder="Subtítulo"
           multiline
-          style={{ fontFamily: theme.fontBody, fontSize: "18px", color: "#64748B", marginBottom: "24px", lineHeight: 1.6 }}
+          style={{
+            fontFamily: theme.fontBody,
+            fontSize: "18px",
+            color: theme.secondary,
+            fontWeight: 600,
+            marginBottom: "20px",
+            lineHeight: 1.5,
+            display: "block",
+          }}
         />
       )}
       {(slide.content || editable) && (
@@ -47,69 +93,60 @@ export function SplitLayout({ slide, theme, editable, onFieldChange }: Props) {
           onChange={(v) => onFieldChange?.("content", v)}
           placeholder="Contenido"
           multiline
-          style={{ fontFamily: theme.fontBody, fontSize: "16px", color: "#475569", lineHeight: 1.7 }}
+          style={{
+            fontFamily: theme.fontBody,
+            fontSize: "16px",
+            color: "#475569",
+            lineHeight: 1.7,
+            display: "block",
+          }}
         />
-      )}
-      {slide.listItems && slide.listItems.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "16px" }}>
-          {slide.listItems.map((item, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-              <span className="material-icons" style={{ color: theme.secondary, fontSize: "20px", marginTop: "2px" }}>
-                {item.icon || "check_circle"}
-              </span>
-              <div style={{ flex: 1 }}>
-                <EditableText
-                  as="strong"
-                  value={item.title}
-                  editable={editable}
-                  onChange={(v) => onFieldChange?.(`listItems.${i}.title`, v)}
-                  placeholder="Título"
-                  style={{ fontFamily: theme.fontBody, fontSize: "15px", color: theme.text, display: "block" }}
-                />
-                {(item.description || editable) && (
-                  <EditableText
-                    as="p"
-                    value={item.description || ""}
-                    editable={editable}
-                    onChange={(v) => onFieldChange?.(`listItems.${i}.description`, v)}
-                    placeholder="Descripción"
-                    multiline
-                    style={{ fontFamily: theme.fontBody, fontSize: "13px", color: "#64748B", marginTop: "2px" }}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
       )}
     </div>
   );
 
   const imageBlock = (
-    <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-      {slide.image?.url ? (
-        <img
-          src={slide.image.url}
-          alt={slide.image.alt}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          crossOrigin="anonymous"
-        />
-      ) : (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            background: `linear-gradient(135deg, ${theme.secondary}30, ${theme.accent}30)`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <span className="material-icons" style={{ fontSize: "80px", color: `${theme.secondary}60` }}>
-            image
-          </span>
-        </div>
-      )}
+    <div
+      style={{
+        flex: 1,
+        position: "relative",
+        background: theme.primary,
+        padding: "30px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "20px",
+          overflow: "hidden",
+          background: `linear-gradient(135deg, ${theme.secondary}, ${theme.accent})`,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+        }}
+      >
+        {slide.image?.url ? (
+          <img
+            src={slide.image.url}
+            alt={slide.image.alt}
+            crossOrigin="anonymous"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span className="material-icons" style={{ fontSize: "100px", color: "rgba(255,255,255,0.5)" }}>
+              image
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 
