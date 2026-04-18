@@ -147,8 +147,8 @@ export function ExportOptionsDialog({ open, onOpenChange, format, onConfirm }: P
                 </div>
                 <Slider
                   value={[opacity]}
-                  min={5}
-                  max={40}
+                  min={1}
+                  max={100}
                   step={1}
                   onValueChange={(v) => { setOpacity(v[0]); persist({ logo, watermark, opacity: v[0] }); }}
                 />

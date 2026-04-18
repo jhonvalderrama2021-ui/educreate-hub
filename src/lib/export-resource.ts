@@ -227,7 +227,20 @@ export async function exportToPdf(
             Object.entries(q.options).forEach(([k, v]) => addText(`  ${k}. ${v}`, 10, false, 10));
           }
         } else if (q.type === "true_false") {
-          addText("  ○ Verdadero    ○ Falso", 10, false, 10);
+          // Draw two checkbox squares: ☐ Verdadero  ☐ Falso
+          if (y > pageHeight - 20) newPage();
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          const baseX = margin + 10;
+          const boxSize = 3.2;
+          const boxY = y - boxSize + 0.5;
+          doc.setLineWidth(0.3);
+          doc.rect(baseX, boxY, boxSize, boxSize);
+          doc.text("Verdadero", baseX + boxSize + 2, y);
+          const falseX = baseX + 35;
+          doc.rect(falseX, boxY, boxSize, boxSize);
+          doc.text("Falso", falseX + boxSize + 2, y);
+          y += 6;
         }
         y += 3;
       });
@@ -393,7 +406,7 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
         } else if (q.type === "true_false") {
           children.push(new Paragraph({
             indent: { left: 400 },
-            children: [new TextRun({ text: "○ Verdadero    ○ Falso" })],
+            children: [new TextRun({ text: "☐ Verdadero    ☐ Falso" })],
           }));
         }
       });
