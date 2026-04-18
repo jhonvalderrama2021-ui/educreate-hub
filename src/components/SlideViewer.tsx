@@ -193,12 +193,16 @@ function ScaledSlide({
   theme,
   fullscreen,
   thumbnail,
+  editable,
+  onFieldChange,
 }: {
   slide: any;
   structured: boolean;
   theme: SlideTheme;
   fullscreen?: boolean;
   thumbnail?: boolean;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -220,7 +224,6 @@ function ScaledSlide({
   }, [updateScale, fullscreen]);
 
   if (structured) {
-    // React-rendered slide
     return (
       <div
         ref={containerRef}
@@ -242,7 +245,12 @@ function ScaledSlide({
           }}
           className="slide-content"
         >
-          <SlideRenderer slide={slide as StructuredSlide} theme={theme} />
+          <SlideRenderer
+            slide={slide as StructuredSlide}
+            theme={theme}
+            editable={editable && !thumbnail}
+            onFieldChange={onFieldChange}
+          />
         </div>
       </div>
     );
