@@ -34,11 +34,36 @@ serve(async (req) => {
 
     const { resourceType, pdfContent, instructions, numItems, theme } = await req.json();
 
-    if (!resourceType) {
-      return new Response(JSON.stringify({ error: "resourceType es requerido" }), {
+    // ─── INPUT VALIDATION ───────────────────────────────────────
+    const ALLOWED_TYPES = new Set([
+      "slides", "icfes", "true_false", "mixed",
+      "workshop", "lesson_plan", "rubric",
+    ]);
+    if (typeof resourceType !== "string" || !ALLOWED_TYPES.has(resourceType)) {
+      return new Response(JSON.stringify({ error: "resourceType inválido" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    const MAX_PDF = 150_000;   // ~150 KB of text
+    const MAX_INSTR = 5_000;   // ~5 KB
+    if (pdfContent != null && (typeof pdfContent !== "string" || pdfContent.length > MAX_PDF)) {
+      return new Response(JSON.stringify({ error: "pdfContent demasiado grande (máx. 150 KB)" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (instructions != null && (typeof instructions !== "string" || instructions.length > MAX_INSTR)) {
+      return new Response(JSON.stringify({ error: "instructions demasiado largo (máx. 5 KB)" }), {
+        status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (numItems != null && (typeof numItems !== "number" || numItems < 1 || numItems > 30)) {
+      return new Response(JSON.stringify({ error: "numItems debe estar entre 1 y 30" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ────────────────────────────────────────────────────────────
+
 
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
