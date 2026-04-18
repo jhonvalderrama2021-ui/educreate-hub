@@ -195,6 +195,19 @@ export async function exportToPdf(
 
   addText(title, 18, true);
   if (content.subject) addText(`Área: ${content.subject}`, 11);
+
+  // Student name + date fields for exam-type resources
+  if (["icfes", "quiz", "true_false", "mixed"].includes(resourceType)) {
+    y += 4;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const lineY = y;
+    doc.text("Nombre:", margin, lineY);
+    doc.line(margin + 18, lineY + 1, margin + maxWidth * 0.55, lineY + 1);
+    doc.text("Fecha:", margin + maxWidth * 0.6, lineY);
+    doc.line(margin + maxWidth * 0.6 + 14, lineY + 1, margin + maxWidth, lineY + 1);
+    y += 8;
+  }
   y += 5;
 
   switch (resourceType) {
