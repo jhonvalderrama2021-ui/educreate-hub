@@ -88,8 +88,25 @@ export function StatsLayout({ slide, theme, editable, onFieldChange }: Props) {
                 onChange={(v) => onFieldChange?.(`stats.${i}.label`, v)}
                 placeholder="Etiqueta"
                 multiline
-                style={{ fontFamily: theme.fontBody, fontSize: "16px", color: "#64748B", marginTop: "8px" }}
+                style={{ fontFamily: theme.fontBody, fontSize: "16px", color: "#64748B", marginTop: "8px", display: "block" }}
               />
+              {(stat.source || editable) && (
+                <EditableText
+                  as="p"
+                  value={stat.source ? `Fuente: ${stat.source}` : ""}
+                  editable={editable}
+                  onChange={(v) => onFieldChange?.(`stats.${i}.source`, v.replace(/^Fuente:\s*/i, ""))}
+                  placeholder="Fuente: ..."
+                  style={{
+                    fontFamily: theme.fontBody,
+                    fontSize: "12px",
+                    color: "#94A3B8",
+                    fontStyle: "italic",
+                    marginTop: "12px",
+                    display: "block",
+                  }}
+                />
+              )}
             </div>
           );
         })}

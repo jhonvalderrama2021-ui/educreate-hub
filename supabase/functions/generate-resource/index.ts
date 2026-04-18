@@ -78,8 +78,11 @@ serve(async (req) => {
     const data = await response.json();
     let content = JSON.parse(data.choices[0].message.content);
 
-    // For slides: enforce exact slide count + resolve image queries + apply user-selected theme
+    // For slides: enforce variety, exact count, kill stats without source PDF, then resolve images
     if (resourceType === "slides" && content.slides) {
+      const hasSourcePdf = !!(pdfContent && pdfContent.trim().length > 100);
+      content = enforceLayoutVariety(content);
+      content = stripStatsWithoutSource(content, hasSourcePdf);
       content = enforceSlideCount(content, numItems || 8);
       if (theme) content.theme = theme;
       content = await resolveSlideImages(content);
@@ -98,17 +101,125 @@ serve(async (req) => {
 
 async function resolveSlideImages(presentation: any): Promise<any> {
   const slides = presentation.slides || [];
-  for (const slide of slides) {
-    if (slide.image?.query) {
-      try {
-        const url = await searchUnsplash(slide.image.query);
-        if (url) slide.image.url = url;
-      } catch (e) {
-        console.warn("Unsplash search failed for:", slide.image.query, e);
+  // Resolve in parallel for speed
+  await Promise.all(
+    slides.map(async (slide: any) => {
+      if (slide.image?.query) {
+        try {
+          const url = await searchPexels(slide.image.query);
+          if (url) slide.image.url = url;
+        } catch (e) {
+          console.warn("Pexels search failed for:", slide.image.query, e);
+        }
+      }
+    })
+  );
+  return presentation;
+}
+
+/**
+ * Force layout variety: no two consecutive same layouts, max 2 of any single layout.
+ * Replaces duplicates with under-used alternatives.
+ */
+function enforceLayoutVariety(presentation: any): any {
+  const slides = presentation.slides || [];
+  if (slides.length <= 2) return presentation;
+
+  const middleLayouts = [
+    "grid", "split", "process", "comparison", "list", "timeline",
+    "quote", "imageFull", "bigNumber", "twoColumnText",
+  ];
+  const counts: Record<string, number> = {};
+  slides.forEach((s: any) => {
+    counts[s.layout] = (counts[s.layout] || 0) + 1;
+  });
+
+  for (let i = 1; i < slides.length - 1; i++) {
+    const prev = slides[i - 1].layout;
+    const curr = slides[i].layout;
+    const isStatsWithoutCare = curr === "stats"; // handled later
+    if (curr === prev || counts[curr] > 2) {
+      // pick the least used layout that isn't prev
+      const candidate = middleLayouts
+        .filter((l) => l !== prev)
+        .sort((a, b) => (counts[a] || 0) - (counts[b] || 0))[0];
+      if (candidate) {
+        counts[curr]--;
+        counts[candidate] = (counts[candidate] || 0) + 1;
+        slides[i] = transformSlideLayout(slides[i], candidate);
       }
     }
   }
+  presentation.slides = slides;
   return presentation;
+}
+
+/**
+ * Remove "stats" slides when there is no source PDF (no real data to cite).
+ * Convert them into a "list" or "grid" using the existing labels as content.
+ */
+function stripStatsWithoutSource(presentation: any, hasSourcePdf: boolean): any {
+  if (hasSourcePdf) return presentation;
+  const slides = presentation.slides || [];
+  presentation.slides = slides.map((s: any) => {
+    if (s.layout !== "stats") return s;
+    const items = (s.stats || []).map((st: any, i: number) => ({
+      icon: ["insights", "trending_up", "lightbulb", "school"][i % 4],
+      title: st.label || `Aspecto ${i + 1}`,
+      description: `Concepto clave relacionado con ${presentation.title || "el tema"}.`,
+    }));
+    return { layout: "list", title: s.title, listItems: items };
+  });
+  return presentation;
+}
+
+/**
+ * Lightweight transform that swaps a slide's layout while preserving its title,
+ * and synthesising minimal content for the new layout type.
+ */
+function transformSlideLayout(slide: any, newLayout: string): any {
+  const title = slide.title || "Información clave";
+  const next: any = { layout: newLayout, title };
+  if (newLayout === "quote") {
+    next.content = slide.subtitle || slide.content || `Reflexión central sobre ${title.toLowerCase()}.`;
+    next.subtitle = "Reflexión";
+  } else if (newLayout === "imageFull") {
+    next.subtitle = slide.subtitle || slide.content?.slice(0, 120) || "";
+    next.image = slide.image || { query: title, alt: title, placement: "background" };
+  } else if (newLayout === "bigNumber") {
+    next.bigNumber = slide.stats?.[0]?.value || "1";
+    next.subtitle = slide.stats?.[0]?.label || slide.subtitle || title;
+    next.content = slide.content || `Detalle relevante sobre ${title.toLowerCase()}.`;
+  } else if (newLayout === "twoColumnText") {
+    next.columns = slide.columns || [
+      { title: "Aspecto 1", color: "#3B82F6", points: [slide.subtitle || "Punto destacado"] },
+      { title: "Aspecto 2", color: "#6366F1", points: [slide.content?.slice(0, 80) || "Punto complementario"] },
+    ];
+  } else if (newLayout === "list") {
+    next.listItems = slide.listItems || (slide.cards || []).slice(0, 4).map((c: any) => ({
+      icon: c.icon || "check_circle", title: c.title, description: c.description,
+    }));
+    if (!next.listItems.length) {
+      next.listItems = [{ icon: "check_circle", title, description: slide.content || slide.subtitle || "Detalle relevante." }];
+    }
+  } else if (newLayout === "grid") {
+    next.cards = slide.cards || (slide.listItems || []).slice(0, 4).map((l: any) => ({
+      icon: l.icon || "star", title: l.title, description: l.description, color: "#3B82F6",
+    }));
+    if (!next.cards.length) {
+      next.cards = [
+        { icon: "lightbulb", title, description: slide.content || slide.subtitle || "Concepto clave.", color: "#3B82F6" },
+      ];
+    }
+  } else if (newLayout === "split") {
+    next.subtitle = slide.subtitle || "";
+    next.content = slide.content || slide.subtitle || `Información relevante sobre ${title.toLowerCase()}.`;
+    next.image = slide.image || { query: title, alt: title, placement: "right" };
+  } else {
+    // fallback: keep original
+    return slide;
+  }
+  return next;
 }
 
 /**
@@ -177,23 +288,52 @@ function buildFillerSlide(layout: string, topic: string, idx: number, color: str
   return base;
 }
 
-async function searchUnsplash(query: string): Promise<string | null> {
-  // Use Unsplash Source for simple redirect-based image (no API key needed)
-  // This returns a 1280x720 image URL directly
-  const encoded = encodeURIComponent(query);
-  const url = `https://source.unsplash.com/1280x720/?${encoded}`;
-  
-  try {
-    // Follow redirect to get the actual image URL
-    const res = await fetch(url, { redirect: "follow" });
-    if (res.ok) {
-      return res.url;
-    }
-  } catch {
-    // Fallback: use direct URL (browser will follow redirect)
+async function searchPexels(query: string): Promise<string | null> {
+  const apiKey = Deno.env.get("PEXELS_API_KEY");
+  if (!apiKey) {
+    console.warn("PEXELS_API_KEY not configured");
+    return null;
   }
-  
-  return `https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=1280&h=720&fit=crop&q=80`;
+  try {
+    const encoded = encodeURIComponent(query);
+    const res = await fetch(
+      `https://api.pexels.com/v1/search?query=${encoded}&per_page=5&orientation=landscape`,
+      { headers: { Authorization: apiKey } }
+    );
+    if (!res.ok) {
+      console.warn("Pexels API error:", res.status);
+      return null;
+    }
+    const data = await res.json();
+    const photos = data.photos || [];
+    if (photos.length === 0) return null;
+    const pick = photos[Math.floor(Math.random() * photos.length)];
+    const imgUrl = pick?.src?.large2x || pick?.src?.large || pick?.src?.original || null;
+    if (!imgUrl) return null;
+
+    // Fetch image and inline as data URL so html2canvas can capture it without CORS issues
+    try {
+      const imgRes = await fetch(imgUrl);
+      if (!imgRes.ok) return imgUrl; // fallback to URL
+      const buf = await imgRes.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      // Base64 encode in chunks to avoid stack overflow on large images
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+      return `data:${contentType};base64,${base64}`;
+    } catch (e) {
+      console.warn("Failed to inline Pexels image:", e);
+      return imgUrl;
+    }
+  } catch (e) {
+    console.warn("Pexels search exception:", e);
+    return null;
+  }
 }
 
 function getSystemPrompt(type: string, numItems: number): string {
@@ -428,16 +568,16 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
   ]
 }
 
-## 6. "stats" — Estadísticas con números grandes
+## 6. "stats" — Estadísticas con números grandes (SOLO si tienes datos verificables del documento fuente)
 {
   "layout": "stats",
   "title": "Datos Importantes",
   "stats": [
-    { "value": "85%", "label": "De los estudiantes mejoran", "color": "#3B82F6" },
-    { "value": "+50", "label": "Recursos disponibles", "color": "#6366F1" },
-    { "value": "4.8", "label": "Calificación promedio", "color": "#22C55E" }
+    { "value": "85%", "label": "De los estudiantes mejoran sus calificaciones", "source": "MEN, 2023", "color": "#3B82F6" },
+    { "value": "+50", "label": "Recursos disponibles en la plataforma", "source": "Documento fuente", "color": "#6366F1" }
   ]
 }
+REGLA: cada stat DEBE incluir un campo "source" con la fuente real (ej: "DANE 2023", "MEN", "OMS 2022", "Documento fuente"). Si no puedes citar fuente real, NO uses layout "stats" — usa "list" o "grid" en su lugar.
 
 ## 7. "list" — Lista con iconos
 {
@@ -467,27 +607,65 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
   "content": "Texto adicional de cierre"
 }
 
+## 10. "quote" — Cita destacada (gran impacto visual)
+{
+  "layout": "quote",
+  "title": "Reflexión",
+  "content": "Una cita poderosa o frase clave de 15-30 palabras que resuma una idea central del tema.",
+  "subtitle": "— Autor o contexto"
+}
+
+## 11. "imageFull" — Imagen pantalla completa con texto superpuesto
+{
+  "layout": "imageFull",
+  "title": "Título Impactante",
+  "subtitle": "Subtítulo descriptivo de una frase",
+  "image": { "query": "specific topic keywords in english", "alt": "descripción", "placement": "background" }
+}
+
+## 12. "bigNumber" — Un único número/dato gigante con explicación
+{
+  "layout": "bigNumber",
+  "title": "Dato Clave",
+  "bigNumber": "73%",
+  "subtitle": "De impacto medible en el aula",
+  "content": "Explicación de 30-60 palabras del contexto, la fuente y la relevancia educativa de este dato."
+}
+
+## 13. "twoColumnText" — Dos columnas de texto descriptivo (sin tarjetas)
+{
+  "layout": "twoColumnText",
+  "title": "Dos Perspectivas",
+  "columns": [
+    { "title": "Perspectiva A", "color": "#3B82F6", "points": ["Frase descriptiva completa.", "Otra frase con detalle."] },
+    { "title": "Perspectiva B", "color": "#EC4899", "points": ["Frase descriptiva completa.", "Otra frase con detalle."] }
+  ]
+}
+
 # REGLAS CRÍTICAS
 1. Genera EXACTAMENTE ${numItems} slides en el array "slides". Ni una más ni una menos. Cuenta antes de responder.
 2. La PRIMERA slide SIEMPRE usa layout "hero".
 3. La ÚLTIMA slide SIEMPRE usa layout "conclusion".
-4. Las ${Math.max(0, numItems - 2)} slides intermedias deben VARIAR entre layouts: grid, split, process, comparison, stats, list, timeline. NO repitas el mismo layout dos veces seguidas.
-5. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, etc.).
-6. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema).
-7. Para slides "split", incluye "image.query" con 2-4 palabras clave en INGLÉS para búsqueda en Unsplash.
-8. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
-   - Títulos de slide: 3-8 palabras claras.
-   - Subtítulos: una frase completa (10-18 palabras).
-   - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una). Explica el concepto, da contexto y un ejemplo o aplicación.
-   - "content" en split/conclusion: párrafo de 40-80 palabras con información real y educativa.
-   - Labels de stats: frase descriptiva (5-10 palabras), no solo una palabra.
-   - Puntos en comparison: frases completas, no fragmentos.
-9. Cantidad de elementos por slide:
-   - grid: 3-4 cards
-   - process: 3-5 steps
-   - stats: 3-4 stats
-   - list: 3-5 listItems
-   - comparison: exactamente 2 columns con 3-5 points cada una
-   - timeline: 3-5 events
-10. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".`;
+4. VARIEDAD OBLIGATORIA en las slides intermedias: usa al menos ${Math.min(6, Math.max(3, numItems - 3))} layouts DIFERENTES de esta lista: grid, split, process, comparison, list, timeline, quote, imageFull, bigNumber, twoColumnText.
+5. NUNCA repitas el mismo layout dos veces seguidas. NUNCA uses el mismo layout más de 2 veces en toda la presentación.
+6. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, insights, etc.).
+7. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema — verde para naturaleza, rojo/ocre para historia, púrpura para arte).
+8. Para slides "split" e "imageFull", incluye "image.query" con 3-5 palabras clave ESPECÍFICAS en INGLÉS relacionadas al tema (ej: "ancient roman colosseum", "amazon rainforest aerial", "mathematics chalkboard equations"). NO uses queries genéricos como "education" o "school".
+9. Cada slide debe tener su propio "image.query" único — NO repitas el mismo query en varias slides.
+10. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
+    - Títulos de slide: 3-8 palabras claras.
+    - Subtítulos: una frase completa (10-18 palabras).
+    - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una).
+    - "content" en split/conclusion/bigNumber: párrafo de 40-80 palabras con información real y educativa.
+    - Labels de stats: frase descriptiva (5-10 palabras), nunca solo una palabra.
+    - Puntos en comparison/twoColumnText: frases completas, no fragmentos.
+11. Cantidad de elementos por slide:
+    - grid: 3-4 cards
+    - process: 3-5 steps
+    - stats: 3-4 stats (SOLO con campo "source")
+    - list: 3-5 listItems
+    - comparison/twoColumnText: exactamente 2 columns con 3-5 points cada una
+    - timeline: 3-5 events
+12. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".
+13. Si NO se proporciona documento fuente, EVITA usar el layout "stats" — usa "list", "grid", "bigNumber" (con datos generales conocidos) o "quote" en su lugar.`;
 }

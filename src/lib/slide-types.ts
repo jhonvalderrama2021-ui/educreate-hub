@@ -24,6 +24,7 @@ export interface SlideStep {
 export interface SlideStat {
   value: string;
   label: string;
+  source?: string;
   color?: string;
 }
 
@@ -54,7 +55,11 @@ export type SlideLayout =
   | "stats"
   | "timeline"
   | "list"
-  | "conclusion";
+  | "conclusion"
+  | "quote"
+  | "imageFull"
+  | "bigNumber"
+  | "twoColumnText";
 
 export interface SlideTheme {
   primary: string;     // hex
@@ -71,6 +76,7 @@ export interface StructuredSlide {
   title: string;
   subtitle?: string;
   content?: string;
+  bigNumber?: string;
   cards?: SlideCard[];
   steps?: SlideStep[];
   stats?: SlideStat[];

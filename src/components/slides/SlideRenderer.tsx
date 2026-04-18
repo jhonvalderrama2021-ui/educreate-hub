@@ -8,6 +8,10 @@ import { StatsLayout } from "./StatsLayout";
 import { TimelineLayout } from "./TimelineLayout";
 import { ListLayout } from "./ListLayout";
 import { ConclusionLayout } from "./ConclusionLayout";
+import { QuoteLayout } from "./QuoteLayout";
+import { ImageFullLayout } from "./ImageFullLayout";
+import { BigNumberLayout } from "./BigNumberLayout";
+import { TwoColumnTextLayout } from "./TwoColumnTextLayout";
 
 export interface SlideRendererProps {
   slide: StructuredSlide;
@@ -26,6 +30,10 @@ const LAYOUT_MAP: Record<string, React.FC<any>> = {
   timeline: TimelineLayout,
   list: ListLayout,
   conclusion: ConclusionLayout,
+  quote: QuoteLayout,
+  imageFull: ImageFullLayout,
+  bigNumber: BigNumberLayout,
+  twoColumnText: TwoColumnTextLayout,
 };
 
 export function SlideRenderer({ slide, theme = DEFAULT_THEME, editable, onFieldChange }: SlideRendererProps) {
