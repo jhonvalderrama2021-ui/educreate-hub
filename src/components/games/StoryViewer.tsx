@@ -26,7 +26,7 @@ export function StoryViewer({ content }: Props) {
       {content.chapters.map((ch, i) => (
         <section key={i} className="space-y-3">
           <h2 className="text-xl font-semibold text-foreground border-b border-border pb-1">
-            {i + 1}. {ch.title}
+            {ch.title}
           </h2>
           {ch.imageUrl && (
             <div className="rounded-lg overflow-hidden border border-border">

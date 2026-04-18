@@ -438,21 +438,36 @@ export async function exportToPdf(
       }
       for (let i = 0; i < (content.chapters || []).length; i++) {
         const ch = content.chapters[i];
-        if (y > pageHeight - 40) newPage();
-        addText(`${i + 1}. ${ch.title}`, 13, true);
+        // Each chapter starts on its own page (except first if it fits with cover)
+        if (i > 0) newPage();
+        else if (y > pageHeight - 80) newPage();
+
+        addText(ch.title, 14, true);
+
+        // Pre-load image to know its height for layout
+        let imgData: string | null = null;
+        let imgW = 0, imgH = 0;
         if (ch.imageUrl) {
           try {
-            const img = await urlToDataUrl(ch.imageUrl);
-            const dims = await getImageDims(img);
-            const w = maxWidth * 0.7;
-            const h = (dims.h / dims.w) * w;
-            if (y + h > pageHeight - 20) newPage();
-            doc.addImage(img, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
-            y += h + 4;
-          } catch { /* ignore */ }
+            imgData = await urlToDataUrl(ch.imageUrl);
+            const dims = await getImageDims(imgData);
+            imgW = maxWidth * 0.65;
+            imgH = (dims.h / dims.w) * imgW;
+            // Cap image height so text fits on same page
+            const maxImgH = (pageHeight - topOffset) * 0.45;
+            if (imgH > maxImgH) {
+              imgH = maxImgH;
+              imgW = (dims.w / dims.h) * imgH;
+            }
+          } catch { imgData = null; }
+        }
+
+        if (imgData) {
+          if (y + imgH > pageHeight - 30) newPage();
+          doc.addImage(imgData, "PNG", margin + (maxWidth - imgW) / 2, y, imgW, imgH, undefined, "FAST");
+          y += imgH + 4;
         }
         addText(ch.text, 11, false);
-        y += 4;
       }
       if (content.moral) {
         if (y > pageHeight - 30) newPage();
@@ -721,16 +736,18 @@ async function buildDocxContent(title: string, resourceType: string, content: an
       const chapters = content.chapters || [];
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
+        // Each chapter on its own page
         children.push(new Paragraph({
+          pageBreakBefore: i > 0,
           heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: `${i + 1}. ${ch.title}`, bold: true })],
+          children: [new TextRun({ text: ch.title, bold: true })],
         }));
         if (ch.imageUrl) {
           try {
             const img = await urlToDataUrl(ch.imageUrl);
             const { bytes, type } = dataUrlToUint8(img);
             const dims = await getImageDims(img);
-            const w = 420;
+            const w = 380;
             const h = (dims.h / dims.w) * w;
             children.push(new Paragraph({
               alignment: AlignmentType.CENTER,
