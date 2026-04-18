@@ -107,9 +107,9 @@ export default function GenerateResource() {
 
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [numItems, setNumItems] = useState(10);
+  const [numItems, setNumItems] = useState<number | "">(10);
   const [examType, setExamType] = useState("icfes");
-  const [numSlides, setNumSlides] = useState(8);
+  const [numSlides, setNumSlides] = useState<number | "">(8);
   const [slidePalette, setSlidePalette] = useState<string>("academic");
 
   // Rubric fields
@@ -547,7 +547,24 @@ export default function GenerateResource() {
           <>
             <div className="space-y-2">
               <Label>Número de diapositivas</Label>
-              <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
+              <Input
+                type="number"
+                min={3}
+                max={20}
+                value={numSlides}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") return setNumSlides("");
+                  const n = parseInt(v);
+                  if (!Number.isNaN(n)) setNumSlides(n);
+                }}
+                onBlur={() => {
+                  if (numSlides === "" || (typeof numSlides === "number" && numSlides < 3)) setNumSlides(8);
+                  else if (typeof numSlides === "number" && numSlides > 20) setNumSlides(20);
+                }}
+                placeholder="8"
+                className="w-32"
+              />
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
