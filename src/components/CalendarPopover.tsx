@@ -207,12 +207,12 @@ export function CalendarPopover() {
           tabIndex={0}
           aria-label="Abrir calendario de notas"
           className={cn(
-            "group flex flex-col w-full rounded-xl py-1 px-2",
+            "group flex flex-col w-full rounded-xl py-1.5 px-2",
             "hover:bg-muted/40 transition-colors select-none",
           )}
         >
           {/* Month + Year header */}
-          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <div className="flex items-center justify-center gap-1.5 mb-1">
             <CalendarIcon className="h-3 w-3 text-muted-foreground/70" />
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground capitalize">
               {monthLabel}
@@ -229,7 +229,7 @@ export function CalendarPopover() {
             onScroll={updateCenter}
             onClickCapture={openIfNotDragged}
             className={cn(
-              "flex items-stretch gap-0.5 w-full overflow-x-auto",
+              "flex items-stretch gap-1 w-full overflow-x-auto py-1 px-1",
               "cursor-grab",
               isDragging && "cursor-grabbing",
               "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
@@ -249,9 +249,9 @@ export function CalendarPopover() {
                   }}
                   data-today={isToday || undefined}
                   className={cn(
-                    "relative flex flex-col items-center justify-center rounded-md shrink-0 min-w-[30px] px-1 py-0.5 transition-colors",
+                    "relative flex flex-col items-center justify-center rounded-lg shrink-0 min-w-[34px] px-1.5 py-1 transition-colors",
                     isToday
-                      ? "bg-primary/12 text-primary ring-1 ring-primary/25"
+                      ? "bg-primary/15 ring-1 ring-primary/30 shadow-sm"
                       : isWeekend
                         ? "text-amber-600/90 dark:text-amber-400/90"
                         : "text-foreground/70 hover:text-foreground",
@@ -261,7 +261,7 @@ export function CalendarPopover() {
                     className={cn(
                       "text-[8px] font-semibold uppercase tracking-wider leading-none",
                       isToday
-                        ? "text-primary/70"
+                        ? "text-primary"
                         : isWeekend
                           ? "text-amber-600/70 dark:text-amber-400/70"
                           : "text-muted-foreground",
@@ -271,8 +271,8 @@ export function CalendarPopover() {
                   </span>
                   <span
                     className={cn(
-                      "text-[11px] font-bold leading-tight mt-0.5",
-                      isToday && "text-xs",
+                      "text-[12px] font-bold leading-none mt-1",
+                      isToday && "text-[13px] text-primary",
                     )}
                   >
                     {d.getDate()}
