@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 
@@ -105,7 +105,7 @@ export async function exportToDocx(
     );
   }
 
-  const children = buildDocxContent(title, resourceType, content);
+  const children = await buildDocxContent(title, resourceType, content);
 
   const doc = new Document({
     styles: {
@@ -114,7 +114,7 @@ export async function exportToDocx(
     sections: [
       {
         headers: headerChildren.length ? { default: new Header({ children: headerChildren }) } : undefined,
-        children,
+        children: children as any,
       },
     ],
   });
