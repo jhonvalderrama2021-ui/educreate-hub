@@ -70,8 +70,8 @@ export default function Resources() {
       <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
         <ResourcesSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 bg-card/90 backdrop-blur border-b border-border px-4">
-            <div className="h-full flex items-center gap-3">
+          <header className="bg-card/90 backdrop-blur border-b border-border px-4 sticky top-0 z-30">
+            <div className="flex items-center gap-3 py-3">
               <div className="flex-1 min-w-0">
                 <CalendarPopover />
               </div>
