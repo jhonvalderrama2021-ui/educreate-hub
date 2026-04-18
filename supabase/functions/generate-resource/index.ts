@@ -58,6 +58,7 @@ serve(async (req) => {
         ],
         response_format: { type: "json_object" },
         temperature: 0.7,
+        max_tokens: 16000,
       }),
     });
 
@@ -77,8 +78,9 @@ serve(async (req) => {
     const data = await response.json();
     let content = JSON.parse(data.choices[0].message.content);
 
-    // For slides: resolve image queries to real Unsplash URLs
+    // For slides: enforce exact slide count + resolve image queries
     if (resourceType === "slides" && content.slides) {
+      content = enforceSlideCount(content, numItems || 8);
       content = await resolveSlideImages(content);
     }
 
@@ -95,7 +97,6 @@ serve(async (req) => {
 
 async function resolveSlideImages(presentation: any): Promise<any> {
   const slides = presentation.slides || [];
-  
   for (const slide of slides) {
     if (slide.image?.query) {
       try {
@@ -106,8 +107,73 @@ async function resolveSlideImages(presentation: any): Promise<any> {
       }
     }
   }
-  
   return presentation;
+}
+
+/**
+ * Ensures the presentation has exactly `expected` slides.
+ * - Truncates if too many (preserves hero + conclusion).
+ * - Pads with auto-generated content slides if too few.
+ */
+function enforceSlideCount(presentation: any, expected: number): any {
+  let slides = presentation.slides || [];
+  console.log(`[slides] Generated ${slides.length}, expected ${expected}`);
+  if (slides.length === expected) return presentation;
+
+  if (slides.length > expected) {
+    const hero = slides[0];
+    const conclusion = slides[slides.length - 1];
+    const middle = slides.slice(1, -1).slice(0, expected - 2);
+    presentation.slides = [hero, ...middle, conclusion];
+    return presentation;
+  }
+
+  const palette = ["#3B82F6", "#6366F1", "#8B5CF6", "#22C55E", "#F59E0B", "#EF4444"];
+  const lastIsConclusion = slides[slides.length - 1]?.layout === "conclusion";
+  const conclusion = lastIsConclusion ? slides.pop() : null;
+  const missing = expected - slides.length - (conclusion ? 1 : 0);
+  const layouts = ["list", "grid", "stats", "process", "split"];
+  for (let i = 0; i < missing; i++) {
+    slides.push(buildFillerSlide(layouts[i % layouts.length], presentation.title || "el tema", i + 1, palette[i % palette.length]));
+  }
+  if (conclusion) slides.push(conclusion);
+  presentation.slides = slides;
+  return presentation;
+}
+
+function buildFillerSlide(layout: string, topic: string, idx: number, color: string): any {
+  const base: any = { layout, title: `Aspecto clave ${idx}` };
+  if (layout === "list") {
+    base.listItems = [
+      { icon: "check_circle", title: "Punto importante", description: `Detalle relevante sobre ${topic} que conviene profundizar en el aula.` },
+      { icon: "lightbulb", title: "Idea destacada", description: `Aplicación práctica de ${topic} dentro del contexto educativo.` },
+      { icon: "school", title: "Aprendizaje esperado", description: `Lo que el estudiante debe comprender al finalizar esta sección.` },
+    ];
+  } else if (layout === "grid") {
+    base.cards = [
+      { icon: "star", title: "Concepto central", description: `Definición clave relacionada con ${topic}.`, color },
+      { icon: "explore", title: "Contexto", description: `Marco general en el que se aplica ${topic}.`, color },
+      { icon: "build", title: "Aplicación", description: `Cómo se usa ${topic} en la práctica.`, color },
+    ];
+  } else if (layout === "stats") {
+    base.stats = [
+      { value: "100%", label: "Comprensión esperada", color },
+      { value: "3+", label: "Áreas de aplicación", color },
+      { value: "5", label: "Conceptos clave", color },
+    ];
+  } else if (layout === "process") {
+    base.steps = [
+      { number: 1, title: "Explorar", description: `Acercamiento inicial a ${topic}.`, color },
+      { number: 2, title: "Comprender", description: `Análisis profundo de ${topic}.`, color },
+      { number: 3, title: "Aplicar", description: `Uso de ${topic} en situaciones reales.`, color },
+    ];
+  } else {
+    base.layout = "split";
+    base.subtitle = `Más sobre ${topic}`;
+    base.content = `Esta sección amplía la información sobre ${topic} con aspectos adicionales relevantes para el aprendizaje del estudiante.`;
+    base.image = { query: topic, alt: topic, placement: "right" };
+  }
+  return base;
 }
 
 async function searchUnsplash(query: string): Promise<string | null> {
@@ -401,13 +467,26 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
 }
 
 # REGLAS CRÍTICAS
-1. La PRIMERA slide SIEMPRE usa layout "hero"
-2. La ÚLTIMA slide SIEMPRE usa layout "conclusion"
-3. VARÍA los layouts intermedios: NO repitas el mismo layout consecutivamente
-4. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, etc.)
-5. Elige una paleta de colores coherente con el tema educativo
-6. Para slides "split", incluye "image.query" con palabras clave en INGLÉS para búsqueda en Unsplash
-7. Genera EXACTAMENTE ${numItems} slides
-8. Los textos deben ser concisos: títulos max 6 palabras, descripciones max 2 líneas
-9. Cada slide grid debe tener 2-4 cards, cada process 3-5 steps, cada stats 3-4 stats`;
+1. Genera EXACTAMENTE ${numItems} slides en el array "slides". Ni una más ni una menos. Cuenta antes de responder.
+2. La PRIMERA slide SIEMPRE usa layout "hero".
+3. La ÚLTIMA slide SIEMPRE usa layout "conclusion".
+4. Las ${Math.max(0, numItems - 2)} slides intermedias deben VARIAR entre layouts: grid, split, process, comparison, stats, list, timeline. NO repitas el mismo layout dos veces seguidas.
+5. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, etc.).
+6. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema).
+7. Para slides "split", incluye "image.query" con 2-4 palabras clave en INGLÉS para búsqueda en Unsplash.
+8. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
+   - Títulos de slide: 3-8 palabras claras.
+   - Subtítulos: una frase completa (10-18 palabras).
+   - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una). Explica el concepto, da contexto y un ejemplo o aplicación.
+   - "content" en split/conclusion: párrafo de 40-80 palabras con información real y educativa.
+   - Labels de stats: frase descriptiva (5-10 palabras), no solo una palabra.
+   - Puntos en comparison: frases completas, no fragmentos.
+9. Cantidad de elementos por slide:
+   - grid: 3-4 cards
+   - process: 3-5 steps
+   - stats: 3-4 stats
+   - list: 3-5 listItems
+   - comparison: exactamente 2 columns con 3-5 points cada una
+   - timeline: 3-5 events
+10. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".`;
 }
