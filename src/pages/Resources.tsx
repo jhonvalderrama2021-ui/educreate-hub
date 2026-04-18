@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
+import { CalendarPopover } from "@/components/CalendarPopover";
 import { Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import GenerateResource from "@/pages/resources/GenerateResource";
@@ -70,9 +71,11 @@ export default function Resources() {
         <ResourcesSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 bg-card/90 backdrop-blur border-b border-border px-4">
-            <div className="h-full flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2" />
-              <div className="flex items-center gap-2">
+            <div className="h-full flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <CalendarPopover />
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <ThemeToggle />
                 <UserMenu />
               </div>

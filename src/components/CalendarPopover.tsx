@@ -134,8 +134,10 @@ export function CalendarPopover() {
 
   // Drag-to-scroll
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const dayRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const dragState = useRef({ active: false, startX: 0, startScroll: 0, moved: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [centerDate, setCenterDate] = useState<Date>(today);
 
   // Center today on mount
   useEffect(() => {
@@ -147,6 +149,24 @@ export function CalendarPopover() {
       el.scrollTo({ left: offset, behavior: "auto" });
     }
   }, []);
+
+  // Track which day sits at the visual center to update the month label
+  const updateCenter = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const centerX = el.scrollLeft + el.clientWidth / 2;
+    let nearest: { date: Date; dist: number } | null = null;
+    for (const d of stripDays) {
+      const node = dayRefs.current.get(d.toDateString());
+      if (!node) continue;
+      const nodeCenter = node.offsetLeft + node.clientWidth / 2;
+      const dist = Math.abs(nodeCenter - centerX);
+      if (!nearest || dist < nearest.dist) nearest = { date: d, dist };
+    }
+    if (nearest && nearest.date.toDateString() !== centerDate.toDateString()) {
+      setCenterDate(nearest.date);
+    }
+  };
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = scrollerRef.current;
@@ -177,76 +197,99 @@ export function CalendarPopover() {
     }
   };
 
+  const monthLabel = format(centerDate, "MMMM yyyy", { locale: es });
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <div
-          ref={scrollerRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onClickCapture={openIfNotDragged}
           role="button"
           tabIndex={0}
           aria-label="Abrir calendario de notas"
           className={cn(
-            "group flex items-stretch gap-1 w-full overflow-x-auto py-1.5 px-2 rounded-xl",
-            "hover:bg-muted/40 transition-colors select-none cursor-grab",
-            isDragging && "cursor-grabbing bg-muted/40",
-            "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+            "group flex flex-col w-full rounded-xl py-1 px-2",
+            "hover:bg-muted/40 transition-colors select-none",
           )}
         >
-          {stripDays.map((d) => {
-            const isToday = isSameDay(d, today);
-            const marked = hasNoteOn(d);
-            const dow = d.getDay(); // 0 sun, 6 sat
-            const isWeekend = dow === 0 || dow === 6;
-            return (
-              <div
-                key={d.toISOString()}
-                data-today={isToday || undefined}
-                className={cn(
-                  "relative flex flex-col items-center justify-center rounded-lg shrink-0 min-w-[36px] px-1.5 py-0.5 transition-colors",
-                  isToday
-                    ? "bg-primary/15 text-primary ring-1 ring-primary/30"
-                    : isWeekend
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-foreground/70 hover:text-foreground",
-                )}
-              >
-                <span
+          {/* Month + Year header */}
+          <div className="flex items-center justify-center gap-1.5 mb-0.5">
+            <CalendarIcon className="h-3 w-3 text-muted-foreground/70" />
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground capitalize">
+              {monthLabel}
+            </span>
+          </div>
+
+          {/* Day strip */}
+          <div
+            ref={scrollerRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onScroll={updateCenter}
+            onClickCapture={openIfNotDragged}
+            className={cn(
+              "flex items-stretch gap-0.5 w-full overflow-x-auto",
+              "cursor-grab",
+              isDragging && "cursor-grabbing",
+              "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+            )}
+          >
+            {stripDays.map((d) => {
+              const isToday = isSameDay(d, today);
+              const marked = hasNoteOn(d);
+              const dow = d.getDay();
+              const isWeekend = dow === 0 || dow === 6;
+              return (
+                <div
+                  key={d.toISOString()}
+                  ref={(node) => {
+                    if (node) dayRefs.current.set(d.toDateString(), node);
+                    else dayRefs.current.delete(d.toDateString());
+                  }}
+                  data-today={isToday || undefined}
                   className={cn(
-                    "text-[9px] font-semibold uppercase tracking-wider leading-none",
+                    "relative flex flex-col items-center justify-center rounded-md shrink-0 min-w-[30px] px-1 py-0.5 transition-colors",
                     isToday
-                      ? "text-primary/80"
+                      ? "bg-primary/12 text-primary ring-1 ring-primary/25"
                       : isWeekend
-                        ? "text-amber-600/80 dark:text-amber-400/80"
-                        : "text-muted-foreground",
+                        ? "text-amber-600/90 dark:text-amber-400/90"
+                        : "text-foreground/70 hover:text-foreground",
                   )}
                 >
-                  {format(d, "EEEEE", { locale: es })}
-                </span>
-                <span
-                  className={cn(
-                    "text-xs font-bold leading-tight mt-0.5",
-                    isToday && "text-sm",
-                  )}
-                >
-                  {d.getDate()}
-                </span>
-                {marked && (
                   <span
                     className={cn(
-                      "absolute -bottom-0.5 h-1 w-1 rounded-full",
-                      isToday ? "bg-primary" : isWeekend ? "bg-amber-500" : "bg-primary",
+                      "text-[8px] font-semibold uppercase tracking-wider leading-none",
+                      isToday
+                        ? "text-primary/70"
+                        : isWeekend
+                          ? "text-amber-600/70 dark:text-amber-400/70"
+                          : "text-muted-foreground",
                     )}
-                    aria-hidden
-                  />
-                )}
-              </div>
-            );
-          })}
+                  >
+                    {format(d, "EEEEE", { locale: es })}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-[11px] font-bold leading-tight mt-0.5",
+                      isToday && "text-xs",
+                    )}
+                  >
+                    {d.getDate()}
+                  </span>
+                  {marked && (
+                    <span
+                      className={cn(
+                        "absolute -bottom-0.5 h-1 w-1 rounded-full",
+                        isToday ? "bg-primary" : isWeekend ? "bg-amber-500" : "bg-primary",
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </PopoverTrigger>
       <PopoverContent
