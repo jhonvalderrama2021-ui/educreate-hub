@@ -1,11 +1,14 @@
 import { StructuredSlide, SlideTheme } from "@/lib/slide-types";
+import { EditableText } from "./EditableText";
 
 interface Props {
   slide: StructuredSlide;
   theme: SlideTheme;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }
 
-export function TimelineLayout({ slide, theme }: Props) {
+export function TimelineLayout({ slide, theme, editable, onFieldChange }: Props) {
   const events = slide.timelineEvents || [];
 
   return (
@@ -13,17 +16,21 @@ export function TimelineLayout({ slide, theme }: Props) {
       className="w-full h-full flex flex-col"
       style={{ padding: "60px 70px", gap: "32px", background: theme.background }}
     >
-      <h2
+      <EditableText
+        as="h2"
+        value={slide.title}
+        editable={editable}
+        onChange={(v) => onFieldChange?.("title", v)}
+        placeholder="Título"
         style={{
           fontFamily: theme.fontHeading,
           fontSize: "36px",
           fontWeight: 700,
           color: theme.text,
           textAlign: "center",
+          display: "block",
         }}
-      >
-        {slide.title}
-      </h2>
+      />
 
       <div
         style={{
@@ -35,7 +42,6 @@ export function TimelineLayout({ slide, theme }: Props) {
           paddingLeft: "60px",
         }}
       >
-        {/* Vertical line */}
         <div
           style={{
             position: "absolute",
@@ -51,7 +57,6 @@ export function TimelineLayout({ slide, theme }: Props) {
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {events.map((event, i) => (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "20px", position: "relative" }}>
-              {/* Dot */}
               <div
                 style={{
                   position: "absolute",
@@ -75,7 +80,12 @@ export function TimelineLayout({ slide, theme }: Props) {
                   flex: 1,
                 }}
               >
-                <span
+                <EditableText
+                  as="span"
+                  value={event.date}
+                  editable={editable}
+                  onChange={(v) => onFieldChange?.(`timelineEvents.${i}.date`, v)}
+                  placeholder="Fecha"
                   style={{
                     fontFamily: theme.fontBody,
                     fontSize: "12px",
@@ -83,11 +93,15 @@ export function TimelineLayout({ slide, theme }: Props) {
                     color: theme.secondary,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
+                    display: "inline-block",
                   }}
-                >
-                  {event.date}
-                </span>
-                <h3
+                />
+                <EditableText
+                  as="h3"
+                  value={event.title}
+                  editable={editable}
+                  onChange={(v) => onFieldChange?.(`timelineEvents.${i}.title`, v)}
+                  placeholder="Título"
                   style={{
                     fontFamily: theme.fontHeading,
                     fontSize: "17px",
@@ -95,13 +109,18 @@ export function TimelineLayout({ slide, theme }: Props) {
                     color: theme.text,
                     marginTop: "4px",
                     marginBottom: "4px",
+                    display: "block",
                   }}
-                >
-                  {event.title}
-                </h3>
-                <p style={{ fontFamily: theme.fontBody, fontSize: "13px", color: "#64748B", lineHeight: 1.5 }}>
-                  {event.description}
-                </p>
+                />
+                <EditableText
+                  as="p"
+                  value={event.description}
+                  editable={editable}
+                  onChange={(v) => onFieldChange?.(`timelineEvents.${i}.description`, v)}
+                  placeholder="Descripción"
+                  multiline
+                  style={{ fontFamily: theme.fontBody, fontSize: "13px", color: "#64748B", lineHeight: 1.5 }}
+                />
               </div>
             </div>
           ))}

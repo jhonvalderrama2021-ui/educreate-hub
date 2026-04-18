@@ -1,11 +1,14 @@
 import { StructuredSlide, SlideTheme } from "@/lib/slide-types";
+import { EditableText } from "./EditableText";
 
 interface Props {
   slide: StructuredSlide;
   theme: SlideTheme;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }
 
-export function ListLayout({ slide, theme }: Props) {
+export function ListLayout({ slide, theme, editable, onFieldChange }: Props) {
   const items = slide.listItems || [];
 
   return (
@@ -13,16 +16,20 @@ export function ListLayout({ slide, theme }: Props) {
       className="w-full h-full flex flex-col"
       style={{ padding: "60px 70px", gap: "32px", background: theme.background }}
     >
-      <h2
+      <EditableText
+        as="h2"
+        value={slide.title}
+        editable={editable}
+        onChange={(v) => onFieldChange?.("title", v)}
+        placeholder="Título"
         style={{
           fontFamily: theme.fontHeading,
           fontSize: "36px",
           fontWeight: 700,
           color: theme.text,
+          display: "block",
         }}
-      >
-        {slide.title}
-      </h2>
+      />
 
       <div style={{ display: "flex", flexDirection: "column", gap: "16px", flex: 1 }}>
         {items.map((item, i) => (
@@ -55,21 +62,31 @@ export function ListLayout({ slide, theme }: Props) {
                 {item.icon || "star"}
               </span>
             </div>
-            <div>
-              <h3
+            <div style={{ flex: 1 }}>
+              <EditableText
+                as="h3"
+                value={item.title}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`listItems.${i}.title`, v)}
+                placeholder="Título"
                 style={{
                   fontFamily: theme.fontHeading,
                   fontSize: "17px",
                   fontWeight: 600,
                   color: theme.text,
                   marginBottom: "4px",
+                  display: "block",
                 }}
-              >
-                {item.title}
-              </h3>
-              <p style={{ fontFamily: theme.fontBody, fontSize: "14px", color: "#64748B", lineHeight: 1.5 }}>
-                {item.description}
-              </p>
+              />
+              <EditableText
+                as="p"
+                value={item.description}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`listItems.${i}.description`, v)}
+                placeholder="Descripción"
+                multiline
+                style={{ fontFamily: theme.fontBody, fontSize: "14px", color: "#64748B", lineHeight: 1.5 }}
+              />
             </div>
           </div>
         ))}

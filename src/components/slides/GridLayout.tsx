@@ -1,13 +1,16 @@
 import { StructuredSlide, SlideTheme } from "@/lib/slide-types";
+import { EditableText } from "./EditableText";
 
 interface Props {
   slide: StructuredSlide;
   theme: SlideTheme;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }
 
 const CARD_COLORS = ["#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
 
-export function GridLayout({ slide, theme }: Props) {
+export function GridLayout({ slide, theme, editable, onFieldChange }: Props) {
   const cards = slide.cards || [];
   const cols = cards.length <= 2 ? cards.length : cards.length <= 4 ? 2 : 3;
 
@@ -29,16 +32,19 @@ export function GridLayout({ slide, theme }: Props) {
             auto_awesome
           </span>
         </div>
-        <h2
+        <EditableText
+          as="h2"
+          value={slide.title}
+          editable={editable}
+          onChange={(v) => onFieldChange?.("title", v)}
+          placeholder="Título"
           style={{
             fontFamily: theme.fontHeading,
             fontSize: "36px",
             fontWeight: 700,
             color: theme.text,
           }}
-        >
-          {slide.title}
-        </h2>
+        />
       </div>
 
       <div
@@ -82,7 +88,12 @@ export function GridLayout({ slide, theme }: Props) {
                   </span>
                 </div>
               )}
-              <h3
+              <EditableText
+                as="h3"
+                value={card.title}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`cards.${i}.title`, v)}
+                placeholder="Título de tarjeta"
                 style={{
                   fontFamily: theme.fontHeading,
                   fontSize: "18px",
@@ -90,19 +101,21 @@ export function GridLayout({ slide, theme }: Props) {
                   color: theme.text,
                   marginBottom: "8px",
                 }}
-              >
-                {card.title}
-              </h3>
-              <p
+              />
+              <EditableText
+                as="p"
+                value={card.description}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`cards.${i}.description`, v)}
+                placeholder="Descripción"
+                multiline
                 style={{
                   fontFamily: theme.fontBody,
                   fontSize: "14px",
                   color: "#64748B",
                   lineHeight: 1.6,
                 }}
-              >
-                {card.description}
-              </p>
+              />
             </div>
           );
         })}
