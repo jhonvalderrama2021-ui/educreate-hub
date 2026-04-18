@@ -60,23 +60,27 @@ async function renderStructuredSlideOffscreen(
       await (document as any).fonts.ready;
     }
 
-    // Wait for all images inside the slide to load
+    // Wait for all images inside the slide to load (data URLs resolve instantly,
+    // remote URLs may need a moment).
     const imgs = Array.from(container.querySelectorAll("img"));
     await Promise.all(
-      imgs.map((img) =>
-        img.complete && img.naturalWidth > 0
-          ? Promise.resolve()
-          : new Promise<void>((resolve) => {
-              const done = () => resolve();
-              img.addEventListener("load", done, { once: true });
-              img.addEventListener("error", done, { once: true });
-              setTimeout(done, 4000);
-            })
-      )
+      imgs.map((img) => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          const done = () => resolve();
+          img.addEventListener("load", done, { once: true });
+          img.addEventListener("error", done, { once: true });
+          // Force decode if supported
+          if (typeof (img as any).decode === "function") {
+            (img as any).decode().then(done).catch(done);
+          }
+          setTimeout(done, 6000);
+        });
+      })
     );
 
     // Final settle frame
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 150));
 
     const canvas = await html2canvas(container, {
       width: SLIDE_W,
