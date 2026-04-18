@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { createElement } from "react";
 import { SlideRenderer } from "@/components/slides/SlideRenderer";
 import { DEFAULT_THEME, type StructuredSlide, type SlideTheme } from "@/lib/slide-types";
+import { supabase } from "@/integrations/supabase/client";
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -20,10 +21,62 @@ function isStructuredPresentation(content: any): boolean {
   return content?.slides?.[0]?.layout !== undefined;
 }
 
+// ============================================================
+// IMAGE PRE-FETCHING — Critical for blank-PDF fix
+// ============================================================
+// We proxy every Pexels URL through our edge function which returns base64.
+// html2canvas can then capture them without CORS taint and without race
+// conditions waiting for remote loads.
+
+const imageCache = new Map<string, string>();
+
+async function urlToBase64ViaProxy(url: string): Promise<string | null> {
+  if (!url) return null;
+  if (imageCache.has(url)) return imageCache.get(url)!;
+  try {
+    const { data, error } = await supabase.functions.invoke("pexels-proxy", {
+      body: { url },
+    });
+    if (error || !data?.dataUrl) {
+      console.warn("pexels-proxy failed:", error || data);
+      return null;
+    }
+    imageCache.set(url, data.dataUrl);
+    return data.dataUrl as string;
+  } catch (e) {
+    console.warn("proxy invoke failed:", e);
+    return null;
+  }
+}
+
 /**
- * Renders a structured slide off-screen at full 1280x720 resolution
- * using React, waits for fonts/images, then captures with html2canvas.
+ * Walks the presentation and replaces every slide.image.url with a base64
+ * data URL fetched through our edge proxy. Mutates a *clone* and returns it.
  */
+async function inlineAllImages(content: any): Promise<any> {
+  const cloned = JSON.parse(JSON.stringify(content));
+  const slides = cloned.slides || [];
+  const tasks: Promise<void>[] = [];
+  for (const slide of slides) {
+    const url = slide?.image?.url;
+    if (!url || url.startsWith("data:")) continue;
+    tasks.push(
+      urlToBase64ViaProxy(url).then((b64) => {
+        if (b64) slide.image.url = b64;
+      })
+    );
+  }
+  // Run in parallel but cap concurrency to avoid hammering the proxy.
+  const CONCURRENCY = 4;
+  for (let i = 0; i < tasks.length; i += CONCURRENCY) {
+    await Promise.all(tasks.slice(i, i + CONCURRENCY));
+  }
+  return cloned;
+}
+
+// ============================================================
+// OFF-SCREEN SLIDE RENDERER
+// ============================================================
 async function renderStructuredSlideOffscreen(
   slide: StructuredSlide,
   theme: SlideTheme
@@ -47,21 +100,14 @@ async function renderStructuredSlideOffscreen(
   let root: Root | null = null;
   try {
     root = createRoot(container);
-    root.render(
-      createElement(SlideRenderer, { slide, theme }) as any
-    );
+    root.render(createElement(SlideRenderer, { slide, theme }) as any);
 
-    // Allow React to commit + initial paint
     await new Promise((r) => requestAnimationFrame(() => r(null)));
     await new Promise((r) => setTimeout(r, 50));
 
-    // Wait for fonts (Material Icons + Inter + Space Grotesk)
-    if ((document as any).fonts?.ready) {
-      await (document as any).fonts.ready;
-    }
+    if ((document as any).fonts?.ready) await (document as any).fonts.ready;
 
-    // Wait for all images inside the slide to load (data URLs resolve instantly,
-    // remote URLs may need a moment).
+    // Wait for inline (data:) images to decode — they're already in memory
     const imgs = Array.from(container.querySelectorAll("img"));
     await Promise.all(
       imgs.map((img) => {
@@ -70,96 +116,37 @@ async function renderStructuredSlideOffscreen(
           const done = () => resolve();
           img.addEventListener("load", done, { once: true });
           img.addEventListener("error", done, { once: true });
-          // Force decode if supported
           if (typeof (img as any).decode === "function") {
             (img as any).decode().then(done).catch(done);
           }
-          setTimeout(done, 6000);
+          setTimeout(done, 4000);
         });
       })
     );
 
-    // Final settle frame
-    await new Promise((r) => setTimeout(r, 150));
+    await new Promise((r) => setTimeout(r, 100));
 
-    const canvas = await html2canvas(container, {
+    return await html2canvas(container, {
       width: SLIDE_W,
       height: SLIDE_H,
       windowWidth: SLIDE_W,
       windowHeight: SLIDE_H,
       scale: 2,
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false,
       backgroundColor: "#ffffff",
       logging: false,
       imageTimeout: 5000,
     });
-
-    return canvas;
   } finally {
-    if (root) {
-      try { root.unmount(); } catch {}
-    }
+    if (root) try { root.unmount(); } catch {}
     if (container.parentNode) container.parentNode.removeChild(container);
   }
 }
 
-/**
- * Legacy: render free HTML slide in iframe and capture.
- */
-async function renderHtmlSlideToCanvas(html: string): Promise<HTMLCanvasElement> {
-  const container = document.createElement("div");
-  container.style.cssText =
-    `position:fixed;left:-9999px;top:0;width:${SLIDE_W}px;height:${SLIDE_H}px;overflow:hidden;z-index:-1;`;
-  document.body.appendChild(container);
-
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText = `width:${SLIDE_W}px;height:${SLIDE_H}px;border:none;`;
-  iframe.sandbox.add("allow-same-origin");
-  iframe.sandbox.add("allow-scripts");
-  container.appendChild(iframe);
-
-  await new Promise<void>((resolve) => {
-    iframe.onload = () => resolve();
-    iframe.srcdoc = html;
-  });
-
-  await new Promise((r) => setTimeout(r, 1500));
-
-  const iframeDoc = iframe.contentDocument;
-  if (!iframeDoc?.body) {
-    document.body.removeChild(container);
-    throw new Error("Could not access iframe document");
-  }
-
-  const canvas = await html2canvas(iframeDoc.body, {
-    width: SLIDE_W,
-    height: SLIDE_H,
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-  });
-
-  document.body.removeChild(container);
-  return canvas;
-}
-
-async function captureSlide(
-  slideData: any,
-  theme: SlideTheme,
-  isStructured: boolean
-): Promise<HTMLCanvasElement> {
-  if (isStructured) {
-    return renderStructuredSlideOffscreen(slideData as StructuredSlide, theme);
-  }
-  if (slideData.html) {
-    return renderHtmlSlideToCanvas(slideData.html);
-  }
-  throw new Error("Slide has no renderable content");
-}
-
+// ============================================================
+// PUBLIC EXPORTERS
+// ============================================================
 export async function exportSlidesToPdf(content: any) {
   const slides = content?.slides || [];
   if (slides.length === 0) {
@@ -168,19 +155,23 @@ export async function exportSlidesToPdf(content: any) {
   }
 
   const isStructured = isStructuredPresentation(content);
-  const theme: SlideTheme = content?.theme || DEFAULT_THEME;
-  const toastId = toast.loading(`Generando PDF (0/${slides.length})...`);
+  const toastId = toast.loading(`Preparando imágenes...`);
 
   try {
+    // Step 1 — pre-fetch every remote image as base64
+    const inlined = isStructured ? await inlineAllImages(content) : content;
+    const theme: SlideTheme = inlined?.theme || DEFAULT_THEME;
+
     const { default: jsPDF } = await import("jspdf");
     const doc = new jsPDF({ orientation: "landscape", unit: "px", format: [SLIDE_W, SLIDE_H] });
 
-    for (let idx = 0; idx < slides.length; idx++) {
-      toast.loading(`Generando PDF (${idx + 1}/${slides.length})...`, { id: toastId });
+    const total = inlined.slides.length;
+    for (let idx = 0; idx < total; idx++) {
+      toast.loading(`Generando PDF (${idx + 1}/${total})...`, { id: toastId });
       if (idx > 0) doc.addPage();
 
       try {
-        const canvas = await captureSlide(slides[idx], theme, isStructured);
+        const canvas = await renderStructuredSlideOffscreen(inlined.slides[idx], theme);
         const imgData = canvas.toDataURL("image/jpeg", 0.92);
         doc.addImage(imgData, "JPEG", 0, 0, SLIDE_W, SLIDE_H);
       } catch (e) {
@@ -192,7 +183,7 @@ export async function exportSlidesToPdf(content: any) {
       }
     }
 
-    doc.save(`${sanitizeFilename(content?.title || "Diapositivas")}.pdf`);
+    doc.save(`${sanitizeFilename(inlined?.title || "Diapositivas")}.pdf`);
     toast.success("PDF descargado exitosamente", { id: toastId });
   } catch (e: any) {
     console.error("PDF export error:", e);
@@ -208,21 +199,23 @@ export async function exportSlidesToPptx(content: any) {
   }
 
   const isStructured = isStructuredPresentation(content);
-  const theme: SlideTheme = content?.theme || DEFAULT_THEME;
-  const toastId = toast.loading(`Generando PPTX (0/${slides.length})...`);
+  const toastId = toast.loading(`Preparando imágenes...`);
 
   try {
+    const inlined = isStructured ? await inlineAllImages(content) : content;
+    const theme: SlideTheme = inlined?.theme || DEFAULT_THEME;
+
     const pptxgenModule = await import("pptxgenjs");
     const PptxGenJS = pptxgenModule.default;
     const pres = new PptxGenJS();
     pres.layout = "LAYOUT_WIDE";
 
-    for (let idx = 0; idx < slides.length; idx++) {
-      toast.loading(`Generando PPTX (${idx + 1}/${slides.length})...`, { id: toastId });
+    const total = inlined.slides.length;
+    for (let idx = 0; idx < total; idx++) {
+      toast.loading(`Generando PPTX (${idx + 1}/${total})...`, { id: toastId });
       const slide = pres.addSlide();
-
       try {
-        const canvas = await captureSlide(slides[idx], theme, isStructured);
+        const canvas = await renderStructuredSlideOffscreen(inlined.slides[idx], theme);
         const imgData = canvas.toDataURL("image/png");
         slide.addImage({ data: imgData, x: 0, y: 0, w: "100%", h: "100%" });
       } catch (e) {
@@ -233,7 +226,7 @@ export async function exportSlidesToPptx(content: any) {
       }
     }
 
-    const fileName = sanitizeFilename(content?.title || "Diapositivas");
+    const fileName = sanitizeFilename(inlined?.title || "Diapositivas");
     await pres.writeFile({ fileName: `${fileName}.pptx` });
     toast.success("Presentación PPTX descargada exitosamente", { id: toastId });
   } catch (e: any) {
