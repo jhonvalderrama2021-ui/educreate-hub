@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 
@@ -105,7 +105,7 @@ export async function exportToDocx(
     );
   }
 
-  const children = buildDocxContent(title, resourceType, content);
+  const children = await buildDocxContent(title, resourceType, content);
 
   const doc = new Document({
     styles: {
@@ -114,7 +114,7 @@ export async function exportToDocx(
     sections: [
       {
         headers: headerChildren.length ? { default: new Header({ children: headerChildren }) } : undefined,
-        children,
+        children: children as any,
       },
     ],
   });
@@ -343,13 +343,134 @@ export async function exportToPdf(
         y += 3;
       });
       break;
+
+    case "crossword": {
+      // Render crossword grid
+      const rows: number = content.rows;
+      const cols: number = content.cols;
+      const grid: string[][] = content.grid;
+      const numbered: { row: number; col: number; n: number }[] = content.numbered || [];
+      const cellSize = Math.min(10, (maxWidth - 4) / cols);
+      const gridStartX = margin + (maxWidth - cellSize * cols) / 2;
+      let gridStartY = y;
+      const gridHeight = cellSize * rows;
+      if (gridStartY + gridHeight > pageHeight - 20) {
+        newPage();
+        gridStartY = y;
+      }
+
+      const numMap = new Map<string, number>();
+      numbered.forEach((n) => numMap.set(`${n.row}-${n.col}`, n.n));
+
+      doc.setLineWidth(0.2);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = gridStartX + c * cellSize;
+          const yy = gridStartY + r * cellSize;
+          const letter = grid[r][c];
+          if (!letter) {
+            doc.setFillColor(40, 40, 40);
+            doc.rect(x, yy, cellSize, cellSize, "F");
+          } else {
+            doc.setDrawColor(0);
+            doc.rect(x, yy, cellSize, cellSize);
+            const num = numMap.get(`${r}-${c}`);
+            if (num !== undefined) {
+              doc.setFontSize(Math.max(4, cellSize * 0.3));
+              doc.setFont("helvetica", "normal");
+              doc.text(String(num), x + 0.5, yy + cellSize * 0.32);
+            }
+          }
+        }
+      }
+      y = gridStartY + gridHeight + 6;
+
+      // Clues
+      const drawClues = (heading: string, list: any[]) => {
+        if (y > pageHeight - 30) newPage();
+        addText(heading, 12, true);
+        list.forEach((c) => addText(`${c.number}. ${c.clue}`, 9, false, 4));
+        y += 2;
+      };
+      drawClues("Horizontales", content.across || []);
+      drawClues("Verticales", content.down || []);
+
+      // Solution sheet on its own page
+      newPage();
+      addText("SOLUCIÓN — USO DEL DOCENTE", 14, true);
+      y += 2;
+      let sgY = y;
+      if (sgY + gridHeight > pageHeight - 20) { newPage(); sgY = y; }
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = gridStartX + c * cellSize;
+          const yy = sgY + r * cellSize;
+          const letter = grid[r][c];
+          if (!letter) {
+            doc.setFillColor(40, 40, 40);
+            doc.rect(x, yy, cellSize, cellSize, "F");
+          } else {
+            doc.setDrawColor(0);
+            doc.rect(x, yy, cellSize, cellSize);
+            doc.setFontSize(Math.max(5, cellSize * 0.55));
+            doc.setFont("helvetica", "bold");
+            doc.text(letter, x + cellSize / 2, yy + cellSize * 0.7, { align: "center" });
+          }
+        }
+      }
+      y = sgY + gridHeight + 6;
+      break;
+    }
+
+    case "story": {
+      // Cover image
+      if (content.coverImageUrl) {
+        try {
+          const cover = await urlToDataUrl(content.coverImageUrl);
+          const dims = await getImageDims(cover);
+          const w = maxWidth * 0.85;
+          const h = (dims.h / dims.w) * w;
+          if (y + h > pageHeight - 20) newPage();
+          doc.addImage(cover, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
+          y += h + 5;
+        } catch { /* ignore */ }
+      }
+      if (content.character) {
+        addText(`Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, 10, false);
+        y += 2;
+      }
+      for (let i = 0; i < (content.chapters || []).length; i++) {
+        const ch = content.chapters[i];
+        if (y > pageHeight - 40) newPage();
+        addText(`${i + 1}. ${ch.title}`, 13, true);
+        if (ch.imageUrl) {
+          try {
+            const img = await urlToDataUrl(ch.imageUrl);
+            const dims = await getImageDims(img);
+            const w = maxWidth * 0.7;
+            const h = (dims.h / dims.w) * w;
+            if (y + h > pageHeight - 20) newPage();
+            doc.addImage(img, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
+            y += h + 4;
+          } catch { /* ignore */ }
+        }
+        addText(ch.text, 11, false);
+        y += 4;
+      }
+      if (content.moral) {
+        if (y > pageHeight - 30) newPage();
+        addText("Moraleja", 12, true);
+        addText(content.moral, 11, false);
+      }
+      break;
+    }
   }
 
   doc.save(`${sanitizeFilename(title)}.pdf`);
 }
 
-function buildDocxContent(title: string, resourceType: string, content: any): Paragraph[] {
-  const children: Paragraph[] = [
+async function buildDocxContent(title: string, resourceType: string, content: any): Promise<(Paragraph | Table)[]> {
+  const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: title, bold: true })] }),
   ];
 
@@ -507,6 +628,130 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
         });
       });
       break;
+
+    case "crossword": {
+      const rows: number = content.rows;
+      const cols: number = content.cols;
+      const grid: string[][] = content.grid;
+      const numbered: { row: number; col: number; n: number }[] = content.numbered || [];
+      const numMap = new Map<string, number>();
+      numbered.forEach((n) => numMap.set(`${n.row}-${n.col}`, n.n));
+
+      const cellWidth = Math.max(360, Math.floor(9000 / cols));
+      const buildGridTable = (showLetters: boolean) => {
+        const tableRows: TableRow[] = [];
+        for (let r = 0; r < rows; r++) {
+          const cells: TableCell[] = [];
+          for (let c = 0; c < cols; c++) {
+            const letter = grid[r][c];
+            const num = numMap.get(`${r}-${c}`);
+            const isBlack = !letter;
+            const para: Paragraph[] = [];
+            if (!isBlack) {
+              const runs: TextRun[] = [];
+              if (num !== undefined) runs.push(new TextRun({ text: String(num), size: 12, superScript: true }));
+              if (showLetters) runs.push(new TextRun({ text: letter, bold: true, size: 22 }));
+              para.push(new Paragraph({ alignment: AlignmentType.CENTER, children: runs }));
+            } else {
+              para.push(new Paragraph({ children: [] }));
+            }
+            cells.push(new TableCell({
+              width: { size: cellWidth, type: WidthType.DXA },
+              shading: isBlack ? { fill: "222222", type: ShadingType.CLEAR, color: "auto" } : undefined,
+              verticalAlign: VerticalAlign.CENTER,
+              children: para,
+            }));
+          }
+          tableRows.push(new TableRow({ height: { value: cellWidth, rule: "exact" } as any, children: cells }));
+        }
+        return new Table({
+          width: { size: cellWidth * cols, type: WidthType.DXA },
+          columnWidths: Array(cols).fill(cellWidth),
+          rows: tableRows,
+        });
+      };
+
+      children.push(buildGridTable(false));
+      children.push(new Paragraph({ children: [] }));
+
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Horizontales")] }));
+      (content.across || []).forEach((c: any) => children.push(
+        new Paragraph({ children: [new TextRun({ text: `${c.number}. `, bold: true }), new TextRun(c.clue)] }),
+      ));
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Verticales")] }));
+      (content.down || []).forEach((c: any) => children.push(
+        new Paragraph({ children: [new TextRun({ text: `${c.number}. `, bold: true }), new TextRun(c.clue)] }),
+      ));
+
+      // Solution page
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: "Solución — Uso del docente", bold: true })],
+      }));
+      children.push(new Paragraph({ children: [] }));
+      children.push(buildGridTable(true));
+      break;
+    }
+
+    case "story": {
+      if (content.coverImageUrl) {
+        try {
+          const cover = await urlToDataUrl(content.coverImageUrl);
+          const { bytes, type } = dataUrlToUint8(cover);
+          const dims = await getImageDims(cover);
+          const w = 480;
+          const h = (dims.h / dims.w) * w;
+          children.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+          }));
+        } catch { /* ignore */ }
+      }
+      if (content.character) {
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: `Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, italics: true })],
+        }));
+      }
+      const chapters = content.chapters || [];
+      for (let i = 0; i < chapters.length; i++) {
+        const ch = chapters[i];
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          children: [new TextRun({ text: `${i + 1}. ${ch.title}`, bold: true })],
+        }));
+        if (ch.imageUrl) {
+          try {
+            const img = await urlToDataUrl(ch.imageUrl);
+            const { bytes, type } = dataUrlToUint8(img);
+            const dims = await getImageDims(img);
+            const w = 420;
+            const h = (dims.h / dims.w) * w;
+            children.push(new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+            }));
+          } catch { /* ignore */ }
+        }
+        ch.text.split(/\n\n+/).forEach((p: string) => {
+          children.push(new Paragraph({ children: [new TextRun(p)], spacing: { after: 120 } }));
+        });
+      }
+      if (content.moral) {
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: "Moraleja", bold: true })],
+        }));
+        children.push(new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: content.moral, italics: true })],
+        }));
+      }
+      break;
+    }
   }
 
   return children;

@@ -12,6 +12,8 @@ import GenerateResource from "@/pages/resources/GenerateResource";
 import ResourceHistory from "@/pages/resources/ResourceHistory";
 import BotList from "@/pages/resources/BotList";
 import BotChat from "@/pages/resources/BotChat";
+import Crossword from "@/pages/resources/Crossword";
+import Story from "@/pages/resources/Story";
 
 function ResourcesHome() {
   return (
@@ -90,6 +92,8 @@ export default function Resources() {
               <Route path="history" element={<ResourceHistory />} />
               <Route path="bots" element={<BotList />} />
               <Route path="bot-chat/:botId" element={<BotChat />} />
+              <Route path="crossword" element={<Crossword />} />
+              <Route path="story" element={<Story />} />
             </Routes>
           </main>
         </div>

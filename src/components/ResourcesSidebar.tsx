@@ -1,4 +1,4 @@
-import { ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot, Presentation, BookOpen } from "lucide-react";
+import { ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot, Presentation, BookOpen, Puzzle, BookText } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu,
@@ -12,6 +12,11 @@ const modules = [
   { title: "Talleres", url: "/resources/generate?type=workshop", icon: FileEdit, description: "Genera talleres educativos con IA" },
   { title: "Diapositivas", url: "/resources/generate?type=slides", icon: Presentation, description: "Genera presentaciones con IA" },
   { title: "Crear Bot", url: "/resources/bots", icon: Bot, description: "Crea bots educativos especializados" },
+];
+
+const gameModules = [
+  { title: "Crucigrama", url: "/resources/crossword", icon: Puzzle, description: "Genera crucigramas educativos en español" },
+  { title: "Crear Cuento", url: "/resources/story", icon: BookText, description: "Crea cuentos ilustrados con IA" },
 ];
 
 const managementModules = [
@@ -45,6 +50,24 @@ export function ResourcesSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {modules.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={item.description}>
+                    <NavLink to={item.url} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      {!collapsed && <span>{item.title}</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="px-2 py-3">
+          <SidebarGroupLabel className="px-3 text-[11px] font-semibold tracking-wide text-muted-foreground">Juegos</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {gameModules.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild tooltip={item.description}>
                     <NavLink to={item.url} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors" activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">

@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.pexels-proxy]
 verify_jwt = false
+
+[functions.generate-crossword]
+verify_jwt = false
+
+[functions.generate-story]
+verify_jwt = false
