@@ -119,23 +119,75 @@ export function CalendarPopover() {
     fetchNotes();
   };
 
-  const todayLabel = format(today, "d MMM", { locale: es });
+  // Build a 7-day "compass": 3 days before today, today centered, 3 days after
+  const compassDays = useMemo(() => {
+    const days: Date[] = [];
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  }, [today.toDateString()]);
+
+  const hasNoteOn = (d: Date) => notes.some((n) => isSameDay(parseISO(n.date), d));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2 h-9 rounded-full border-border/70 hover:border-primary hover:text-primary transition-colors"
+        <button
+          type="button"
           aria-label="Abrir calendario de notas"
+          className="group flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-xl hover:bg-muted/60 transition-colors"
         >
-          <CalendarIcon className="h-4 w-4" />
-          <span className="hidden sm:inline text-xs font-medium capitalize">{todayLabel}</span>
-          {notes.length > 0 && (
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden />
-          )}
-        </Button>
+          {compassDays.map((d, i) => {
+            const isToday = isSameDay(d, today);
+            const marked = hasNoteOn(d);
+            const distance = Math.abs(i - 3); // 0 center, up to 3 edges
+            const opacity = isToday ? 1 : distance === 1 ? 0.85 : distance === 2 ? 0.6 : 0.4;
+            return (
+              <div
+                key={d.toISOString()}
+                style={{ opacity }}
+                className={cn(
+                  "relative flex flex-col items-center justify-center rounded-lg transition-all",
+                  isToday
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/30 px-2 py-1 scale-110"
+                    : "px-1.5 py-0.5 text-foreground group-hover:scale-105",
+                  distance >= 3 && "hidden md:flex",
+                  distance === 2 && "hidden sm:flex",
+                )}
+              >
+                <span
+                  className={cn(
+                    "text-[9px] font-semibold uppercase tracking-wider leading-none",
+                    isToday ? "text-primary-foreground/90" : "text-muted-foreground",
+                  )}
+                >
+                  {format(d, "EEEEE", { locale: es })}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold leading-tight mt-0.5",
+                    isToday && "text-base",
+                  )}
+                >
+                  {d.getDate()}
+                </span>
+                {marked && (
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 h-1 w-1 rounded-full",
+                      isToday ? "bg-primary-foreground" : "bg-primary",
+                    )}
+                    aria-hidden
+                  />
+                )}
+              </div>
+            );
+          })}
+          <CalendarIcon className="h-3.5 w-3.5 ml-1 text-muted-foreground group-hover:text-primary transition-colors" />
+        </button>
       </PopoverTrigger>
       <PopoverContent
         align="end"
