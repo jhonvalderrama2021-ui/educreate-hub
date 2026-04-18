@@ -96,7 +96,6 @@ serve(async (req) => {
 
 async function resolveSlideImages(presentation: any): Promise<any> {
   const slides = presentation.slides || [];
-  
   for (const slide of slides) {
     if (slide.image?.query) {
       try {
@@ -107,8 +106,73 @@ async function resolveSlideImages(presentation: any): Promise<any> {
       }
     }
   }
-  
   return presentation;
+}
+
+/**
+ * Ensures the presentation has exactly `expected` slides.
+ * - Truncates if too many (preserves hero + conclusion).
+ * - Pads with auto-generated content slides if too few.
+ */
+function enforceSlideCount(presentation: any, expected: number): any {
+  let slides = presentation.slides || [];
+  console.log(`[slides] Generated ${slides.length}, expected ${expected}`);
+  if (slides.length === expected) return presentation;
+
+  if (slides.length > expected) {
+    const hero = slides[0];
+    const conclusion = slides[slides.length - 1];
+    const middle = slides.slice(1, -1).slice(0, expected - 2);
+    presentation.slides = [hero, ...middle, conclusion];
+    return presentation;
+  }
+
+  const palette = ["#3B82F6", "#6366F1", "#8B5CF6", "#22C55E", "#F59E0B", "#EF4444"];
+  const lastIsConclusion = slides[slides.length - 1]?.layout === "conclusion";
+  const conclusion = lastIsConclusion ? slides.pop() : null;
+  const missing = expected - slides.length - (conclusion ? 1 : 0);
+  const layouts = ["list", "grid", "stats", "process", "split"];
+  for (let i = 0; i < missing; i++) {
+    slides.push(buildFillerSlide(layouts[i % layouts.length], presentation.title || "el tema", i + 1, palette[i % palette.length]));
+  }
+  if (conclusion) slides.push(conclusion);
+  presentation.slides = slides;
+  return presentation;
+}
+
+function buildFillerSlide(layout: string, topic: string, idx: number, color: string): any {
+  const base: any = { layout, title: `Aspecto clave ${idx}` };
+  if (layout === "list") {
+    base.listItems = [
+      { icon: "check_circle", title: "Punto importante", description: `Detalle relevante sobre ${topic} que conviene profundizar en el aula.` },
+      { icon: "lightbulb", title: "Idea destacada", description: `Aplicación práctica de ${topic} dentro del contexto educativo.` },
+      { icon: "school", title: "Aprendizaje esperado", description: `Lo que el estudiante debe comprender al finalizar esta sección.` },
+    ];
+  } else if (layout === "grid") {
+    base.cards = [
+      { icon: "star", title: "Concepto central", description: `Definición clave relacionada con ${topic}.`, color },
+      { icon: "explore", title: "Contexto", description: `Marco general en el que se aplica ${topic}.`, color },
+      { icon: "build", title: "Aplicación", description: `Cómo se usa ${topic} en la práctica.`, color },
+    ];
+  } else if (layout === "stats") {
+    base.stats = [
+      { value: "100%", label: "Comprensión esperada", color },
+      { value: "3+", label: "Áreas de aplicación", color },
+      { value: "5", label: "Conceptos clave", color },
+    ];
+  } else if (layout === "process") {
+    base.steps = [
+      { number: 1, title: "Explorar", description: `Acercamiento inicial a ${topic}.`, color },
+      { number: 2, title: "Comprender", description: `Análisis profundo de ${topic}.`, color },
+      { number: 3, title: "Aplicar", description: `Uso de ${topic} en situaciones reales.`, color },
+    ];
+  } else {
+    base.layout = "split";
+    base.subtitle = `Más sobre ${topic}`;
+    base.content = `Esta sección amplía la información sobre ${topic} con aspectos adicionales relevantes para el aprendizaje del estudiante.`;
+    base.image = { query: topic, alt: topic, placement: "right" };
+  }
+  return base;
 }
 
 async function searchUnsplash(query: string): Promise<string | null> {
