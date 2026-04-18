@@ -459,7 +459,7 @@ export default function GenerateResource() {
             <Label>Asignatura <span className="text-destructive">*</span></Label>
             <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
               <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-72">
                 {SUBJECTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                 <SelectItem value="Otras">Otras</SelectItem>
               </SelectContent>
@@ -474,7 +474,7 @@ export default function GenerateResource() {
               <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
               <Select value={grade} onValueChange={setGrade}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72">
                   {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
                     <SelectItem key={g} value={String(g)}>Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}</SelectItem>
                   ))}
