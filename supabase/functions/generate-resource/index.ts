@@ -466,13 +466,26 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
 }
 
 # REGLAS CRÍTICAS
-1. La PRIMERA slide SIEMPRE usa layout "hero"
-2. La ÚLTIMA slide SIEMPRE usa layout "conclusion"
-3. VARÍA los layouts intermedios: NO repitas el mismo layout consecutivamente
-4. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, etc.)
-5. Elige una paleta de colores coherente con el tema educativo
-6. Para slides "split", incluye "image.query" con palabras clave en INGLÉS para búsqueda en Unsplash
-7. Genera EXACTAMENTE ${numItems} slides
-8. Los textos deben ser concisos: títulos max 6 palabras, descripciones max 2 líneas
-9. Cada slide grid debe tener 2-4 cards, cada process 3-5 steps, cada stats 3-4 stats`;
+1. Genera EXACTAMENTE ${numItems} slides en el array "slides". Ni una más ni una menos. Cuenta antes de responder.
+2. La PRIMERA slide SIEMPRE usa layout "hero".
+3. La ÚLTIMA slide SIEMPRE usa layout "conclusion".
+4. Las ${Math.max(0, numItems - 2)} slides intermedias deben VARIAR entre layouts: grid, split, process, comparison, stats, list, timeline. NO repitas el mismo layout dos veces seguidas.
+5. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, etc.).
+6. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema).
+7. Para slides "split", incluye "image.query" con 2-4 palabras clave en INGLÉS para búsqueda en Unsplash.
+8. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
+   - Títulos de slide: 3-8 palabras claras.
+   - Subtítulos: una frase completa (10-18 palabras).
+   - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una). Explica el concepto, da contexto y un ejemplo o aplicación.
+   - "content" en split/conclusion: párrafo de 40-80 palabras con información real y educativa.
+   - Labels de stats: frase descriptiva (5-10 palabras), no solo una palabra.
+   - Puntos en comparison: frases completas, no fragmentos.
+9. Cantidad de elementos por slide:
+   - grid: 3-4 cards
+   - process: 3-5 steps
+   - stats: 3-4 stats
+   - list: 3-5 listItems
+   - comparison: exactamente 2 columns con 3-5 points cada una
+   - timeline: 3-5 events
+10. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".`;
 }
