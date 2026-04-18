@@ -55,12 +55,46 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
       copy[r][c] = letter;
       return copy;
     });
-    // auto-advance to next cell to the right or down
     if (letter) {
       const next = document.querySelector<HTMLInputElement>(
         `input[data-cell="${r}-${c + 1}"]`,
       );
       next?.focus();
+    }
+  };
+
+  const handleKeyDown = (r: number, c: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      const current = userGrid[r]?.[c] || "";
+      if (!current) {
+        e.preventDefault();
+        const prev = document.querySelector<HTMLInputElement>(
+          `input[data-cell="${r}-${c - 1}"]`,
+        );
+        if (prev) {
+          prev.focus();
+          setUserGrid((g) => {
+            const copy = g.map((row) => [...row]);
+            if (copy[r][c - 1] !== undefined) copy[r][c - 1] = "";
+            return copy;
+          });
+        }
+      }
+    } else if (e.key === "Delete") {
+      e.preventDefault();
+      setUserGrid((g) => {
+        const copy = g.map((row) => [...row]);
+        copy[r][c] = "";
+        return copy;
+      });
+    } else if (e.key === "ArrowRight") {
+      document.querySelector<HTMLInputElement>(`input[data-cell="${r}-${c + 1}"]`)?.focus();
+    } else if (e.key === "ArrowLeft") {
+      document.querySelector<HTMLInputElement>(`input[data-cell="${r}-${c - 1}"]`)?.focus();
+    } else if (e.key === "ArrowDown") {
+      document.querySelector<HTMLInputElement>(`input[data-cell="${r + 1}-${c}"]`)?.focus();
+    } else if (e.key === "ArrowUp") {
+      document.querySelector<HTMLInputElement>(`input[data-cell="${r - 1}-${c}"]`)?.focus();
     }
   };
 
