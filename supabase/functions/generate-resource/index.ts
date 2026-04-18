@@ -307,10 +307,29 @@ async function searchPexels(query: string): Promise<string | null> {
     const data = await res.json();
     const photos = data.photos || [];
     if (photos.length === 0) return null;
-    // Pick a random image from top 5 to vary results between slides
     const pick = photos[Math.floor(Math.random() * photos.length)];
-    // src.large is ~940px, src.large2x is ~1880px — best for 1280x720 slides
-    return pick?.src?.large2x || pick?.src?.large || pick?.src?.original || null;
+    const imgUrl = pick?.src?.large2x || pick?.src?.large || pick?.src?.original || null;
+    if (!imgUrl) return null;
+
+    // Fetch image and inline as data URL so html2canvas can capture it without CORS issues
+    try {
+      const imgRes = await fetch(imgUrl);
+      if (!imgRes.ok) return imgUrl; // fallback to URL
+      const buf = await imgRes.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      // Base64 encode in chunks to avoid stack overflow on large images
+      let binary = "";
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+      }
+      const base64 = btoa(binary);
+      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+      return `data:${contentType};base64,${base64}`;
+    } catch (e) {
+      console.warn("Failed to inline Pexels image:", e);
+      return imgUrl;
+    }
   } catch (e) {
     console.warn("Pexels search exception:", e);
     return null;
