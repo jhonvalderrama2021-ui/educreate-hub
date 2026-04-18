@@ -269,9 +269,12 @@ serve(async (req) => {
       ? `\n\nBasado en el siguiente material:\n${String(pdfContent).slice(0, 6000)}`
       : "";
 
-    const systemPrompt = `Eres un generador de crucigramas en español. Genera exactamente ${total} palabras relacionadas con el tema dado. Cada palabra debe ser un sustantivo común o propio (1 sola palabra, sin espacios ni guiones), entre 3 y 12 letras. Usa palabras españolas. Las pistas deben ser definiciones claras y educativas, en español, dificultad ${difficultyLabel}. NUNCA incluyas la palabra dentro de su propia pista.`;
+    // Ask the AI for MANY more words than needed so the backtracking algorithm
+    // has a large pool to satisfy the exact across/down quotas.
+    const poolSize = Math.min(60, total * 3);
+    const systemPrompt = `Eres un generador de crucigramas en español. Genera EXACTAMENTE ${poolSize} palabras únicas relacionadas con el tema dado, variadas en longitud (entre 3 y 10 letras es lo ideal). Cada palabra debe ser una sola palabra (sustantivo común o propio), sin espacios, guiones ni tildes en la palabra misma. Usa palabras españolas comunes. Las pistas deben ser definiciones claras y educativas en español, dificultad ${difficultyLabel}. NUNCA incluyas la palabra dentro de su propia pista. Es CRÍTICO devolver al menos ${poolSize} palabras para que el algoritmo pueda armar el crucigrama.`;
 
-    const userPrompt = `Tema: ${theme}\nGenera ${total} palabras con sus pistas para un crucigrama${sourceContext}`;
+    const userPrompt = `Tema: ${theme}\nGenera ${poolSize} palabras con sus pistas para un crucigrama (necesitamos un pool grande para encontrar combinaciones que se crucen)${sourceContext}`;
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
