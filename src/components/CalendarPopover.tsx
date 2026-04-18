@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format, isSameDay, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { CalendarIcon, Plus, Trash2, StickyNote } from "lucide-react";
@@ -133,46 +133,47 @@ export function CalendarPopover() {
   const hasNoteOn = (d: Date) => notes.some((n) => isSameDay(parseISO(n.date), d));
 
   // Drag-to-scroll
-  const scrollerRef = useState<HTMLDivElement | null>(null);
-  const [scrollerEl, setScrollerEl] = [scrollerRef[0], scrollerRef[1]];
-  const dragRef = useState<{ active: boolean; startX: number; startScroll: number; moved: number }>({
-    active: false,
-    startX: 0,
-    startScroll: 0,
-    moved: 0,
-  });
-  const [drag, setDrag] = [dragRef[0], dragRef[1]];
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const dragState = useRef({ active: false, startX: 0, startScroll: 0, moved: 0 });
+  const [isDragging, setIsDragging] = useState(false);
 
   // Center today on mount
   useEffect(() => {
-    if (!scrollerEl) return;
-    const todayEl = scrollerEl.querySelector<HTMLElement>("[data-today='true']");
+    const el = scrollerRef.current;
+    if (!el) return;
+    const todayEl = el.querySelector<HTMLElement>("[data-today='true']");
     if (todayEl) {
-      const offset = todayEl.offsetLeft - scrollerEl.clientWidth / 2 + todayEl.clientWidth / 2;
-      scrollerEl.scrollTo({ left: offset, behavior: "auto" });
+      const offset = todayEl.offsetLeft - el.clientWidth / 2 + todayEl.clientWidth / 2;
+      el.scrollTo({ left: offset, behavior: "auto" });
     }
-  }, [scrollerEl]);
+  }, []);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!scrollerEl) return;
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-    setDrag({ active: true, startX: e.clientX, startScroll: scrollerEl.scrollLeft, moved: 0 });
+    const el = scrollerRef.current;
+    if (!el) return;
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragState.current = { active: true, startX: e.clientX, startScroll: el.scrollLeft, moved: 0 };
+    setIsDragging(true);
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.active || !scrollerEl) return;
-    const delta = e.clientX - drag.startX;
-    scrollerEl.scrollLeft = drag.startScroll - delta;
-    if (Math.abs(delta) > 4) {
-      setDrag({ ...drag, moved: Math.abs(delta) });
+    const el = scrollerRef.current;
+    if (!dragState.current.active || !el) return;
+    const delta = e.clientX - dragState.current.startX;
+    el.scrollLeft = dragState.current.startScroll - delta;
+    if (Math.abs(delta) > Math.abs(dragState.current.moved)) {
+      dragState.current.moved = delta;
     }
   };
-  const onPointerUp = () => setDrag({ ...drag, active: false });
+  const onPointerUp = () => {
+    dragState.current.active = false;
+    setIsDragging(false);
+  };
 
   const openIfNotDragged = (e: React.MouseEvent) => {
-    if (drag.moved > 5) {
+    if (Math.abs(dragState.current.moved) > 5) {
       e.preventDefault();
       e.stopPropagation();
-      setDrag({ active: false, startX: 0, startScroll: 0, moved: 0 });
+      dragState.current.moved = 0;
     }
   };
 
