@@ -420,59 +420,119 @@ export async function exportToPdf(
     }
 
     case "story": {
-      // Cover image
-      if (content.coverImageUrl) {
-        try {
-          const cover = await urlToDataUrl(content.coverImageUrl);
-          const dims = await getImageDims(cover);
-          const w = maxWidth * 0.85;
-          const h = (dims.h / dims.w) * w;
-          if (y + h > pageHeight - 20) newPage();
-          doc.addImage(cover, "PNG", margin + (maxWidth - w) / 2, y, w, h, undefined, "FAST");
-          y += h + 5;
-        } catch { /* ignore */ }
+      // Helper: elegant serif title
+      const addStoryTitle = (text: string, size: number) => {
+        doc.setFont("times", "bold");
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(text, maxWidth);
+        for (const line of lines) {
+          if (y > pageHeight - 20) newPage();
+          doc.text(line, pageWidth / 2, y, { align: "center" });
+          y += size * 0.55;
+        }
+        y += 3;
+      };
+      const addStoryBody = (text: string) => {
+        doc.setFont("times", "normal");
+        doc.setFontSize(12);
+        const paragraphs = text.split(/\n\n+/);
+        for (const para of paragraphs) {
+          const lines = doc.splitTextToSize(para, maxWidth);
+          for (const line of lines) {
+            if (y > pageHeight - 20) newPage();
+            doc.text(line, margin, y);
+            y += 6;
+          }
+          y += 3;
+        }
+      };
+
+      // ---- COVER PAGE: full page, image fills + title centered ----
+      if (content.coverImageUrl || content.title) {
+        // We are already on page 1 with topOffset
+        if (content.coverImageUrl) {
+          try {
+            const cover = await urlToDataUrl(content.coverImageUrl);
+            const dims = await getImageDims(cover);
+            // Use most of the page for the cover image
+            const availH = pageHeight - topOffset - 60; // leave room for title
+            const availW = maxWidth;
+            let w = availW;
+            let h = (dims.h / dims.w) * w;
+            if (h > availH) {
+              h = availH;
+              w = (dims.w / dims.h) * h;
+            }
+            const x = margin + (maxWidth - w) / 2;
+            doc.addImage(cover, "PNG", x, y, w, h, undefined, "FAST");
+            y += h + 10;
+          } catch { /* ignore */ }
+        }
+        // Decorative title under the cover
+        addStoryTitle(content.title || title, 26);
+        if (content.character) {
+          doc.setFont("times", "italic");
+          doc.setFontSize(12);
+          const ptxt = `Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`;
+          if (y > pageHeight - 20) newPage();
+          doc.text(ptxt, pageWidth / 2, y, { align: "center" });
+          y += 8;
+        }
       }
-      if (content.character) {
-        addText(`Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, 10, false);
-        y += 2;
-      }
+
+      // ---- CHAPTERS: each on its own page, image + text fit together ----
       for (let i = 0; i < (content.chapters || []).length; i++) {
         const ch = content.chapters[i];
-        // Each chapter starts on its own page (except first if it fits with cover)
-        if (i > 0) newPage();
-        else if (y > pageHeight - 80) newPage();
+        newPage();
 
-        addText(ch.title, 14, true);
+        addStoryTitle(ch.title, 18);
 
-        // Pre-load image to know its height for layout
+        // Pre-load image and shrink so the WHOLE text + image fit on one page
         let imgData: string | null = null;
         let imgW = 0, imgH = 0;
         if (ch.imageUrl) {
           try {
             imgData = await urlToDataUrl(ch.imageUrl);
             const dims = await getImageDims(imgData);
-            imgW = maxWidth * 0.65;
+            // Estimate text height: chars / chars-per-line * line-height
+            doc.setFont("times", "normal");
+            doc.setFontSize(12);
+            const textLines = doc.splitTextToSize(ch.text, maxWidth).length;
+            const estTextH = textLines * 6 + 12;
+            const availTotal = pageHeight - y - 20;
+            const maxImgH = Math.max(40, availTotal - estTextH - 8);
+            imgW = maxWidth * 0.75;
             imgH = (dims.h / dims.w) * imgW;
-            // Cap image height so text fits on same page
-            const maxImgH = (pageHeight - topOffset) * 0.45;
             if (imgH > maxImgH) {
               imgH = maxImgH;
+              imgW = (dims.w / dims.h) * imgH;
+            }
+            // Hard cap so it never dominates
+            const absoluteCap = (pageHeight - topOffset) * 0.4;
+            if (imgH > absoluteCap) {
+              imgH = absoluteCap;
               imgW = (dims.w / dims.h) * imgH;
             }
           } catch { imgData = null; }
         }
 
         if (imgData) {
-          if (y + imgH > pageHeight - 30) newPage();
           doc.addImage(imgData, "PNG", margin + (maxWidth - imgW) / 2, y, imgW, imgH, undefined, "FAST");
-          y += imgH + 4;
+          y += imgH + 6;
         }
-        addText(ch.text, 11, false);
+        addStoryBody(ch.text);
       }
       if (content.moral) {
-        if (y > pageHeight - 30) newPage();
-        addText("Moraleja", 12, true);
-        addText(content.moral, 11, false);
+        newPage();
+        addStoryTitle("Moraleja", 20);
+        doc.setFont("times", "italic");
+        doc.setFontSize(13);
+        const lines = doc.splitTextToSize(content.moral, maxWidth);
+        for (const line of lines) {
+          if (y > pageHeight - 20) newPage();
+          doc.text(line, pageWidth / 2, y, { align: "center" });
+          y += 7;
+        }
       }
       break;
     }
@@ -714,60 +774,88 @@ async function buildDocxContent(title: string, resourceType: string, content: an
     }
 
     case "story": {
+      // Story uses elegant serif typography
+      const STORY_FONT = "Georgia";
+
+      // ---- COVER PAGE: image + decorative title, all on first page ----
+      // Replace the default top title (added at top of buildDocxContent) is hard,
+      // so we just keep adding cover content; the title above will already render.
       if (content.coverImageUrl) {
         try {
           const cover = await urlToDataUrl(content.coverImageUrl);
           const { bytes, type } = dataUrlToUint8(cover);
           const dims = await getImageDims(cover);
-          const w = 480;
+          const w = 520;
           const h = (dims.h / dims.w) * w;
           children.push(new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+            spacing: { before: 200, after: 200 },
+            children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: Math.min(h, 520) } } as any)],
           }));
         } catch { /* ignore */ }
       }
+      // Decorative cover title (the auto title from buildDocxContent already exists,
+      // so add a stylized restatement only if there's a character)
       if (content.character) {
         children.push(new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: `Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`, italics: true })],
+          spacing: { before: 200 },
+          children: [new TextRun({
+            text: `Protagonista: ${content.character}${content.characterType ? ` (${content.characterType})` : ""}`,
+            italics: true,
+            font: STORY_FONT,
+            size: 26,
+          })],
         }));
       }
+
       const chapters = content.chapters || [];
       for (let i = 0; i < chapters.length; i++) {
         const ch = chapters[i];
-        // Each chapter on its own page
+        // Each chapter starts on its own page
         children.push(new Paragraph({
-          pageBreakBefore: i > 0,
-          heading: HeadingLevel.HEADING_2,
-          children: [new TextRun({ text: ch.title, bold: true })],
+          pageBreakBefore: true,
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 200, after: 240 },
+          children: [new TextRun({
+            text: ch.title,
+            bold: true,
+            font: STORY_FONT,
+            size: 40, // 20pt
+          })],
         }));
         if (ch.imageUrl) {
           try {
             const img = await urlToDataUrl(ch.imageUrl);
             const { bytes, type } = dataUrlToUint8(img);
             const dims = await getImageDims(img);
-            const w = 380;
+            const w = 360;
             const h = (dims.h / dims.w) * w;
             children.push(new Paragraph({
               alignment: AlignmentType.CENTER,
-              children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: h } } as any)],
+              spacing: { after: 200 },
+              children: [new ImageRun({ type, data: bytes, transformation: { width: w, height: Math.min(h, 280) } } as any)],
             }));
           } catch { /* ignore */ }
         }
         ch.text.split(/\n\n+/).forEach((p: string) => {
-          children.push(new Paragraph({ children: [new TextRun(p)], spacing: { after: 120 } }));
+          children.push(new Paragraph({
+            alignment: AlignmentType.JUSTIFIED,
+            spacing: { after: 160, line: 320 },
+            children: [new TextRun({ text: p, font: STORY_FONT, size: 24 })],
+          }));
         });
       }
       if (content.moral) {
         children.push(new Paragraph({
-          heading: HeadingLevel.HEADING_2,
+          pageBreakBefore: true,
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "Moraleja", bold: true })],
+          spacing: { before: 400, after: 240 },
+          children: [new TextRun({ text: "Moraleja", bold: true, font: STORY_FONT, size: 36 })],
         }));
         children.push(new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: content.moral, italics: true })],
+          children: [new TextRun({ text: content.moral, italics: true, font: STORY_FONT, size: 26 })],
         }));
       }
       break;
