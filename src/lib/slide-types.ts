@@ -59,7 +59,11 @@ export type SlideLayout =
   | "quote"
   | "imageFull"
   | "bigNumber"
-  | "twoColumnText";
+  | "twoColumnText"
+  | "cardOverlay"
+  | "magazine"
+  | "diagonalSplit"
+  | "circleHero";
 
 export interface SlideTheme {
   primary: string;     // hex
