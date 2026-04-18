@@ -25,6 +25,10 @@ export function SlideViewer({ slides, title, theme = DEFAULT_THEME, editable, on
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Disable global slide nav while user is editing inline text
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || ["INPUT", "TEXTAREA"].includes(target?.tagName || "")) return;
+
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         setCurrentSlide((p) => Math.max(0, p - 1));
@@ -49,8 +53,21 @@ export function SlideViewer({ slides, title, theme = DEFAULT_THEME, editable, on
 
   const structured = isStructured(slides);
 
+  const handleFieldChange = (path: string, value: any) => {
+    if (!onSlideChange || !structured) return;
+    const updated = updateSlideField(slides[currentSlide] as StructuredSlide, path, value);
+    onSlideChange(currentSlide, updated);
+  };
+
   return (
     <div className="space-y-4">
+      {editable && (
+        <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2 rounded-lg">
+          <span className="material-icons" style={{ fontSize: "16px" }}>edit</span>
+          <span>Modo edición activo — haz clic sobre cualquier título o texto de la diapositiva para modificarlo.</span>
+        </div>
+      )}
+
       {/* Main Slide */}
       <div
         className={`relative ${
@@ -65,6 +82,8 @@ export function SlideViewer({ slides, title, theme = DEFAULT_THEME, editable, on
           structured={structured}
           theme={theme}
           fullscreen={fullscreen}
+          editable={editable && !fullscreen}
+          onFieldChange={handleFieldChange}
         />
 
         {/* Controls overlay */}
