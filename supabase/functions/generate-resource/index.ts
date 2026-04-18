@@ -149,7 +149,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-resource error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
+    return new Response(JSON.stringify({ error: "Error al generar el recurso. Intenta nuevamente." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
