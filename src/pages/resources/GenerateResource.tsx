@@ -274,7 +274,7 @@ export default function GenerateResource() {
       if (rubricObjective) parts.push(`Objetivo/Competencia a evaluar: ${rubricObjective}`);
     }
     if (resourceType === "slides") {
-      parts.push(`Número de diapositivas: ${numSlides}`);
+      parts.push(`Número de diapositivas: ${numSlides || 8}`);
     }
     if (instructions.trim()) {
       parts.push(`Instrucciones adicionales: ${instructions}`);
@@ -305,7 +305,7 @@ export default function GenerateResource() {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
         instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
-        numItems: resourceType === "slides" ? numSlides : numItems,
+        numItems: resourceType === "slides" ? (numSlides || 8) : (numItems || 10),
       };
       if (palette) params.theme = palette.theme;
 
@@ -625,7 +625,24 @@ export default function GenerateResource() {
         {extraFields.includes("numItems") && (
           <div className="space-y-2">
             <Label>Número de preguntas</Label>
-            <Input type="number" min={1} max={50} value={numItems} onChange={(e) => setNumItems(parseInt(e.target.value) || 10)} className="w-32" />
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              value={numItems}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "") return setNumItems("");
+                const n = parseInt(v);
+                if (!Number.isNaN(n)) setNumItems(n);
+              }}
+              onBlur={() => {
+                if (numItems === "" || (typeof numItems === "number" && numItems < 1)) setNumItems(10);
+                else if (typeof numItems === "number" && numItems > 50) setNumItems(50);
+              }}
+              placeholder="10"
+              className="w-32"
+            />
           </div>
         )}
 
