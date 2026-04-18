@@ -311,25 +311,9 @@ async function searchPexels(query: string): Promise<string | null> {
     const imgUrl = pick?.src?.large2x || pick?.src?.large || pick?.src?.original || null;
     if (!imgUrl) return null;
 
-    // Fetch image and inline as data URL so html2canvas can capture it without CORS issues
-    try {
-      const imgRes = await fetch(imgUrl);
-      if (!imgRes.ok) return imgUrl; // fallback to URL
-      const buf = await imgRes.arrayBuffer();
-      const bytes = new Uint8Array(buf);
-      // Base64 encode in chunks to avoid stack overflow on large images
-      let binary = "";
-      const chunkSize = 0x8000;
-      for (let i = 0; i < bytes.length; i += chunkSize) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-      }
-      const base64 = btoa(binary);
-      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-      return `data:${contentType};base64,${base64}`;
-    } catch (e) {
-      console.warn("Failed to inline Pexels image:", e);
-      return imgUrl;
-    }
+    // Return direct Pexels URL — Pexels supports CORS, so the client can load with crossOrigin="anonymous"
+    // (Base64 inlining was removed because encoding 8+ images on the edge worker exceeded CPU limits.)
+    return imgUrl;
   } catch (e) {
     console.warn("Pexels search exception:", e);
     return null;
