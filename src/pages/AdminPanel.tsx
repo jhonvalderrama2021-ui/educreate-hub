@@ -325,7 +325,15 @@ export default function AdminPanel() {
               </div>
               <div className="p-5 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="api-key">Clave API</Label>
+                  <Label htmlFor="api-key">
+                    {keyConfigured ? "Reemplazar Clave API" : "Clave API"}
+                  </Label>
+                  {keyConfigured && (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-sm text-muted-foreground">
+                      <Key className="h-3.5 w-3.5" />
+                      sk-••••••••••••••••••••
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Input
@@ -333,8 +341,9 @@ export default function AdminPanel() {
                         type={showKey ? "text" : "password"}
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="sk-..."
+                        placeholder={keyConfigured ? "Pega una nueva clave para reemplazar" : "sk-..."}
                         className="pr-10 font-mono text-sm"
+                        autoComplete="off"
                       />
                       <button
                         type="button"
@@ -344,14 +353,14 @@ export default function AdminPanel() {
                         {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
-                    <Button onClick={saveApiKey} disabled={savingKey} className="gradient-primary">
+                    <Button onClick={saveApiKey} disabled={savingKey || !apiKey.trim()} className="gradient-primary">
                       <Save className="h-4 w-4 mr-1" />
                       {savingKey ? "Guardando..." : "Guardar"}
                     </Button>
                   </div>
                   {keyConfigured && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" /> API Key configurada correctamente
+                      <CheckCircle className="h-3 w-3" /> API Key configurada correctamente (no se muestra por seguridad)
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">
