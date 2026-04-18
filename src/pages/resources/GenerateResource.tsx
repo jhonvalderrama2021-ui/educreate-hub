@@ -166,6 +166,7 @@ export default function GenerateResource() {
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [exportDialog, setExportDialog] = useState<null | "pdf" | "docx">(null);
 
   const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
@@ -806,10 +807,10 @@ export default function GenerateResource() {
                 </>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => exportToDocx(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                  <Button variant="outline" size="sm" onClick={() => setExportDialog("docx")}>
                     <Download className="h-4 w-4 mr-1" /> Word
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportToPdf(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                  <Button variant="outline" size="sm" onClick={() => setExportDialog("pdf")}>
                     <Download className="h-4 w-4 mr-1" /> PDF
                   </Button>
                 </>
