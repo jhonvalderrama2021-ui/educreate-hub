@@ -58,6 +58,37 @@ export async function exportToDocx(
   const watermarkData = options.watermarkDataUrl ? await urlToDataUrl(options.watermarkDataUrl) : undefined;
 
   const headerChildren: Paragraph[] = [];
+
+  // Watermark behind the page (centered, faded) using floating image
+  if (watermarkData) {
+    const { bytes, type } = dataUrlToUint8(watermarkData);
+    const wmDims = await getImageDims(watermarkData);
+    const wmWidth = 400;
+    const wmHeight = (wmDims.h / wmDims.w) * wmWidth;
+    headerChildren.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            type,
+            data: bytes,
+            transformation: { width: wmWidth, height: wmHeight },
+            floating: {
+              horizontalPosition: {
+                relative: "page",
+                align: "center",
+              },
+              verticalPosition: {
+                relative: "page",
+                align: "center",
+              },
+              behindDocument: true,
+            },
+          } as any),
+        ],
+      }),
+    );
+  }
+
   if (logoData) {
     const { bytes, type } = dataUrlToUint8(logoData);
     headerChildren.push(
@@ -74,24 +105,6 @@ export async function exportToDocx(
     );
   }
 
-  const footerChildren: Paragraph[] = [];
-  if (watermarkData) {
-    const { bytes, type } = dataUrlToUint8(watermarkData);
-    footerChildren.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new ImageRun({
-            type,
-            data: bytes,
-            transformation: { width: 60, height: 60 },
-          } as any),
-          new TextRun({ text: "  Marca de agua", italics: true, color: "BBBBBB", size: 16 }),
-        ],
-      }),
-    );
-  }
-
   const children = buildDocxContent(title, resourceType, content);
 
   const doc = new Document({
@@ -101,7 +114,6 @@ export async function exportToDocx(
     sections: [
       {
         headers: headerChildren.length ? { default: new Header({ children: headerChildren }) } : undefined,
-        footers: footerChildren.length ? { default: new Footer({ children: footerChildren }) } : undefined,
         children,
       },
     ],
