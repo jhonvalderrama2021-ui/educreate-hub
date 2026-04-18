@@ -12,6 +12,26 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
 
   try {
+    // ─── AUTH CHECK ─────────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabaseAuth = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ────────────────────────────────────────────────────────────
+
     const { resourceType, pdfContent, instructions, numItems, theme } = await req.json();
 
     if (!resourceType) {
@@ -112,7 +132,10 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("OpenAI error:", response.status, errText);
-      return new Response(JSON.stringify({ error: `Error de OpenAI (${response.status}): ${errText}` }), {
+      const clientMsg = response.status === 401
+        ? "Servicio de IA no disponible. Contacta al administrador para verificar la configuración."
+        : "Error al generar el recurso. Intenta nuevamente.";
+      return new Response(JSON.stringify({ error: clientMsg }), {
         status: response.status === 401 ? 401 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -126,7 +149,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-resource error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
+    return new Response(JSON.stringify({ error: "Error al generar el recurso. Intenta nuevamente." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
