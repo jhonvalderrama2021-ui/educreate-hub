@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
-  FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation,
+  FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation, Puzzle, BookText,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
@@ -23,6 +23,8 @@ const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   lesson_plan: { label: "Plan de clase", icon: ClipboardList },
   rubric: { label: "Rúbrica", icon: Table2 },
   slides: { label: "Diapositivas", icon: Presentation },
+  crossword: { label: "Crucigrama", icon: Puzzle },
+  story: { label: "Cuento", icon: BookText },
 };
 
 interface Resource {
