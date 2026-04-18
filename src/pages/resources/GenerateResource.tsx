@@ -15,10 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { SLIDE_PALETTES, getPaletteById, type StructuredSlide } from "@/lib/slide-types";
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
   ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
-  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation,
+  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
@@ -109,6 +110,7 @@ export default function GenerateResource() {
   const [numItems, setNumItems] = useState(10);
   const [examType, setExamType] = useState("icfes");
   const [numSlides, setNumSlides] = useState(8);
+  const [slidePalette, setSlidePalette] = useState<string>("academic");
 
   // Rubric fields
   const [rubricType, setRubricType] = useState("analitica");
@@ -298,12 +300,14 @@ export default function GenerateResource() {
 
     try {
       const effectiveType = getEffectiveResourceType();
-      const params = {
+      const palette = resourceType === "slides" ? getPaletteById(slidePalette) : null;
+      const params: any = {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
-        instructions: buildInstructions(),
+        instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
         numItems: resourceType === "slides" ? numSlides : numItems,
       };
+      if (palette) params.theme = palette.theme;
 
       let result;
       if (aiProvider === "openai") {
@@ -538,12 +542,41 @@ export default function GenerateResource() {
           </>
         )}
 
-        {/* Slides: number of slides */}
+        {/* Slides: number + palette */}
         {resourceType === "slides" && (
-          <div className="space-y-2">
-            <Label>Número de diapositivas</Label>
-            <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label>Número de diapositivas</Label>
+              <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Palette className="h-4 w-4 text-primary" /> Paleta de colores
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {SLIDE_PALETTES.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSlidePalette(p.id)}
+                    className={`text-left p-3 rounded-lg border-2 transition-all ${
+                      slidePalette === p.id
+                        ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex gap-1 mb-2">
+                      {p.preview.map((c, i) => (
+                        <div key={i} className="h-6 w-6 rounded-md border border-border/50" style={{ background: c }} />
+                      ))}
+                    </div>
+                    <div className="text-sm font-medium text-foreground">{p.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">{p.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {/* Methodology */}
@@ -684,21 +717,19 @@ export default function GenerateResource() {
                 <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
                 <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
-              {resourceType !== "slides" && (
-                <Button
-                  variant={isEditing ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    if (!isEditing) {
-                      setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
-                    }
-                    setIsEditing(!isEditing);
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  {isEditing ? "Viendo edición" : "Editar"}
-                </Button>
-              )}
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (!isEditing) {
+                    setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
+                  }
+                  setIsEditing(!isEditing);
+                }}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                {isEditing ? "Viendo edición" : "Editar"}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
               </Button>
@@ -726,7 +757,20 @@ export default function GenerateResource() {
 
           <div className="p-6">
             {resourceType === "slides" ? (
-              <SlideViewer slides={displayContent?.slides || []} title={displayContent?.title} theme={displayContent?.theme} />
+              <SlideViewer
+                slides={displayContent?.slides || []}
+                title={displayContent?.title}
+                theme={displayContent?.theme}
+                editable={isEditing}
+                onSlideChange={(idx, updated) => {
+                  setEditableContent((prev: any) => {
+                    const base = prev || JSON.parse(JSON.stringify(generatedContent));
+                    const nextSlides = [...(base.slides || [])];
+                    nextSlides[idx] = updated;
+                    return { ...base, slides: nextSlides };
+                  });
+                }}
+              />
             ) : (
               <ResourceContentViewer
                 type={resourceType}

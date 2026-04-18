@@ -1,11 +1,14 @@
 import { StructuredSlide, SlideTheme } from "@/lib/slide-types";
+import { EditableText } from "./EditableText";
 
 interface Props {
   slide: StructuredSlide;
   theme: SlideTheme;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }
 
-export function HeroLayout({ slide, theme }: Props) {
+export function HeroLayout({ slide, theme, editable, onFieldChange }: Props) {
   return (
     <div
       className="w-full h-full flex items-center justify-center text-center"
@@ -30,7 +33,12 @@ export function HeroLayout({ slide, theme }: Props) {
             </span>
           </div>
         )}
-        <h1
+        <EditableText
+          as="h1"
+          value={slide.title}
+          editable={editable}
+          onChange={(v) => onFieldChange?.("title", v)}
+          placeholder="Título"
           style={{
             fontFamily: theme.fontHeading,
             fontSize: "52px",
@@ -38,22 +46,26 @@ export function HeroLayout({ slide, theme }: Props) {
             color: "white",
             marginBottom: "16px",
             lineHeight: 1.2,
+            display: "block",
           }}
-        >
-          {slide.title}
-        </h1>
-        {slide.subtitle && (
-          <p
+        />
+        {(slide.subtitle || editable) && (
+          <EditableText
+            as="p"
+            value={slide.subtitle || ""}
+            editable={editable}
+            onChange={(v) => onFieldChange?.("subtitle", v)}
+            placeholder="Subtítulo"
+            multiline
             style={{
               fontFamily: theme.fontBody,
               fontSize: "22px",
               color: "rgba(255,255,255,0.85)",
               maxWidth: "700px",
               margin: "0 auto",
+              display: "block",
             }}
-          >
-            {slide.subtitle}
-          </p>
+          />
         )}
       </div>
     </div>

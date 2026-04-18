@@ -1,13 +1,16 @@
 import { StructuredSlide, SlideTheme } from "@/lib/slide-types";
+import { EditableText } from "./EditableText";
 
 interface Props {
   slide: StructuredSlide;
   theme: SlideTheme;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }
 
 const STAT_COLORS = ["#3B82F6", "#6366F1", "#22C55E", "#F59E0B"];
 
-export function StatsLayout({ slide, theme }: Props) {
+export function StatsLayout({ slide, theme, editable, onFieldChange }: Props) {
   const stats = slide.stats || [];
   const cols = stats.length <= 3 ? stats.length : Math.min(4, stats.length);
 
@@ -16,21 +19,31 @@ export function StatsLayout({ slide, theme }: Props) {
       className="w-full h-full flex flex-col"
       style={{ padding: "60px 70px", gap: "40px", background: theme.background }}
     >
-      <h2
+      <EditableText
+        as="h2"
+        value={slide.title}
+        editable={editable}
+        onChange={(v) => onFieldChange?.("title", v)}
+        placeholder="Título"
         style={{
           fontFamily: theme.fontHeading,
           fontSize: "36px",
           fontWeight: 700,
           color: theme.text,
           textAlign: "center",
+          display: "block",
         }}
-      >
-        {slide.title}
-      </h2>
-      {slide.subtitle && (
-        <p style={{ fontFamily: theme.fontBody, fontSize: "18px", color: "#64748B", textAlign: "center", marginTop: "-24px" }}>
-          {slide.subtitle}
-        </p>
+      />
+      {(slide.subtitle || editable) && (
+        <EditableText
+          as="p"
+          value={slide.subtitle || ""}
+          editable={editable}
+          onChange={(v) => onFieldChange?.("subtitle", v)}
+          placeholder="Subtítulo"
+          multiline
+          style={{ fontFamily: theme.fontBody, fontSize: "18px", color: "#64748B", textAlign: "center", marginTop: "-24px", display: "block" }}
+        />
       )}
 
       <div
@@ -55,19 +68,28 @@ export function StatsLayout({ slide, theme }: Props) {
                 boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
               }}
             >
-              <div
+              <EditableText
+                as="div"
+                value={stat.value}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`stats.${i}.value`, v)}
+                placeholder="Valor"
                 style={{
                   fontFamily: theme.fontHeading,
                   fontSize: "56px",
                   fontWeight: 700,
                   color,
                 }}
-              >
-                {stat.value}
-              </div>
-              <p style={{ fontFamily: theme.fontBody, fontSize: "16px", color: "#64748B", marginTop: "8px" }}>
-                {stat.label}
-              </p>
+              />
+              <EditableText
+                as="p"
+                value={stat.label}
+                editable={editable}
+                onChange={(v) => onFieldChange?.(`stats.${i}.label`, v)}
+                placeholder="Etiqueta"
+                multiline
+                style={{ fontFamily: theme.fontBody, fontSize: "16px", color: "#64748B", marginTop: "8px" }}
+              />
             </div>
           );
         })}

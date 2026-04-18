@@ -2,31 +2,33 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SlideRenderer } from "@/components/slides/SlideRenderer";
-import { StructuredSlide, StructuredPresentation, SlideTheme, DEFAULT_THEME } from "@/lib/slide-types";
+import { StructuredSlide, SlideTheme, DEFAULT_THEME, updateSlideField } from "@/lib/slide-types";
 
 interface Props {
   slides: any[];
   title?: string;
   theme?: SlideTheme;
+  editable?: boolean;
+  onSlideChange?: (index: number, updatedSlide: StructuredSlide) => void;
 }
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
 
-/**
- * Detects if slides use the new structured format or legacy HTML format.
- * Structured slides have a `layout` field; legacy slides have `html`.
- */
 function isStructured(slides: any[]): boolean {
   return slides.length > 0 && !!slides[0]?.layout;
 }
 
-export function SlideViewer({ slides, title, theme = DEFAULT_THEME }: Props) {
+export function SlideViewer({ slides, title, theme = DEFAULT_THEME, editable, onSlideChange }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Disable global slide nav while user is editing inline text
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || ["INPUT", "TEXTAREA"].includes(target?.tagName || "")) return;
+
       if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         setCurrentSlide((p) => Math.max(0, p - 1));
@@ -51,8 +53,21 @@ export function SlideViewer({ slides, title, theme = DEFAULT_THEME }: Props) {
 
   const structured = isStructured(slides);
 
+  const handleFieldChange = (path: string, value: any) => {
+    if (!onSlideChange || !structured) return;
+    const updated = updateSlideField(slides[currentSlide] as StructuredSlide, path, value);
+    onSlideChange(currentSlide, updated);
+  };
+
   return (
     <div className="space-y-4">
+      {editable && (
+        <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 px-3 py-2 rounded-lg">
+          <span className="material-icons" style={{ fontSize: "16px" }}>edit</span>
+          <span>Modo edición activo — haz clic sobre cualquier título o texto de la diapositiva para modificarlo.</span>
+        </div>
+      )}
+
       {/* Main Slide */}
       <div
         className={`relative ${
@@ -67,6 +82,8 @@ export function SlideViewer({ slides, title, theme = DEFAULT_THEME }: Props) {
           structured={structured}
           theme={theme}
           fullscreen={fullscreen}
+          editable={editable && !fullscreen}
+          onFieldChange={handleFieldChange}
         />
 
         {/* Controls overlay */}
@@ -176,12 +193,16 @@ function ScaledSlide({
   theme,
   fullscreen,
   thumbnail,
+  editable,
+  onFieldChange,
 }: {
   slide: any;
   structured: boolean;
   theme: SlideTheme;
   fullscreen?: boolean;
   thumbnail?: boolean;
+  editable?: boolean;
+  onFieldChange?: (path: string, value: any) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -203,7 +224,6 @@ function ScaledSlide({
   }, [updateScale, fullscreen]);
 
   if (structured) {
-    // React-rendered slide
     return (
       <div
         ref={containerRef}
@@ -225,7 +245,12 @@ function ScaledSlide({
           }}
           className="slide-content"
         >
-          <SlideRenderer slide={slide as StructuredSlide} theme={theme} />
+          <SlideRenderer
+            slide={slide as StructuredSlide}
+            theme={theme}
+            editable={editable && !thumbnail}
+            onFieldChange={onFieldChange}
+          />
         </div>
       </div>
     );
