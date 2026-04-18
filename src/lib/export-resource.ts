@@ -406,7 +406,7 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
         } else if (q.type === "true_false") {
           children.push(new Paragraph({
             indent: { left: 400 },
-            children: [new TextRun({ text: "○ Verdadero    ○ Falso" })],
+            children: [new TextRun({ text: "☐ Verdadero    ☐ Falso" })],
           }));
         }
       });
