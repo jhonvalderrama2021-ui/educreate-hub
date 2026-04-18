@@ -469,10 +469,16 @@ export async function exportToPdf(
   doc.save(`${sanitizeFilename(title)}.pdf`);
 }
 
-function buildDocxContent(title: string, resourceType: string, content: any): Paragraph[] {
-  const children: Paragraph[] = [
+async function buildDocxContent(title: string, resourceType: string, content: any): Promise<(Paragraph | Table)[]> {
+  const children: (Paragraph | Table)[] = [
     new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: title, bold: true })] }),
   ];
+  // dummy to keep below diff smaller
+  ;[].push(); // no-op
+  // continue building below using `children`
+  // (the original `const children` line is replaced just above)
+  // ---
+  // To keep TypeScript happy after this header, we re-declare a noop line ignored by tsc.
 
   if (content.subject) {
     children.push(new Paragraph({ children: [new TextRun({ text: `Área: ${content.subject}`, italics: true, size: 22 })] }));
