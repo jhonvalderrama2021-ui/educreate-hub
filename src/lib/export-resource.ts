@@ -362,24 +362,23 @@ export async function exportToPdf(
       const numMap = new Map<string, number>();
       numbered.forEach((n) => numMap.set(`${n.row}-${n.col}`, n.n));
 
-      doc.setLineWidth(0.2);
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(0);
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const x = gridStartX + c * cellSize;
           const yy = gridStartY + r * cellSize;
           const letter = grid[r][c];
-          if (!letter) {
-            doc.setFillColor(40, 40, 40);
-            doc.rect(x, yy, cellSize, cellSize, "F");
-          } else {
-            doc.setDrawColor(0);
-            doc.rect(x, yy, cellSize, cellSize);
-            const num = numMap.get(`${r}-${c}`);
-            if (num !== undefined) {
-              doc.setFontSize(Math.max(4, cellSize * 0.3));
-              doc.setFont("helvetica", "normal");
-              doc.text(String(num), x + 0.5, yy + cellSize * 0.32);
-            }
+          if (!letter) continue; // skip empty cells — no black background
+          // White cell with border
+          doc.setFillColor(255, 255, 255);
+          doc.rect(x, yy, cellSize, cellSize, "FD");
+          const num = numMap.get(`${r}-${c}`);
+          if (num !== undefined) {
+            doc.setFontSize(Math.max(4, cellSize * 0.3));
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0);
+            doc.text(String(num), x + 0.5, yy + cellSize * 0.32);
           }
         }
       }
@@ -406,16 +405,14 @@ export async function exportToPdf(
           const x = gridStartX + c * cellSize;
           const yy = sgY + r * cellSize;
           const letter = grid[r][c];
-          if (!letter) {
-            doc.setFillColor(40, 40, 40);
-            doc.rect(x, yy, cellSize, cellSize, "F");
-          } else {
-            doc.setDrawColor(0);
-            doc.rect(x, yy, cellSize, cellSize);
-            doc.setFontSize(Math.max(5, cellSize * 0.55));
-            doc.setFont("helvetica", "bold");
-            doc.text(letter, x + cellSize / 2, yy + cellSize * 0.7, { align: "center" });
-          }
+          if (!letter) continue;
+          doc.setDrawColor(0);
+          doc.setFillColor(255, 255, 255);
+          doc.rect(x, yy, cellSize, cellSize, "FD");
+          doc.setFontSize(Math.max(5, cellSize * 0.55));
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(0);
+          doc.text(letter, x + cellSize / 2, yy + cellSize * 0.7, { align: "center" });
         }
       }
       y = sgY + gridHeight + 6;
