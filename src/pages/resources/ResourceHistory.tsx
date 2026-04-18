@@ -50,7 +50,10 @@ export default function ResourceHistory() {
   const { data: allResources = [], isLoading, isFetching } = useQuery({
     queryKey: RESOURCES_QK(user?.id),
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 10_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("generated_resources")

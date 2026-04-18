@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
@@ -28,6 +29,7 @@ export interface StoryContent {
 
 export default function Story() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [character, setCharacter] = useState("");
   const [characterType, setCharacterType] = useState("humano");
@@ -69,7 +71,10 @@ export default function Story() {
       content,
     });
     if (error) toast.error("Error al guardar");
-    else toast.success("Guardado en historial");
+    else {
+      queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
+      toast.success("Guardado en historial");
+    }
   };
 
   return (

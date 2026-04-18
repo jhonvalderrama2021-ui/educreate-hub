@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
@@ -119,6 +120,7 @@ const RESOURCE_FIELDS: Record<string, string[]> = {
 
 export default function GenerateResource() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
 
@@ -382,6 +384,7 @@ export default function GenerateResource() {
       });
 
       if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
       toast.success("Recurso guardado en tu historial");
     } catch (e: any) {
       toast.error("Error al guardar: " + e.message);
