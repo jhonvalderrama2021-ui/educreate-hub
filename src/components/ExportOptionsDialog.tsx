@@ -118,7 +118,7 @@ export function ExportOptionsDialog({ open, onOpenChange, format, onConfirm }: P
 
           {/* Watermark */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Marca de agua (centrada en cada página)</Label>
+            <Label className="text-sm font-medium">Marca de agua (imagen de fondo, centrada)</Label>
             <div className="flex items-center gap-3">
               {watermark ? (
                 <div className="relative">

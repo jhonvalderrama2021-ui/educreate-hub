@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, Footer, PageBreak } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 
@@ -58,6 +58,37 @@ export async function exportToDocx(
   const watermarkData = options.watermarkDataUrl ? await urlToDataUrl(options.watermarkDataUrl) : undefined;
 
   const headerChildren: Paragraph[] = [];
+
+  // Watermark behind the page (centered, faded) using floating image
+  if (watermarkData) {
+    const { bytes, type } = dataUrlToUint8(watermarkData);
+    const wmDims = await getImageDims(watermarkData);
+    const wmWidth = 400;
+    const wmHeight = (wmDims.h / wmDims.w) * wmWidth;
+    headerChildren.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            type,
+            data: bytes,
+            transformation: { width: wmWidth, height: wmHeight },
+            floating: {
+              horizontalPosition: {
+                relative: "page",
+                align: "center",
+              },
+              verticalPosition: {
+                relative: "page",
+                align: "center",
+              },
+              behindDocument: true,
+            },
+          } as any),
+        ],
+      }),
+    );
+  }
+
   if (logoData) {
     const { bytes, type } = dataUrlToUint8(logoData);
     headerChildren.push(
@@ -74,24 +105,6 @@ export async function exportToDocx(
     );
   }
 
-  const footerChildren: Paragraph[] = [];
-  if (watermarkData) {
-    const { bytes, type } = dataUrlToUint8(watermarkData);
-    footerChildren.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        children: [
-          new ImageRun({
-            type,
-            data: bytes,
-            transformation: { width: 60, height: 60 },
-          } as any),
-          new TextRun({ text: "  Marca de agua", italics: true, color: "BBBBBB", size: 16 }),
-        ],
-      }),
-    );
-  }
-
   const children = buildDocxContent(title, resourceType, content);
 
   const doc = new Document({
@@ -101,7 +114,6 @@ export async function exportToDocx(
     sections: [
       {
         headers: headerChildren.length ? { default: new Header({ children: headerChildren }) } : undefined,
-        footers: footerChildren.length ? { default: new Footer({ children: footerChildren }) } : undefined,
         children,
       },
     ],
@@ -183,6 +195,19 @@ export async function exportToPdf(
 
   addText(title, 18, true);
   if (content.subject) addText(`Área: ${content.subject}`, 11);
+
+  // Student name + date fields for exam-type resources
+  if (["icfes", "quiz", "true_false", "mixed"].includes(resourceType)) {
+    y += 4;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const lineY = y;
+    doc.text("Nombre:", margin, lineY);
+    doc.line(margin + 18, lineY + 1, margin + maxWidth * 0.55, lineY + 1);
+    doc.text("Fecha:", margin + maxWidth * 0.6, lineY);
+    doc.line(margin + maxWidth * 0.6 + 14, lineY + 1, margin + maxWidth, lineY + 1);
+    y += 8;
+  }
   y += 5;
 
   switch (resourceType) {
@@ -209,7 +234,8 @@ export async function exportToPdf(
 
       // ---- Answer sheet on its own page (teacher only) ----
       if (content.questions?.length) {
-        newPage();
+        // Only break to new page if there isn't enough room left
+        if (y > topOffset + 20) newPage();
         addText("HOJA DE RESPUESTAS — USO DEL DOCENTE", 14, true);
         y += 4;
         const cols = 4;
@@ -316,6 +342,19 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
 
   if (content.subject) {
     children.push(new Paragraph({ children: [new TextRun({ text: `Área: ${content.subject}`, italics: true, size: 22 })] }));
+  }
+
+  // Student name + date for exam-type resources
+  if (["icfes", "quiz", "true_false", "mixed"].includes(resourceType)) {
+    children.push(new Paragraph({
+      spacing: { before: 200, after: 100 },
+      children: [
+        new TextRun({ text: "Nombre: ", bold: true }),
+        new TextRun({ text: "______________________________________     " }),
+        new TextRun({ text: "Fecha: ", bold: true }),
+        new TextRun({ text: "____________________" }),
+      ],
+    }));
   }
 
   children.push(new Paragraph({ children: [] }));
