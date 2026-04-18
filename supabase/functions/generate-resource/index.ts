@@ -77,8 +77,9 @@ serve(async (req) => {
     const data = await response.json();
     let content = JSON.parse(data.choices[0].message.content);
 
-    // For slides: resolve image queries to real Unsplash URLs
+    // For slides: enforce exact slide count + resolve image queries
     if (resourceType === "slides" && content.slides) {
+      content = enforceSlideCount(content, numItems || 8);
       content = await resolveSlideImages(content);
     }
 
