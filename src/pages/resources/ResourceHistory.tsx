@@ -13,6 +13,7 @@ import {
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
+import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -39,6 +40,7 @@ export default function ResourceHistory() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -169,10 +171,10 @@ export default function ResourceHistory() {
                         </>
                       ) : (
                         <>
-                          <Button variant="outline" size="sm" onClick={() => exportToDocx(r.title, r.resource_type, r.content)}>
+                          <Button variant="outline" size="sm" onClick={() => setExportTarget({ resource: r, format: "docx" })}>
                             <Download className="h-3.5 w-3.5 mr-1" /> Word
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => exportToPdf(r.title, r.resource_type, r.content)}>
+                          <Button variant="outline" size="sm" onClick={() => setExportTarget({ resource: r, format: "pdf" })}>
                             <Download className="h-3.5 w-3.5 mr-1" /> PDF
                           </Button>
                         </>
@@ -190,6 +192,19 @@ export default function ResourceHistory() {
             );
           })}
         </div>
+      )}
+
+      {exportTarget && (
+        <ExportOptionsDialog
+          open={!!exportTarget}
+          onOpenChange={(o) => !o && setExportTarget(null)}
+          format={exportTarget.format}
+          onConfirm={async (opts) => {
+            const { resource, format } = exportTarget;
+            if (format === "docx") await exportToDocx(resource.title, resource.resource_type, resource.content, opts);
+            else await exportToPdf(resource.title, resource.resource_type, resource.content, opts);
+          }}
+        />
       )}
     </div>
   );

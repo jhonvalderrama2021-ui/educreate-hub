@@ -8,6 +8,7 @@ import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
+import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -165,6 +166,7 @@ export default function GenerateResource() {
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [exportDialog, setExportDialog] = useState<null | "pdf" | "docx">(null);
 
   const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
@@ -805,10 +807,10 @@ export default function GenerateResource() {
                 </>
               ) : (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => exportToDocx(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                  <Button variant="outline" size="sm" onClick={() => setExportDialog("docx")}>
                     <Download className="h-4 w-4 mr-1" /> Word
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportToPdf(displayContent?.title || title || "Recurso", resourceType, displayContent)}>
+                  <Button variant="outline" size="sm" onClick={() => setExportDialog("pdf")}>
                     <Download className="h-4 w-4 mr-1" /> PDF
                   </Button>
                 </>
@@ -842,6 +844,19 @@ export default function GenerateResource() {
             )}
           </div>
         </div>
+      )}
+
+      {exportDialog && resourceType !== "slides" && (
+        <ExportOptionsDialog
+          open={!!exportDialog}
+          onOpenChange={(o) => !o && setExportDialog(null)}
+          format={exportDialog}
+          onConfirm={async (opts) => {
+            const name = displayContent?.title || title || "Recurso";
+            if (exportDialog === "docx") await exportToDocx(name, resourceType, displayContent, opts);
+            else await exportToPdf(name, resourceType, displayContent, opts);
+          }}
+        />
       )}
     </div>
   );

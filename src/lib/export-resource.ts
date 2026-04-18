@@ -1,37 +1,180 @@
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, HeadingLevel, BorderStyle, WidthType, ShadingType } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, Footer, PageBreak } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 
 const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
 const cellBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
 
-export async function exportToDocx(title: string, resourceType: string, content: any) {
+export interface ExportOptions {
+  /** data URL or remote URL of a logo, placed top-right of every page */
+  logoDataUrl?: string;
+  /** data URL or remote URL of a watermark image, centered behind content */
+  watermarkDataUrl?: string;
+  /** 0..1, default 0.12 */
+  watermarkOpacity?: number;
+}
+
+// ---------- helpers ----------
+async function urlToDataUrl(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url;
+  const res = await fetch(url);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onloadend = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+function dataUrlToUint8(dataUrl: string): { bytes: Uint8Array; type: "png" | "jpg" | "gif" } {
+  const match = dataUrl.match(/^data:image\/(png|jpeg|jpg|gif);base64,(.+)$/i);
+  if (!match) throw new Error("Imagen inválida");
+  const ext = match[1].toLowerCase();
+  const type: "png" | "jpg" | "gif" = ext === "jpeg" || ext === "jpg" ? "jpg" : (ext as "png" | "gif");
+  const binary = atob(match[2]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return { bytes, type };
+}
+
+async function getImageDims(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.width, h: img.height });
+    img.onerror = () => resolve({ w: 1, h: 1 });
+    img.src = dataUrl;
+  });
+}
+
+// ---------- DOCX ----------
+export async function exportToDocx(
+  title: string,
+  resourceType: string,
+  content: any,
+  options: ExportOptions = {},
+) {
+  const logoData = options.logoDataUrl ? await urlToDataUrl(options.logoDataUrl) : undefined;
+  const watermarkData = options.watermarkDataUrl ? await urlToDataUrl(options.watermarkDataUrl) : undefined;
+
+  const headerChildren: Paragraph[] = [];
+  if (logoData) {
+    const { bytes, type } = dataUrlToUint8(logoData);
+    headerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.RIGHT,
+        children: [
+          new ImageRun({
+            type,
+            data: bytes,
+            transformation: { width: 80, height: 80 },
+          } as any),
+        ],
+      }),
+    );
+  }
+
+  const footerChildren: Paragraph[] = [];
+  if (watermarkData) {
+    const { bytes, type } = dataUrlToUint8(watermarkData);
+    footerChildren.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [
+          new ImageRun({
+            type,
+            data: bytes,
+            transformation: { width: 60, height: 60 },
+          } as any),
+          new TextRun({ text: "  Marca de agua", italics: true, color: "BBBBBB", size: 16 }),
+        ],
+      }),
+    );
+  }
+
   const children = buildDocxContent(title, resourceType, content);
 
   const doc = new Document({
     styles: {
       default: { document: { run: { font: "Arial", size: 24 } } },
     },
-    sections: [{ children }],
+    sections: [
+      {
+        headers: headerChildren.length ? { default: new Header({ children: headerChildren }) } : undefined,
+        footers: footerChildren.length ? { default: new Footer({ children: footerChildren }) } : undefined,
+        children,
+      },
+    ],
   });
 
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `${sanitizeFilename(title)}.docx`);
 }
 
-export function exportToPdf(title: string, resourceType: string, content: any) {
+// ---------- PDF ----------
+export async function exportToPdf(
+  title: string,
+  resourceType: string,
+  content: any,
+  options: ExportOptions = {},
+) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const maxWidth = pageWidth - margin * 2;
   let y = 20;
+
+  const logoData = options.logoDataUrl ? await urlToDataUrl(options.logoDataUrl) : undefined;
+  const watermarkData = options.watermarkDataUrl ? await urlToDataUrl(options.watermarkDataUrl) : undefined;
+  const watermarkOpacity = options.watermarkOpacity ?? 0.12;
+
+  let logoDims: { w: number; h: number } | undefined;
+  let watermarkDims: { w: number; h: number } | undefined;
+  if (logoData) logoDims = await getImageDims(logoData);
+  if (watermarkData) watermarkDims = await getImageDims(watermarkData);
+
+  const decorate = () => {
+    // Watermark first (background)
+    if (watermarkData && watermarkDims) {
+      const targetW = pageWidth * 0.6;
+      const targetH = (watermarkDims.h / watermarkDims.w) * targetW;
+      const x = (pageWidth - targetW) / 2;
+      const yy = (pageHeight - targetH) / 2;
+      const gState = (doc as any).GState ? new (doc as any).GState({ opacity: watermarkOpacity }) : null;
+      if (gState && (doc as any).setGState) (doc as any).setGState(gState);
+      try {
+        doc.addImage(watermarkData, "PNG", x, yy, targetW, targetH, undefined, "FAST");
+      } catch {/* ignore */}
+      if (gState && (doc as any).setGState) (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
+    }
+    // Logo top-right
+    if (logoData && logoDims) {
+      const targetW = 25;
+      const targetH = (logoDims.h / logoDims.w) * targetW;
+      try {
+        doc.addImage(logoData, "PNG", pageWidth - margin - targetW, 8, targetW, targetH, undefined, "FAST");
+      } catch {/* ignore */}
+    }
+  };
+
+  decorate();
+  // top offset to avoid logo overlap
+  const topOffset = logoData ? 30 : 20;
+  y = topOffset;
+
+  const newPage = () => {
+    doc.addPage();
+    decorate();
+    y = topOffset;
+  };
 
   const addText = (text: string, size: number, bold = false, indent = 0) => {
     doc.setFontSize(size);
     doc.setFont("helvetica", bold ? "bold" : "normal");
     const lines = doc.splitTextToSize(text, maxWidth - indent);
     for (const line of lines) {
-      if (y > 270) { doc.addPage(); y = 20; }
+      if (y > pageHeight - 20) newPage();
       doc.text(line, margin + indent, y);
       y += size * 0.5;
     }
@@ -45,8 +188,12 @@ export function exportToPdf(title: string, resourceType: string, content: any) {
   switch (resourceType) {
     case "icfes":
     case "quiz":
-      content.questions?.forEach((q: any) => {
-        addText(`${q.number}. ${q.question}`, 11, true);
+    case "true_false":
+    case "mixed":
+      // ---- Questions only (no answers inline) ----
+      content.questions?.forEach((q: any, idx: number) => {
+        const num = q.number || idx + 1;
+        addText(`${num}. ${q.question}`, 11, true);
         if (q.context) addText(q.context, 10, false, 5);
         if (q.options) {
           if (Array.isArray(q.options)) {
@@ -54,11 +201,47 @@ export function exportToPdf(title: string, resourceType: string, content: any) {
           } else {
             Object.entries(q.options).forEach(([k, v]) => addText(`  ${k}. ${v}`, 10, false, 10));
           }
+        } else if (q.type === "true_false") {
+          addText("  ○ Verdadero    ○ Falso", 10, false, 10);
         }
-        addText(`Respuesta: ${q.correct}`, 10, true, 5);
-        if (q.explanation) addText(`Explicación: ${q.explanation}`, 9, false, 5);
         y += 3;
       });
+
+      // ---- Answer sheet on its own page (teacher only) ----
+      if (content.questions?.length) {
+        newPage();
+        addText("HOJA DE RESPUESTAS — USO DEL DOCENTE", 14, true);
+        y += 4;
+        const cols = 4;
+        const colWidth = maxWidth / cols;
+        let col = 0;
+        const startY = y;
+        let rowY = y;
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        content.questions.forEach((q: any, idx: number) => {
+          const num = q.number || idx + 1;
+          if (rowY > pageHeight - 20) {
+            newPage();
+            rowY = y;
+            col = 0;
+          }
+          const x = margin + col * colWidth;
+          doc.text(`${num}. ${q.correct ?? "—"}`, x, rowY);
+          col++;
+          if (col >= cols) { col = 0; rowY += 8; }
+        });
+        y = rowY + 12;
+        const hasExplanations = content.questions.some((q: any) => q.explanation);
+        if (hasExplanations) {
+          if (y > pageHeight - 40) newPage();
+          addText("Explicaciones", 12, true);
+          content.questions.forEach((q: any, idx: number) => {
+            if (!q.explanation) return;
+            addText(`${q.number || idx + 1}. ${q.explanation}`, 9, false, 5);
+          });
+        }
+      }
       break;
 
     case "workshop":
@@ -140,10 +323,14 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
   switch (resourceType) {
     case "icfes":
     case "quiz":
-      content.questions?.forEach((q: any) => {
+    case "true_false":
+    case "mixed":
+      // Questions WITHOUT inline answers
+      content.questions?.forEach((q: any, idx: number) => {
+        const num = q.number || idx + 1;
         children.push(new Paragraph({
           spacing: { before: 200 },
-          children: [new TextRun({ text: `${q.number}. ${q.question}`, bold: true })],
+          children: [new TextRun({ text: `${num}. ${q.question}`, bold: true })],
         }));
         if (q.context) {
           children.push(new Paragraph({ children: [new TextRun({ text: q.context, italics: true, size: 20 })] }));
@@ -164,18 +351,50 @@ function buildDocxContent(title: string, resourceType: string, content: any): Pa
               }));
             });
           }
-        }
-        children.push(new Paragraph({
-          indent: { left: 400 },
-          children: [new TextRun({ text: `Respuesta correcta: ${q.correct}`, bold: true, color: "2E7D32" })],
-        }));
-        if (q.explanation) {
+        } else if (q.type === "true_false") {
           children.push(new Paragraph({
             indent: { left: 400 },
-            children: [new TextRun({ text: `Explicación: ${q.explanation}`, italics: true, size: 20 })],
+            children: [new TextRun({ text: "○ Verdadero    ○ Falso" })],
           }));
         }
       });
+
+      // Answer sheet on its own page
+      if (content.questions?.length) {
+        children.push(new Paragraph({ children: [new PageBreak()] }));
+        children.push(new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+          children: [new TextRun({ text: "Hoja de respuestas — Uso del docente", bold: true })],
+        }));
+        children.push(new Paragraph({ children: [] }));
+        // 4 per line
+        const perLine = 4;
+        for (let i = 0; i < content.questions.length; i += perLine) {
+          const chunk = content.questions.slice(i, i + perLine);
+          const text = chunk
+            .map((q: any, j: number) => `${q.number || i + j + 1}. ${q.correct ?? "—"}`)
+            .join("    ");
+          children.push(new Paragraph({ children: [new TextRun({ text, bold: true })] }));
+        }
+        const hasExplanations = content.questions.some((q: any) => q.explanation);
+        if (hasExplanations) {
+          children.push(new Paragraph({ children: [] }));
+          children.push(new Paragraph({
+            heading: HeadingLevel.HEADING_2,
+            children: [new TextRun({ text: "Explicaciones" })],
+          }));
+          content.questions.forEach((q: any, idx: number) => {
+            if (!q.explanation) return;
+            children.push(new Paragraph({
+              children: [
+                new TextRun({ text: `${q.number || idx + 1}. `, bold: true }),
+                new TextRun({ text: q.explanation, italics: true, size: 20 }),
+              ],
+            }));
+          });
+        }
+      }
       break;
 
     case "workshop":
