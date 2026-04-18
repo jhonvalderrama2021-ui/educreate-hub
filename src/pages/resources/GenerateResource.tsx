@@ -15,10 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { SLIDE_PALETTES, getPaletteById, type StructuredSlide } from "@/lib/slide-types";
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
   ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
-  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation,
+  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
