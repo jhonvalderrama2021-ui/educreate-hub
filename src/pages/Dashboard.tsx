@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,7 +31,6 @@ const RECENT_TYPE_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
-  useUserRole();
   const navigate = useNavigate();
 
   const [totalResources, setTotalResources] = useState(0);
