@@ -542,12 +542,41 @@ export default function GenerateResource() {
           </>
         )}
 
-        {/* Slides: number of slides */}
+        {/* Slides: number + palette */}
         {resourceType === "slides" && (
-          <div className="space-y-2">
-            <Label>Número de diapositivas</Label>
-            <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label>Número de diapositivas</Label>
+              <Input type="number" min={3} max={20} value={numSlides} onChange={(e) => setNumSlides(parseInt(e.target.value) || 8)} className="w-32" />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Palette className="h-4 w-4 text-primary" /> Paleta de colores
+              </Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {SLIDE_PALETTES.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSlidePalette(p.id)}
+                    className={`text-left p-3 rounded-lg border-2 transition-all ${
+                      slidePalette === p.id
+                        ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex gap-1 mb-2">
+                      {p.preview.map((c, i) => (
+                        <div key={i} className="h-6 w-6 rounded-md border border-border/50" style={{ background: c }} />
+                      ))}
+                    </div>
+                    <div className="text-sm font-medium text-foreground">{p.name}</div>
+                    <div className="text-xs text-muted-foreground line-clamp-2">{p.description}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
 
         {/* Methodology */}
