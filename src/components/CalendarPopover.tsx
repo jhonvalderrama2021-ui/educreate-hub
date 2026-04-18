@@ -294,10 +294,10 @@ export function CalendarPopover() {
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[340px] sm:w-[380px] p-0 overflow-hidden"
+        className="w-[340px] sm:w-[380px] p-0 overflow-hidden flex flex-col max-h-[min(640px,85vh)]"
         sideOffset={8}
       >
-        <div className="p-3 border-b border-border bg-muted/30">
+        <div className="p-3 border-b border-border bg-muted/30 shrink-0">
           <div className="flex items-center gap-2">
             <CalendarIcon className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold text-foreground">Calendario de notas</h3>
@@ -307,50 +307,50 @@ export function CalendarPopover() {
           </p>
         </div>
 
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(d) => d && setSelected(d)}
-          locale={es}
-          modifiers={{ marked: markedDates }}
-          modifiersClassNames={{ marked: "calendar-day-marked" }}
-          components={{
-            DayContent: ({ date }) => {
-              const key = format(date, "yyyy-MM-dd");
-              const c = colorByDate.get(key);
-              return (
-                <div className="relative flex items-center justify-center w-full h-full">
-                  <span>{date.getDate()}</span>
-                  {c && (
-                    <span
-                      className={cn(
-                        "absolute bottom-0.5 h-1 w-1 rounded-full",
-                        colorMeta(c).dot,
-                      )}
-                    />
-                  )}
-                </div>
-              );
-            },
-          }}
-          className={cn("p-3 pointer-events-auto")}
-        />
+        <div className="flex-1 overflow-y-auto">
+          <Calendar
+            mode="single"
+            selected={selected}
+            onSelect={(d) => d && setSelected(d)}
+            locale={es}
+            modifiers={{ marked: markedDates }}
+            modifiersClassNames={{ marked: "calendar-day-marked" }}
+            components={{
+              DayContent: ({ date }) => {
+                const key = format(date, "yyyy-MM-dd");
+                const c = colorByDate.get(key);
+                return (
+                  <div className="relative flex items-center justify-center w-full h-full">
+                    <span>{date.getDate()}</span>
+                    {c && (
+                      <span
+                        className={cn(
+                          "absolute bottom-0.5 h-1 w-1 rounded-full",
+                          colorMeta(c).dot,
+                        )}
+                      />
+                    )}
+                  </div>
+                );
+              },
+            }}
+            className={cn("p-3 pointer-events-auto w-full [&_table]:w-full [&_.rdp-month]:w-full [&_.rdp-cell]:w-[14.28%] [&_.rdp-head_cell]:w-[14.28%]")}
+          />
 
-        <div className="border-t border-border p-3 space-y-3 bg-card">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-foreground capitalize">
-              {format(selected, "EEEE d 'de' MMMM yyyy", { locale: es })}
-            </p>
+          <div className="border-t border-border p-3 space-y-3 bg-card">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-foreground capitalize">
+                {format(selected, "EEEE d 'de' MMMM yyyy", { locale: es })}
+              </p>
+              {notesForSelected.length > 0 && (
+                <span className="text-[10px] text-muted-foreground">
+                  {notesForSelected.length} nota{notesForSelected.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+
             {notesForSelected.length > 0 && (
-              <span className="text-[10px] text-muted-foreground">
-                {notesForSelected.length} nota{notesForSelected.length === 1 ? "" : "s"}
-              </span>
-            )}
-          </div>
-
-          {notesForSelected.length > 0 && (
-            <ScrollArea className="max-h-32">
-              <div className="space-y-1.5 pr-2">
+              <div className="space-y-1.5">
                 {notesForSelected.map((n) => {
                   const meta = colorMeta(n.color);
                   return (
@@ -384,61 +384,61 @@ export function CalendarPopover() {
                   );
                 })}
               </div>
-            </ScrollArea>
-          )}
+            )}
 
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Nueva nota</Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ej: Examen final de matemáticas"
-                className="h-8 text-xs"
-              />
-            </div>
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Detalles (opcional)"
-              className="text-xs min-h-[52px] resize-none"
-            />
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                {COLORS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setColor(c.value)}
-                    className={cn(
-                      "h-5 w-5 rounded-full transition-transform",
-                      c.dot,
-                      color === c.value
-                        ? "ring-2 ring-offset-2 ring-offset-card ring-foreground/40 scale-110"
-                        : "opacity-70 hover:opacity-100",
-                    )}
-                    aria-label={c.label}
-                    title={c.label}
-                  />
-                ))}
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Nueva nota</Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ej: Examen final de matemáticas"
+                  className="h-8 text-xs"
+                />
               </div>
-              <Button
-                size="sm"
-                className="h-8 gradient-primary text-xs gap-1"
-                onClick={handleSave}
-                disabled={saving || !title.trim()}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Agregar
-              </Button>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Detalles (opcional)"
+                className="text-xs min-h-[52px] resize-none"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setColor(c.value)}
+                      className={cn(
+                        "h-5 w-5 rounded-full transition-transform",
+                        c.dot,
+                        color === c.value
+                          ? "ring-2 ring-offset-2 ring-offset-card ring-foreground/40 scale-110"
+                          : "opacity-70 hover:opacity-100",
+                      )}
+                      aria-label={c.label}
+                      title={c.label}
+                    />
+                  ))}
+                </div>
+                <Button
+                  size="sm"
+                  className="h-8 gradient-primary text-xs gap-1"
+                  onClick={handleSave}
+                  disabled={saving || !title.trim()}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar
+                </Button>
+              </div>
             </div>
-          </div>
 
-          {loading && (
-            <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-              <StickyNote className="h-3 w-3" /> Cargando notas...
-            </p>
-          )}
+            {loading && (
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <StickyNote className="h-3 w-3" /> Cargando notas...
+              </p>
+            )}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
