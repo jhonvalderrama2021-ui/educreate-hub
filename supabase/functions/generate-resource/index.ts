@@ -334,6 +334,14 @@ function getLayoutSchema(layout: string): string {
       return `{ "layout": "bigNumber", "title": "string", "bigNumber": "73%", "subtitle": "frase 6-10 palabras", "content": "explicación 40-70 palabras" }`;
     case "twoColumnText":
       return `{ "layout": "twoColumnText", "title": "string", "columns": [{ "title": "Perspectiva", "color": "#hex", "points": ["frase completa.", "..."] }] } — exactamente 2 columnas con 3-4 points.`;
+    case "cardOverlay":
+      return `{ "layout": "cardOverlay", "title": "string impactante", "content": "párrafo 50-80 palabras concreto", "image": { "query": "english keywords", "alt": "...", "placement": "background" } }`;
+    case "magazine":
+      return `{ "layout": "magazine", "title": "string", "listItems": [{ "icon": "material_icon", "title": "3-5 palabras", "description": "20-40 palabras" }], "image": { "query": "...", "alt": "...", "placement": "left" } } — 4 listItems exactos.`;
+    case "diagonalSplit":
+      return `{ "layout": "diagonalSplit", "title": "string", "subtitle": "frase 8-15 palabras", "content": "párrafo 40-70 palabras", "image": { "query": "...", "alt": "...", "placement": "left" } }`;
+    case "circleHero":
+      return `{ "layout": "circleHero", "title": "string", "subtitle": "frase 10-18 palabras", "image": { "query": "...", "alt": "...", "placement": "right" } }`;
     default:
       return `{ "layout": "${layout}", "title": "string", "content": "párrafo 50-80 palabras" }`;
   }
