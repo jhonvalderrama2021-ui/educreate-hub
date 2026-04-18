@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
@@ -36,67 +37,80 @@ interface Resource {
   created_at: string;
 }
 
+const RESOURCES_QK = (uid?: string) => ["generated_resources", uid] as const;
+
 export default function ResourceHistory() {
   const { user } = useAuth();
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
+  // Cached query — instantly shows previous data when navigating back
+  const { data: allResources = [], isLoading, isFetching } = useQuery({
+    queryKey: RESOURCES_QK(user?.id),
+    enabled: !!user,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("generated_resources")
+        .select("*")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as Resource[];
+    },
+  });
+
+  // Realtime: refresh cache the instant a resource is added/updated/deleted
   useEffect(() => {
     if (!user) return;
-    loadResources();
-    // Refresh when user returns to this tab/route
-    const onFocus = () => loadResources();
-    const onVisible = () => { if (document.visibilityState === "visible") loadResources(); };
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, filter]);
+    const channel = supabase
+      .channel(`generated_resources-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "generated_resources", filter: `user_id=eq.${user.id}` },
+        () => queryClient.invalidateQueries({ queryKey: RESOURCES_QK(user.id) }),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
 
-  const loadResources = async () => {
-    if (!user) return;
-    setLoading(true);
-    let query = (supabase as any)
-      .from("generated_resources")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-
-    if (filter !== "all") query = query.eq("resource_type", filter);
-
-    const { data, error } = await query;
-    if (error) toast.error("Error al cargar el historial");
-    setResources(data || []);
-    setLoading(false);
-  };
+  const resources = filter === "all"
+    ? allResources
+    : allResources.filter((r) => r.resource_type === filter);
+  // Only show full-screen spinner on first load (no cache yet)
+  const loading = isLoading && allResources.length === 0;
 
   const togglePublic = async (id: string, isPublic: boolean) => {
+    queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (prev) =>
+      (prev || []).map((r) => (r.id === id ? { ...r, is_public: !isPublic } : r)),
+    );
     const { error } = await (supabase as any)
       .from("generated_resources")
       .update({ is_public: !isPublic })
       .eq("id", id);
-
-    if (error) { toast.error("Error al actualizar"); return; }
-    setResources((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, is_public: !isPublic } : r))
-    );
+    if (error) {
+      toast.error("Error al actualizar");
+      queryClient.invalidateQueries({ queryKey: RESOURCES_QK(user?.id) });
+    }
   };
 
   const deleteResource = async (id: string) => {
     if (!confirm("¿Eliminar este recurso?")) return;
+    const prev = queryClient.getQueryData<Resource[]>(RESOURCES_QK(user?.id));
+    queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (cur) =>
+      (cur || []).filter((r) => r.id !== id),
+    );
     const { error } = await (supabase as any)
       .from("generated_resources")
       .delete()
       .eq("id", id);
-
-    if (error) { toast.error("Error al eliminar"); return; }
-    setResources((prev) => prev.filter((r) => r.id !== id));
+    if (error) {
+      toast.error("Error al eliminar");
+      queryClient.setQueryData(RESOURCES_QK(user?.id), prev);
+      return;
+    }
     toast.success("Recurso eliminado");
   };
 
