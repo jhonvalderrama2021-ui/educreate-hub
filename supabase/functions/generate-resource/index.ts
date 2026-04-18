@@ -12,7 +12,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
 
   try {
-    const { resourceType, pdfContent, instructions, numItems } = await req.json();
+    const { resourceType, pdfContent, instructions, numItems, theme } = await req.json();
 
     if (!resourceType) {
       return new Response(JSON.stringify({ error: "resourceType es requerido" }), {
@@ -78,9 +78,10 @@ serve(async (req) => {
     const data = await response.json();
     let content = JSON.parse(data.choices[0].message.content);
 
-    // For slides: enforce exact slide count + resolve image queries
+    // For slides: enforce exact slide count + resolve image queries + apply user-selected theme
     if (resourceType === "slides" && content.slides) {
       content = enforceSlideCount(content, numItems || 8);
+      if (theme) content.theme = theme;
       content = await resolveSlideImages(content);
     }
 
