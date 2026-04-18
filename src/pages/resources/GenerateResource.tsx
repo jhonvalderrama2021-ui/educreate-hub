@@ -32,10 +32,37 @@ const RESOURCE_TYPES = [
 
 const SUBJECTS = [
   "Matemáticas",
+  "Español y Literatura",
+  "Lengua Castellana",
+  "Inglés",
+  "Francés",
   "Ciencias Naturales",
   "Biología",
-  "Lenguaje",
+  "Química",
+  "Física",
   "Ciencias Sociales",
+  "Historia",
+  "Geografía",
+  "Filosofía",
+  "Economía",
+  "Política y Constitución",
+  "Cátedra de la Paz",
+  "Educación Ética y Valores Humanos",
+  "Educación Religiosa",
+  "Educación Artística",
+  "Música",
+  "Danza",
+  "Teatro",
+  "Artes Plásticas",
+  "Educación Física, Recreación y Deportes",
+  "Tecnología e Informática",
+  "Programación y Computación",
+  "Robótica",
+  "Emprendimiento",
+  "Educación Ambiental",
+  "Lectura Crítica",
+  "Competencias Ciudadanas",
+  "Orientación Vocacional",
 ];
 
 const METHODOLOGIES = [
@@ -432,7 +459,7 @@ export default function GenerateResource() {
             <Label>Asignatura <span className="text-destructive">*</span></Label>
             <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
               <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-72">
                 {SUBJECTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                 <SelectItem value="Otras">Otras</SelectItem>
               </SelectContent>
@@ -447,7 +474,7 @@ export default function GenerateResource() {
               <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
               <Select value={grade} onValueChange={setGrade}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72">
                   {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
                     <SelectItem key={g} value={String(g)}>Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}</SelectItem>
                   ))}
