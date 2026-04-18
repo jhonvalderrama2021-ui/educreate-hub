@@ -1,6 +1,8 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SlideViewer } from "@/components/SlideViewer";
+import { CrosswordGrid } from "@/components/games/CrosswordGrid";
+import { StoryViewer } from "@/components/games/StoryViewer";
 
 interface Props {
   type: string;
@@ -312,6 +314,12 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
           }
         />
       );
+
+    case "crossword":
+      return <CrosswordGrid content={content} interactive />;
+
+    case "story":
+      return <StoryViewer content={content} />;
 
     default:
       return <pre className="text-xs overflow-auto">{JSON.stringify(content, null, 2)}</pre>;
