@@ -99,13 +99,15 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="flex items-center justify-between px-6 py-3 max-w-6xl mx-auto">
-          <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-xl">
+        <div className="flex items-center gap-3 px-6 py-3 max-w-6xl mx-auto">
+          <Link to="/dashboard" className="flex items-center gap-2 text-primary font-bold text-xl shrink-0">
             <FileText className="h-6 w-6" />
             NexProfe
           </Link>
-          <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
             <CalendarPopover />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <ThemeToggle />
             <UserMenu />
           </div>
