@@ -85,25 +85,29 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
     }
   }
 
-  // Place first word horizontally near center
+  // Place first word — direction depends on which quota is larger to balance correctly
   const first = sorted[0];
   if (!first) return { grid, placed, size: SIZE };
-  const startCol = Math.floor((SIZE - first.word.length) / 2);
-  const startRow = Math.floor(SIZE / 2);
-  place(first.word, startRow, startCol, "across");
+  const firstDir: "across" | "down" = wantedAcross >= wantedDown ? "across" : "down";
+  const startRow = firstDir === "across"
+    ? Math.floor(SIZE / 2)
+    : Math.floor((SIZE - first.word.length) / 2);
+  const startCol = firstDir === "across"
+    ? Math.floor((SIZE - first.word.length) / 2)
+    : Math.floor(SIZE / 2);
+  place(first.word, startRow, startCol, firstDir);
   placed.push({
     word: first.word,
     display: first.display,
     clue: first.clue,
     row: startRow,
     col: startCol,
-    direction: "across",
+    direction: firstDir,
     number: 0,
   });
 
-  // First word was placed across; adjust if user wanted 0 across (edge case)
-  let acrossCount = 1;
-  let downCount = 0;
+  let acrossCount = firstDir === "across" ? 1 : 0;
+  let downCount = firstDir === "down" ? 1 : 0;
 
   // Helper: find best placement in a specific direction with maximum intersections
   function findPlacement(w: string, dir: "across" | "down"): { row: number; col: number; score: number } | null {
