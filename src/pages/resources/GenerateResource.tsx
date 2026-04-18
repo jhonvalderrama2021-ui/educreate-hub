@@ -717,21 +717,19 @@ export default function GenerateResource() {
                 <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
                 <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
               </div>
-              {resourceType !== "slides" && (
-                <Button
-                  variant={isEditing ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    if (!isEditing) {
-                      setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
-                    }
-                    setIsEditing(!isEditing);
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  {isEditing ? "Viendo edición" : "Editar"}
-                </Button>
-              )}
+              <Button
+                variant={isEditing ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (!isEditing) {
+                    setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
+                  }
+                  setIsEditing(!isEditing);
+                }}
+              >
+                <Pencil className="h-4 w-4 mr-1" />
+                {isEditing ? "Viendo edición" : "Editar"}
+              </Button>
               <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
                 <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
               </Button>
@@ -759,7 +757,20 @@ export default function GenerateResource() {
 
           <div className="p-6">
             {resourceType === "slides" ? (
-              <SlideViewer slides={displayContent?.slides || []} title={displayContent?.title} theme={displayContent?.theme} />
+              <SlideViewer
+                slides={displayContent?.slides || []}
+                title={displayContent?.title}
+                theme={displayContent?.theme}
+                editable={isEditing}
+                onSlideChange={(idx, updated) => {
+                  setEditableContent((prev: any) => {
+                    const base = prev || JSON.parse(JSON.stringify(generatedContent));
+                    const nextSlides = [...(base.slides || [])];
+                    nextSlides[idx] = updated;
+                    return { ...base, slides: nextSlides };
+                  });
+                }}
+              />
             ) : (
               <ResourceContentViewer
                 type={resourceType}
