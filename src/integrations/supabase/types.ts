@@ -210,6 +210,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_has_openai_key: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
