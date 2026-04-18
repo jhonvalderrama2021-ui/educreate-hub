@@ -31,12 +31,10 @@ interface PlacedWord {
   number: number;
 }
 
-// Backtracking placement
-function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) {
-  // Sort by length desc to place harder words first
+// Backtracking placement — tries to satisfy exact across/down quotas
+function attemptBuild(words: WordItem[], wantedAcross: number, wantedDown: number, seedIdx: number) {
   const sorted = [...words].sort((a, b) => b.word.length - a.word.length);
-
-  const SIZE = Math.max(15, Math.min(25, Math.ceil(Math.max(...sorted.map((w) => w.word.length)) * 1.3) + 4));
+  const SIZE = Math.max(18, Math.min(28, Math.ceil(Math.max(...sorted.map((w) => w.word.length)) * 1.5) + 6));
   const grid: string[][] = Array.from({ length: SIZE }, () => Array(SIZE).fill(""));
   const placed: PlacedWord[] = [];
 
@@ -45,7 +43,6 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
     if (dir === "across" && col + word.length > SIZE) return false;
     if (dir === "down" && row + word.length > SIZE) return false;
 
-    // Cells before/after must be empty
     if (dir === "across") {
       if (col > 0 && grid[row][col - 1] !== "") return false;
       if (col + word.length < SIZE && grid[row][col + word.length] !== "") return false;
@@ -60,7 +57,6 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
       const c = dir === "across" ? col + i : col;
       const cell = grid[r][c];
       if (cell === "") {
-        // Adjacent perpendicular cells must be empty (unless this cell intersects)
         if (dir === "across") {
           if (r > 0 && grid[r - 1][c] !== "") return false;
           if (r < SIZE - 1 && grid[r + 1][c] !== "") return false;
@@ -85,36 +81,22 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
     }
   }
 
-  // Place first word — direction depends on which quota is larger to balance correctly
-  const first = sorted[0];
-  if (!first) return { grid, placed, size: SIZE };
+  // Place seed word
+  const first = sorted[seedIdx % sorted.length];
+  if (!first) return null;
   const firstDir: "across" | "down" = wantedAcross >= wantedDown ? "across" : "down";
-  const startRow = firstDir === "across"
-    ? Math.floor(SIZE / 2)
-    : Math.floor((SIZE - first.word.length) / 2);
-  const startCol = firstDir === "across"
-    ? Math.floor((SIZE - first.word.length) / 2)
-    : Math.floor(SIZE / 2);
+  const startRow = firstDir === "across" ? Math.floor(SIZE / 2) : Math.floor((SIZE - first.word.length) / 2);
+  const startCol = firstDir === "across" ? Math.floor((SIZE - first.word.length) / 2) : Math.floor(SIZE / 2);
   place(first.word, startRow, startCol, firstDir);
-  placed.push({
-    word: first.word,
-    display: first.display,
-    clue: first.clue,
-    row: startRow,
-    col: startCol,
-    direction: firstDir,
-    number: 0,
-  });
+  placed.push({ word: first.word, display: first.display, clue: first.clue, row: startRow, col: startCol, direction: firstDir, number: 0 });
 
   let acrossCount = firstDir === "across" ? 1 : 0;
   let downCount = firstDir === "down" ? 1 : 0;
 
-  // Helper: find best placement in a specific direction with maximum intersections
   function findPlacement(w: string, dir: "across" | "down"): { row: number; col: number; score: number } | null {
     let best: { row: number; col: number; score: number } | null = null;
     for (let pi = 0; pi < placed.length; pi++) {
       const p = placed[pi];
-      // Only perpendicular placements yield intersections
       if (p.direction === dir) continue;
       for (let pc = 0; pc < p.word.length; pc++) {
         const pLetter = p.word[pc];
@@ -122,18 +104,13 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
           if (w[wc] !== pLetter) continue;
           let row: number, col: number;
           if (dir === "down") {
-            // p is across; intersection cell is (p.row, p.col + pc)
             row = p.row - wc;
             col = p.col + pc;
           } else {
-            // p is down; intersection cell is (p.row + pc, p.col)
-            row = p.row + pc - 0;
-            col = p.col - wc;
             row = p.row + pc;
             col = p.col - wc;
           }
           if (canPlace(w, row, col, dir)) {
-            // Score: number of intersections with existing letters
             let score = 0;
             for (let i = 0; i < w.length; i++) {
               const r = dir === "across" ? row : row + i;
@@ -148,48 +125,93 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
     return best;
   }
 
-  // Two-pass placement: enforce wantedAcross / wantedDown counts strictly.
-  // Pass 1: try to satisfy each direction's quota in priority order, alternating.
-  const remaining = sorted.slice(1);
+  // Pool of remaining words (mutable). We'll also track which are still available.
+  const remaining = sorted.slice().filter((_, i) => i !== (seedIdx % sorted.length));
+
   const tryPlaceFromPool = (dir: "across" | "down"): boolean => {
+    let bestIdx = -1;
+    let bestScore = -1;
+    let bestPos: { row: number; col: number; score: number } | null = null;
+    // pick the candidate with the highest intersection score
     for (let i = 0; i < remaining.length; i++) {
-      const item = remaining[i];
-      const pos = findPlacement(item.word, dir);
-      if (pos) {
-        place(item.word, pos.row, pos.col, dir);
-        placed.push({
-          word: item.word,
-          display: item.display,
-          clue: item.clue,
-          row: pos.row,
-          col: pos.col,
-          direction: dir,
-          number: 0,
-        });
-        if (dir === "across") acrossCount++; else downCount++;
-        remaining.splice(i, 1);
-        return true;
+      const pos = findPlacement(remaining[i].word, dir);
+      if (pos && pos.score > bestScore) {
+        bestScore = pos.score;
+        bestIdx = i;
+        bestPos = pos;
       }
     }
-    return false;
+    if (bestIdx === -1 || !bestPos) return false;
+    const item = remaining[bestIdx];
+    place(item.word, bestPos.row, bestPos.col, dir);
+    placed.push({ word: item.word, display: item.display, clue: item.clue, row: bestPos.row, col: bestPos.col, direction: dir, number: 0 });
+    if (dir === "across") acrossCount++; else downCount++;
+    remaining.splice(bestIdx, 1);
+    return true;
   };
 
-  // Alternate between directions to balance, prioritizing whichever is most under quota
-  let safety = sorted.length * 4;
-  while (safety-- > 0 && (acrossCount < wantedAcross || downCount < wantedDown) && remaining.length > 0) {
+  // Phase 1: satisfy exact quotas, alternating to whichever direction is most under quota
+  let safety = sorted.length * 6;
+  while (safety-- > 0 && (acrossCount < wantedAcross || downCount < wantedDown)) {
     const acrossDeficit = wantedAcross - acrossCount;
     const downDeficit = wantedDown - downCount;
-    let order: ("across" | "down")[];
-    if (acrossDeficit >= downDeficit) order = ["across", "down"];
-    else order = ["down", "across"];
+    const order: ("across" | "down")[] = acrossDeficit >= downDeficit ? ["across", "down"] : ["down", "across"];
     let placedOne = false;
     for (const dir of order) {
       const need = dir === "across" ? wantedAcross - acrossCount : wantedDown - downCount;
       if (need <= 0) continue;
       if (tryPlaceFromPool(dir)) { placedOne = true; break; }
     }
-    if (!placedOne) break; // can't place anything more in needed directions
+    if (!placedOne) break;
   }
+
+  // Phase 2: if we still haven't reached the TOTAL count, fill with whatever direction works
+  // (prefer the direction still under quota, but accept either)
+  const totalWanted = wantedAcross + wantedDown;
+  safety = sorted.length * 4;
+  while (safety-- > 0 && placed.length < totalWanted) {
+    const acrossUnder = acrossCount < wantedAcross;
+    const downUnder = downCount < wantedDown;
+    const order: ("across" | "down")[] = acrossUnder && !downUnder ? ["across", "down"]
+      : downUnder && !acrossUnder ? ["down", "across"]
+      : acrossCount <= downCount ? ["across", "down"] : ["down", "across"];
+    let placedOne = false;
+    for (const dir of order) {
+      if (tryPlaceFromPool(dir)) { placedOne = true; break; }
+    }
+    if (!placedOne) break;
+  }
+
+  return { grid, placed, size: SIZE, acrossCount, downCount };
+}
+
+function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) {
+  const totalWanted = wantedAcross + wantedDown;
+  // Try multiple seeds and keep the best result (closest to total wanted, then best balance)
+  let best: ReturnType<typeof attemptBuild> | null = null;
+  const maxSeeds = Math.min(8, words.length);
+  for (let s = 0; s < maxSeeds; s++) {
+    const r = attemptBuild(words, wantedAcross, wantedDown, s);
+    if (!r) continue;
+    if (!best) { best = r; continue; }
+    // Prefer the result where placed count is closer to totalWanted
+    const bestPlaced = best.placed.length;
+    const rPlaced = r.placed.length;
+    if (rPlaced > bestPlaced) best = r;
+    else if (rPlaced === bestPlaced) {
+      // tie-break: better balance with the requested across/down
+      const bestErr = Math.abs(best.acrossCount - wantedAcross) + Math.abs(best.downCount - wantedDown);
+      const rErr = Math.abs(r.acrossCount - wantedAcross) + Math.abs(r.downCount - wantedDown);
+      if (rErr < bestErr) best = r;
+    }
+    if (best.placed.length >= totalWanted) break;
+  }
+
+  if (!best) {
+    return { grid: [[]], placed: [], numbered: [], rows: 0, cols: 0 };
+  }
+
+  const { grid, placed, size: SIZE } = best;
 
   // Crop grid to bounding box
   let minR = SIZE, maxR = 0, minC = SIZE, maxC = 0;
@@ -204,7 +226,6 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
       maxC = Math.max(maxC, p.col);
     }
   }
-  // Add 1-cell padding
   minR = Math.max(0, minR - 1);
   minC = Math.max(0, minC - 1);
   maxR = Math.min(SIZE - 1, maxR + 1);
@@ -220,29 +241,24 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
   }
   const adjusted = placed.map((p) => ({ ...p, row: p.row - minR, col: p.col - minC }));
 
-  // Number cells: scan row by row; cell is numbered if it starts an across or down word
   const numbered: { row: number; col: number; n: number }[] = [];
   let n = 1;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (!cropped[r][c]) continue;
-      const startsAcross =
-        (c === 0 || !cropped[r][c - 1]) && c + 1 < cols && cropped[r][c + 1];
-      const startsDown =
-        (r === 0 || !cropped[r - 1][c]) && r + 1 < rows && cropped[r + 1][c];
+      const startsAcross = (c === 0 || !cropped[r][c - 1]) && c + 1 < cols && cropped[r][c + 1];
+      const startsDown = (r === 0 || !cropped[r - 1][c]) && r + 1 < rows && cropped[r + 1][c];
       if (startsAcross || startsDown) {
         numbered.push({ row: r, col: c, n });
         n++;
       }
     }
   }
-  // Assign numbers to placed words by their starting cell
   for (const p of adjusted) {
     const found = numbered.find((x) => x.row === p.row && x.col === p.col);
     if (found) p.number = found.n;
   }
 
-  // Filter out any word that didn't get placed in cropped grid
   return { grid: cropped, placed: adjusted, numbered, rows, cols };
 }
 
