@@ -12,6 +12,10 @@ import { QuoteLayout } from "./QuoteLayout";
 import { ImageFullLayout } from "./ImageFullLayout";
 import { BigNumberLayout } from "./BigNumberLayout";
 import { TwoColumnTextLayout } from "./TwoColumnTextLayout";
+import { CardOverlayLayout } from "./CardOverlayLayout";
+import { MagazineLayout } from "./MagazineLayout";
+import { DiagonalSplitLayout } from "./DiagonalSplitLayout";
+import { CircleHeroLayout } from "./CircleHeroLayout";
 
 export interface SlideRendererProps {
   slide: StructuredSlide;
@@ -34,6 +38,10 @@ const LAYOUT_MAP: Record<string, React.FC<any>> = {
   imageFull: ImageFullLayout,
   bigNumber: BigNumberLayout,
   twoColumnText: TwoColumnTextLayout,
+  cardOverlay: CardOverlayLayout,
+  magazine: MagazineLayout,
+  diagonalSplit: DiagonalSplitLayout,
+  circleHero: CircleHeroLayout,
 };
 
 export function SlideRenderer({ slide, theme = DEFAULT_THEME, editable, onFieldChange }: SlideRendererProps) {

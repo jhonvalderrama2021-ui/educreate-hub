@@ -140,12 +140,17 @@ async function generateOutline(apiKey: string, args: {
 }) {
   const { instructions, pdfContent, total } = args;
 
-  // Distribute layouts: hero first, conclusion last, varied middle.
-  // 1 image every 2 slides → image-friendly layouts on even indexes.
-  const middleLayouts = ["grid", "split", "process", "comparison", "list", "timeline",
-    "quote", "imageFull", "bigNumber", "twoColumnText"];
-  // Layouts that look great with an image
-  const imageLayouts = new Set(["split", "imageFull", "hero"]);
+  // Layouts available in the middle pool — heavy variety with new creative ones.
+  const middleLayouts = [
+    "split", "diagonalSplit", "cardOverlay", "magazine",
+    "grid", "list", "process", "comparison", "timeline",
+    "imageFull", "twoColumnText", "bigNumber", "quote",
+  ];
+  // Layouts that DON'T need a Pexels image (text/color-driven)
+  const noImageLayouts = new Set([
+    "quote", "conclusion", "bigNumber", "comparison", "twoColumnText", "process", "timeline",
+  ]);
+  const heroLayouts = ["hero", "circleHero"];
 
   const sysPrompt = `Eres un experto pedagogo. Genera el ESQUELETO (outline) de una presentación educativa profesional en español. Devuelve JSON estricto con esta forma:
 
@@ -191,26 +196,31 @@ REGLAS:
   }
   if (items.length > total) items.length = total;
 
-  // Assign layout + needsImage to each item
-  const middlePool = [...middleLayouts];
+  // Assign layout + needsImage with STRONG variety enforcement
   const usedCounts: Record<string, number> = {};
+  let prevLayout = "";
   const assigned = items.map((it, i) => {
     let layout: string;
-    if (i === 0) layout = "hero";
-    else if (i === total - 1) layout = "conclusion";
-    else {
-      // pick a middle layout that hasn't been used twice & isn't same as previous
-      const prev = i > 0 ? (items[i - 1] as any)._layout : null;
-      const sortedPool = middlePool
-        .filter((l) => l !== prev)
-        .sort((a, b) => (usedCounts[a] || 0) - (usedCounts[b] || 0));
-      layout = sortedPool[0] || middlePool[i % middlePool.length];
+    if (i === 0) {
+      layout = heroLayouts[Math.floor(Math.random() * heroLayouts.length)];
+    } else if (i === total - 1) {
+      layout = "conclusion";
+    } else {
+      // Pick a layout: not same as previous, used least, random tie-break
+      const candidates = middleLayouts.filter((l) => l !== prevLayout);
+      candidates.sort((a, b) => {
+        const diff = (usedCounts[a] || 0) - (usedCounts[b] || 0);
+        if (diff !== 0) return diff;
+        return Math.random() - 0.5;
+      });
+      layout = candidates[0];
     }
     usedCounts[layout] = (usedCounts[layout] || 0) + 1;
+    prevLayout = layout;
     (it as any)._layout = layout;
 
-    // 1 image every ~2 slides — assign on alternating image-friendly positions
-    const wantsImage = imageLayouts.has(layout) || i % 2 === 0;
+    // Image: every slide gets one EXCEPT noImageLayouts
+    const wantsImage = !noImageLayouts.has(layout);
     return {
       ...it,
       layout,
@@ -324,6 +334,14 @@ function getLayoutSchema(layout: string): string {
       return `{ "layout": "bigNumber", "title": "string", "bigNumber": "73%", "subtitle": "frase 6-10 palabras", "content": "explicación 40-70 palabras" }`;
     case "twoColumnText":
       return `{ "layout": "twoColumnText", "title": "string", "columns": [{ "title": "Perspectiva", "color": "#hex", "points": ["frase completa.", "..."] }] } — exactamente 2 columnas con 3-4 points.`;
+    case "cardOverlay":
+      return `{ "layout": "cardOverlay", "title": "string impactante", "content": "párrafo 50-80 palabras concreto", "image": { "query": "english keywords", "alt": "...", "placement": "background" } }`;
+    case "magazine":
+      return `{ "layout": "magazine", "title": "string", "listItems": [{ "icon": "material_icon", "title": "3-5 palabras", "description": "20-40 palabras" }], "image": { "query": "...", "alt": "...", "placement": "left" } } — 4 listItems exactos.`;
+    case "diagonalSplit":
+      return `{ "layout": "diagonalSplit", "title": "string", "subtitle": "frase 8-15 palabras", "content": "párrafo 40-70 palabras", "image": { "query": "...", "alt": "...", "placement": "left" } }`;
+    case "circleHero":
+      return `{ "layout": "circleHero", "title": "string", "subtitle": "frase 10-18 palabras", "image": { "query": "...", "alt": "...", "placement": "right" } }`;
     default:
       return `{ "layout": "${layout}", "title": "string", "content": "párrafo 50-80 palabras" }`;
   }

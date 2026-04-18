@@ -22,37 +22,23 @@ function isStructuredPresentation(content: any): boolean {
 }
 
 // ============================================================
-// IMAGE PRE-FETCHING — Critical for blank-PDF fix
+// IMAGE PRE-FETCHING via Pexels proxy → base64 (CORS-safe)
 // ============================================================
-// We proxy every Pexels URL through our edge function which returns base64.
-// html2canvas can then capture them without CORS taint and without race
-// conditions waiting for remote loads.
-
 const imageCache = new Map<string, string>();
 
 async function urlToBase64ViaProxy(url: string): Promise<string | null> {
   if (!url) return null;
   if (imageCache.has(url)) return imageCache.get(url)!;
   try {
-    const { data, error } = await supabase.functions.invoke("pexels-proxy", {
-      body: { url },
-    });
-    if (error || !data?.dataUrl) {
-      console.warn("pexels-proxy failed:", error || data);
-      return null;
-    }
+    const { data, error } = await supabase.functions.invoke("pexels-proxy", { body: { url } });
+    if (error || !data?.dataUrl) return null;
     imageCache.set(url, data.dataUrl);
     return data.dataUrl as string;
-  } catch (e) {
-    console.warn("proxy invoke failed:", e);
+  } catch {
     return null;
   }
 }
 
-/**
- * Walks the presentation and replaces every slide.image.url with a base64
- * data URL fetched through our edge proxy. Mutates a *clone* and returns it.
- */
 async function inlineAllImages(content: any): Promise<any> {
   const cloned = JSON.parse(JSON.stringify(content));
   const slides = cloned.slides || [];
@@ -66,7 +52,6 @@ async function inlineAllImages(content: any): Promise<any> {
       })
     );
   }
-  // Run in parallel but cap concurrency to avoid hammering the proxy.
   const CONCURRENCY = 4;
   for (let i = 0; i < tasks.length; i += CONCURRENCY) {
     await Promise.all(tasks.slice(i, i + CONCURRENCY));
@@ -75,40 +60,46 @@ async function inlineAllImages(content: any): Promise<any> {
 }
 
 // ============================================================
-// OFF-SCREEN SLIDE RENDERER
+// VISIBLE OFF-SCREEN RENDER
+// We position a 1280x720 stage well off-screen (left:-20000px) but with
+// FULL opacity & visibility — html2canvas needs a visible, painted layer.
 // ============================================================
-async function renderStructuredSlideOffscreen(
+async function renderSlideToCanvas(
   slide: StructuredSlide,
   theme: SlideTheme
 ): Promise<HTMLCanvasElement> {
-  const container = document.createElement("div");
-  container.style.cssText = [
+  const stage = document.createElement("div");
+  stage.setAttribute("data-export-stage", "1");
+  stage.style.cssText = [
     "position:fixed",
-    "left:0",
+    "left:-20000px",       // off-screen but rendered
     "top:0",
     `width:${SLIDE_W}px`,
     `height:${SLIDE_H}px`,
     "overflow:hidden",
-    "z-index:-9999",
-    "pointer-events:none",
-    "opacity:0",
     "background:#ffffff",
-    "font-family:'Inter',sans-serif",
+    "z-index:0",
+    // KEEP visible — opacity 1, no display:none, no visibility:hidden
+    "opacity:1",
+    "transform:none",
   ].join(";");
-  document.body.appendChild(container);
+  document.body.appendChild(stage);
 
   let root: Root | null = null;
   try {
-    root = createRoot(container);
+    root = createRoot(stage);
     root.render(createElement(SlideRenderer, { slide, theme }) as any);
 
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-    await new Promise((r) => setTimeout(r, 50));
+    // Two RAFs to guarantee React commit + browser paint
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+    await new Promise((r) => setTimeout(r, 80));
 
-    if ((document as any).fonts?.ready) await (document as any).fonts.ready;
+    if ((document as any).fonts?.ready) {
+      try { await (document as any).fonts.ready; } catch {}
+    }
 
-    // Wait for inline (data:) images to decode — they're already in memory
-    const imgs = Array.from(container.querySelectorAll("img"));
+    // Wait for inlined images to fully decode
+    const imgs = Array.from(stage.querySelectorAll("img"));
     await Promise.all(
       imgs.map((img) => {
         if (img.complete && img.naturalWidth > 0) return Promise.resolve();
@@ -119,28 +110,31 @@ async function renderStructuredSlideOffscreen(
           if (typeof (img as any).decode === "function") {
             (img as any).decode().then(done).catch(done);
           }
-          setTimeout(done, 4000);
+          setTimeout(done, 5000);
         });
       })
     );
 
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 120));
 
-    return await html2canvas(container, {
+    return await html2canvas(stage, {
       width: SLIDE_W,
       height: SLIDE_H,
       windowWidth: SLIDE_W,
       windowHeight: SLIDE_H,
+      x: 0,
+      y: 0,
       scale: 2,
       useCORS: true,
       allowTaint: false,
       backgroundColor: "#ffffff",
       logging: false,
-      imageTimeout: 5000,
+      imageTimeout: 8000,
+      foreignObjectRendering: false,
     });
   } finally {
     if (root) try { root.unmount(); } catch {}
-    if (container.parentNode) container.parentNode.removeChild(container);
+    if (stage.parentNode) stage.parentNode.removeChild(stage);
   }
 }
 
@@ -153,12 +147,10 @@ export async function exportSlidesToPdf(content: any) {
     toast.error("No hay diapositivas para exportar");
     return;
   }
-
   const isStructured = isStructuredPresentation(content);
-  const toastId = toast.loading(`Preparando imágenes...`);
+  const toastId = toast.loading("Preparando imágenes...");
 
   try {
-    // Step 1 — pre-fetch every remote image as base64
     const inlined = isStructured ? await inlineAllImages(content) : content;
     const theme: SlideTheme = inlined?.theme || DEFAULT_THEME;
 
@@ -171,7 +163,7 @@ export async function exportSlidesToPdf(content: any) {
       if (idx > 0) doc.addPage();
 
       try {
-        const canvas = await renderStructuredSlideOffscreen(inlined.slides[idx], theme);
+        const canvas = await renderSlideToCanvas(inlined.slides[idx], theme);
         const imgData = canvas.toDataURL("image/jpeg", 0.92);
         doc.addImage(imgData, "JPEG", 0, 0, SLIDE_W, SLIDE_H);
       } catch (e) {
@@ -184,7 +176,7 @@ export async function exportSlidesToPdf(content: any) {
     }
 
     doc.save(`${sanitizeFilename(inlined?.title || "Diapositivas")}.pdf`);
-    toast.success("PDF descargado exitosamente", { id: toastId });
+    toast.success("PDF descargado", { id: toastId });
   } catch (e: any) {
     console.error("PDF export error:", e);
     toast.error("Error al exportar PDF: " + e.message, { id: toastId });
@@ -197,9 +189,8 @@ export async function exportSlidesToPptx(content: any) {
     toast.error("No hay diapositivas para exportar");
     return;
   }
-
   const isStructured = isStructuredPresentation(content);
-  const toastId = toast.loading(`Preparando imágenes...`);
+  const toastId = toast.loading("Preparando imágenes...");
 
   try {
     const inlined = isStructured ? await inlineAllImages(content) : content;
@@ -215,7 +206,7 @@ export async function exportSlidesToPptx(content: any) {
       toast.loading(`Generando PPTX (${idx + 1}/${total})...`, { id: toastId });
       const slide = pres.addSlide();
       try {
-        const canvas = await renderStructuredSlideOffscreen(inlined.slides[idx], theme);
+        const canvas = await renderSlideToCanvas(inlined.slides[idx], theme);
         const imgData = canvas.toDataURL("image/png");
         slide.addImage({ data: imgData, x: 0, y: 0, w: "100%", h: "100%" });
       } catch (e) {
@@ -228,7 +219,7 @@ export async function exportSlidesToPptx(content: any) {
 
     const fileName = sanitizeFilename(inlined?.title || "Diapositivas");
     await pres.writeFile({ fileName: `${fileName}.pptx` });
-    toast.success("Presentación PPTX descargada exitosamente", { id: toastId });
+    toast.success("PPTX descargado", { id: toastId });
   } catch (e: any) {
     console.error("PPTX export error:", e);
     toast.error("Error al exportar PPTX: " + e.message, { id: toastId });

@@ -8,93 +8,158 @@ interface Props {
   onFieldChange?: (path: string, value: any) => void;
 }
 
+/**
+ * BIG NUMBER — dramatic centered number on color block, with optional image
+ * faded on the side. Diagonal accent stripe for visual rhythm.
+ */
 export function BigNumberLayout({ slide, theme, editable, onFieldChange }: Props) {
+  const imgUrl = slide.image?.url;
+
   return (
     <div
-      className="w-full h-full grid"
-      style={{
-        gridTemplateColumns: "1fr 1fr",
-        background: theme.background,
-      }}
+      className="w-full h-full relative overflow-hidden"
+      style={{ background: theme.primary }}
     >
-      {/* Left: gigantic number */}
+      {/* Faded background image */}
+      {imgUrl && (
+        <img
+          src={imgUrl}
+          alt=""
+          crossOrigin="anonymous"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: 0.18,
+          }}
+        />
+      )}
+      {/* Diagonal accent stripe */}
       <div
-        className="flex items-center justify-center"
         style={{
-          background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`,
-          padding: "60px",
+          position: "absolute",
+          top: -100,
+          right: -100,
+          width: 500,
+          height: 500,
+          background: `${theme.accent}25`,
+          transform: "rotate(35deg)",
+          borderRadius: 40,
+        }}
+      />
+
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          padding: "60px 80px",
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto",
+          color: "white",
         }}
       >
-        <EditableText
-          as="div"
-          value={slide.bigNumber || "0"}
-          editable={editable}
-          onChange={(v) => onFieldChange?.("bigNumber", v)}
-          placeholder="42%"
+        {/* Top: small label */}
+        <div
           style={{
-            fontFamily: theme.fontHeading,
-            fontSize: "200px",
-            fontWeight: 800,
-            color: "white",
-            lineHeight: 1,
-            textShadow: "0 4px 24px rgba(0,0,0,0.2)",
+            fontFamily: theme.fontBody,
+            fontSize: "13px",
+            fontWeight: 600,
+            letterSpacing: "2px",
+            textTransform: "uppercase",
+            color: theme.accent,
           }}
-        />
-      </div>
-      {/* Right: explanation */}
-      <div
-        className="flex flex-col justify-center"
-        style={{ padding: "60px 70px" }}
-      >
-        <EditableText
-          as="h2"
-          value={slide.title}
-          editable={editable}
-          onChange={(v) => onFieldChange?.("title", v)}
-          placeholder="Título"
+        >
+          Dato clave
+        </div>
+
+        {/* Center: gigantic number + title */}
+        <div
           style={{
-            fontFamily: theme.fontHeading,
-            fontSize: "32px",
-            fontWeight: 700,
-            color: theme.text,
-            lineHeight: 1.2,
-            marginBottom: "12px",
-            display: "block",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "flex-start",
           }}
-        />
-        {(slide.subtitle || editable) && (
+        >
+          <EditableText
+            as="div"
+            value={slide.bigNumber || "0"}
+            editable={editable}
+            onChange={(v) => onFieldChange?.("bigNumber", v)}
+            placeholder="42%"
+            style={{
+              fontFamily: theme.fontHeading,
+              fontSize: "240px",
+              fontWeight: 900,
+              color: "white",
+              lineHeight: 0.9,
+              letterSpacing: "-6px",
+              marginBottom: "20px",
+              textShadow: "0 4px 30px rgba(0,0,0,0.3)",
+              display: "block",
+            }}
+          />
+          <EditableText
+            as="h2"
+            value={slide.title}
+            editable={editable}
+            onChange={(v) => onFieldChange?.("title", v)}
+            placeholder="Título"
+            style={{
+              fontFamily: theme.fontHeading,
+              fontSize: "32px",
+              fontWeight: 700,
+              color: "white",
+              lineHeight: 1.2,
+              marginBottom: "12px",
+              maxWidth: "780px",
+              display: "block",
+            }}
+          />
+          {(slide.subtitle || editable) && (
+            <EditableText
+              as="p"
+              value={slide.subtitle || ""}
+              editable={editable}
+              onChange={(v) => onFieldChange?.("subtitle", v)}
+              placeholder="Subtítulo"
+              multiline
+              style={{
+                fontFamily: theme.fontBody,
+                fontSize: "18px",
+                color: theme.accent,
+                fontWeight: 600,
+                maxWidth: "780px",
+                display: "block",
+              }}
+            />
+          )}
+        </div>
+
+        {/* Bottom: explanation */}
+        {(slide.content || editable) && (
           <EditableText
             as="p"
-            value={slide.subtitle || ""}
+            value={slide.content || ""}
             editable={editable}
-            onChange={(v) => onFieldChange?.("subtitle", v)}
-            placeholder="Subtítulo"
+            onChange={(v) => onFieldChange?.("content", v)}
+            placeholder="Explicación detallada"
             multiline
             style={{
               fontFamily: theme.fontBody,
-              fontSize: "22px",
-              color: theme.secondary,
-              fontWeight: 600,
-              marginBottom: "24px",
+              fontSize: "16px",
+              color: "rgba(255,255,255,0.85)",
+              lineHeight: 1.6,
+              maxWidth: "820px",
+              borderLeft: `3px solid ${theme.accent}`,
+              paddingLeft: "20px",
               display: "block",
             }}
           />
         )}
-        <EditableText
-          as="p"
-          value={slide.content || ""}
-          editable={editable}
-          onChange={(v) => onFieldChange?.("content", v)}
-          placeholder="Explicación detallada"
-          multiline
-          style={{
-            fontFamily: theme.fontBody,
-            fontSize: "18px",
-            color: "#475569",
-            lineHeight: 1.6,
-            display: "block",
-          }}
-        />
       </div>
     </div>
   );
