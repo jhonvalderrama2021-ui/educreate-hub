@@ -300,12 +300,14 @@ export default function GenerateResource() {
 
     try {
       const effectiveType = getEffectiveResourceType();
-      const params = {
+      const palette = resourceType === "slides" ? getPaletteById(slidePalette) : null;
+      const params: any = {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
-        instructions: buildInstructions(),
+        instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
         numItems: resourceType === "slides" ? numSlides : numItems,
       };
+      if (palette) params.theme = palette.theme;
 
       let result;
       if (aiProvider === "openai") {
