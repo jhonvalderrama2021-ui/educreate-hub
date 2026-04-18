@@ -654,7 +654,13 @@ async function buildDocxContent(title: string, resourceType: string, content: an
             }
             cells.push(new TableCell({
               width: { size: cellWidth, type: WidthType.DXA },
-              shading: isBlack ? { fill: "222222", type: ShadingType.CLEAR, color: "auto" } : undefined,
+              shading: isBlack ? { fill: "FFFFFF", type: ShadingType.CLEAR, color: "auto" } : undefined,
+              borders: isBlack ? {
+                top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              } : undefined,
               verticalAlign: VerticalAlign.CENTER,
               children: para,
             }));
