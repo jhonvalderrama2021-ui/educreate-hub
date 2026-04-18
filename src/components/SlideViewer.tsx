@@ -2,26 +2,24 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SlideRenderer } from "@/components/slides/SlideRenderer";
-import { StructuredSlide, StructuredPresentation, SlideTheme, DEFAULT_THEME } from "@/lib/slide-types";
+import { StructuredSlide, SlideTheme, DEFAULT_THEME, updateSlideField } from "@/lib/slide-types";
 
 interface Props {
   slides: any[];
   title?: string;
   theme?: SlideTheme;
+  editable?: boolean;
+  onSlideChange?: (index: number, updatedSlide: StructuredSlide) => void;
 }
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
 
-/**
- * Detects if slides use the new structured format or legacy HTML format.
- * Structured slides have a `layout` field; legacy slides have `html`.
- */
 function isStructured(slides: any[]): boolean {
   return slides.length > 0 && !!slides[0]?.layout;
 }
 
-export function SlideViewer({ slides, title, theme = DEFAULT_THEME }: Props) {
+export function SlideViewer({ slides, title, theme = DEFAULT_THEME, editable, onSlideChange }: Props) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
 
