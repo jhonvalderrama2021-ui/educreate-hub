@@ -549,16 +549,16 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
   ]
 }
 
-## 6. "stats" — Estadísticas con números grandes
+## 6. "stats" — Estadísticas con números grandes (SOLO si tienes datos verificables del documento fuente)
 {
   "layout": "stats",
   "title": "Datos Importantes",
   "stats": [
-    { "value": "85%", "label": "De los estudiantes mejoran", "color": "#3B82F6" },
-    { "value": "+50", "label": "Recursos disponibles", "color": "#6366F1" },
-    { "value": "4.8", "label": "Calificación promedio", "color": "#22C55E" }
+    { "value": "85%", "label": "De los estudiantes mejoran sus calificaciones", "source": "MEN, 2023", "color": "#3B82F6" },
+    { "value": "+50", "label": "Recursos disponibles en la plataforma", "source": "Documento fuente", "color": "#6366F1" }
   ]
 }
+REGLA: cada stat DEBE incluir un campo "source" con la fuente real (ej: "DANE 2023", "MEN", "OMS 2022", "Documento fuente"). Si no puedes citar fuente real, NO uses layout "stats" — usa "list" o "grid" en su lugar.
 
 ## 7. "list" — Lista con iconos
 {
@@ -588,27 +588,65 @@ IMPORTANTE: Genera JSON ESTRUCTURADO, NO HTML. Cada diapositiva usa un layout pr
   "content": "Texto adicional de cierre"
 }
 
+## 10. "quote" — Cita destacada (gran impacto visual)
+{
+  "layout": "quote",
+  "title": "Reflexión",
+  "content": "Una cita poderosa o frase clave de 15-30 palabras que resuma una idea central del tema.",
+  "subtitle": "— Autor o contexto"
+}
+
+## 11. "imageFull" — Imagen pantalla completa con texto superpuesto
+{
+  "layout": "imageFull",
+  "title": "Título Impactante",
+  "subtitle": "Subtítulo descriptivo de una frase",
+  "image": { "query": "specific topic keywords in english", "alt": "descripción", "placement": "background" }
+}
+
+## 12. "bigNumber" — Un único número/dato gigante con explicación
+{
+  "layout": "bigNumber",
+  "title": "Dato Clave",
+  "bigNumber": "73%",
+  "subtitle": "De impacto medible en el aula",
+  "content": "Explicación de 30-60 palabras del contexto, la fuente y la relevancia educativa de este dato."
+}
+
+## 13. "twoColumnText" — Dos columnas de texto descriptivo (sin tarjetas)
+{
+  "layout": "twoColumnText",
+  "title": "Dos Perspectivas",
+  "columns": [
+    { "title": "Perspectiva A", "color": "#3B82F6", "points": ["Frase descriptiva completa.", "Otra frase con detalle."] },
+    { "title": "Perspectiva B", "color": "#EC4899", "points": ["Frase descriptiva completa.", "Otra frase con detalle."] }
+  ]
+}
+
 # REGLAS CRÍTICAS
 1. Genera EXACTAMENTE ${numItems} slides en el array "slides". Ni una más ni una menos. Cuenta antes de responder.
 2. La PRIMERA slide SIEMPRE usa layout "hero".
 3. La ÚLTIMA slide SIEMPRE usa layout "conclusion".
-4. Las ${Math.max(0, numItems - 2)} slides intermedias deben VARIAR entre layouts: grid, split, process, comparison, stats, list, timeline. NO repitas el mismo layout dos veces seguidas.
-5. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, etc.).
-6. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema).
-7. Para slides "split", incluye "image.query" con 2-4 palabras clave en INGLÉS para búsqueda en Unsplash.
-8. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
-   - Títulos de slide: 3-8 palabras claras.
-   - Subtítulos: una frase completa (10-18 palabras).
-   - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una). Explica el concepto, da contexto y un ejemplo o aplicación.
-   - "content" en split/conclusion: párrafo de 40-80 palabras con información real y educativa.
-   - Labels de stats: frase descriptiva (5-10 palabras), no solo una palabra.
-   - Puntos en comparison: frases completas, no fragmentos.
-9. Cantidad de elementos por slide:
-   - grid: 3-4 cards
-   - process: 3-5 steps
-   - stats: 3-4 stats
-   - list: 3-5 listItems
-   - comparison: exactamente 2 columns con 3-5 points cada una
-   - timeline: 3-5 events
-10. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".`;
+4. VARIEDAD OBLIGATORIA en las slides intermedias: usa al menos ${Math.min(6, Math.max(3, numItems - 3))} layouts DIFERENTES de esta lista: grid, split, process, comparison, list, timeline, quote, imageFull, bigNumber, twoColumnText.
+5. NUNCA repitas el mismo layout dos veces seguidas. NUNCA uses el mismo layout más de 2 veces en toda la presentación.
+6. Usa iconos de Material Icons válidos (school, lightbulb, eco, star, check_circle, trending_up, science, public, groups, psychology, history, build, explore, insights, etc.).
+7. Elige una paleta de colores coherente con el tema (no siempre azul: ajusta al tema — verde para naturaleza, rojo/ocre para historia, púrpura para arte).
+8. Para slides "split" e "imageFull", incluye "image.query" con 3-5 palabras clave ESPECÍFICAS en INGLÉS relacionadas al tema (ej: "ancient roman colosseum", "amazon rainforest aerial", "mathematics chalkboard equations"). NO uses queries genéricos como "education" o "school".
+9. Cada slide debe tener su propio "image.query" único — NO repitas el mismo query en varias slides.
+10. CONTENIDO RICO Y SUSTANCIAL — esto es crítico:
+    - Títulos de slide: 3-8 palabras claras.
+    - Subtítulos: una frase completa (10-18 palabras).
+    - Descripciones de cards/listItems/steps: 2-3 frases completas (25-50 palabras cada una).
+    - "content" en split/conclusion/bigNumber: párrafo de 40-80 palabras con información real y educativa.
+    - Labels de stats: frase descriptiva (5-10 palabras), nunca solo una palabra.
+    - Puntos en comparison/twoColumnText: frases completas, no fragmentos.
+11. Cantidad de elementos por slide:
+    - grid: 3-4 cards
+    - process: 3-5 steps
+    - stats: 3-4 stats (SOLO con campo "source")
+    - list: 3-5 listItems
+    - comparison/twoColumnText: exactamente 2 columns con 3-5 points cada una
+    - timeline: 3-5 events
+12. El contenido debe ser informativo, real y educativamente valioso — NO uses placeholders ni texto genérico tipo "Descripción 1".
+13. Si NO se proporciona documento fuente, EVITA usar el layout "stats" — usa "list", "grid", "bigNumber" (con datos generales conocidos) o "quote" en su lugar.`;
 }
