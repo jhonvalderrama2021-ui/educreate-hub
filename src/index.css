@@ -113,4 +113,24 @@
   .glass-card {
     @apply bg-card/80 backdrop-blur-lg border border-border/50;
   }
+
+  /* Inline-edit affordance for slide content */
+  .slide-editable {
+    position: relative;
+    transition: background 0.15s, box-shadow 0.15s, outline 0.15s;
+  }
+  .slide-editable:hover {
+    background: rgba(99, 102, 241, 0.06);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+  }
+  .slide-editable:focus {
+    background: rgba(99, 102, 241, 0.1);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.6);
+    outline: none;
+  }
+  .slide-editable:empty::before {
+    content: attr(data-placeholder);
+    color: rgba(100, 116, 139, 0.5);
+    font-style: italic;
+  }
 }
