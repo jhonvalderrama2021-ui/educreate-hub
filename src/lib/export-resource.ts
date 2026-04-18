@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, Footer, PageBreak } from "docx";
+import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 
