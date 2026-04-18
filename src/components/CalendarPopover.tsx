@@ -119,10 +119,10 @@ export function CalendarPopover() {
     fetchNotes();
   };
 
-  // Build a 7-day "compass": 3 days before today, today centered, 3 days after
-  const compassDays = useMemo(() => {
+  // Build a 31-day strip centered on today so the user can scroll/drag horizontally
+  const stripDays = useMemo(() => {
     const days: Date[] = [];
-    for (let i = -3; i <= 3; i++) {
+    for (let i = -15; i <= 15; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() + i);
       days.push(d);
@@ -132,36 +132,96 @@ export function CalendarPopover() {
 
   const hasNoteOn = (d: Date) => notes.some((n) => isSameDay(parseISO(n.date), d));
 
+  // Drag-to-scroll
+  const scrollerRef = useState<HTMLDivElement | null>(null);
+  const [scrollerEl, setScrollerEl] = [scrollerRef[0], scrollerRef[1]];
+  const dragRef = useState<{ active: boolean; startX: number; startScroll: number; moved: number }>({
+    active: false,
+    startX: 0,
+    startScroll: 0,
+    moved: 0,
+  });
+  const [drag, setDrag] = [dragRef[0], dragRef[1]];
+
+  // Center today on mount
+  useEffect(() => {
+    if (!scrollerEl) return;
+    const todayEl = scrollerEl.querySelector<HTMLElement>("[data-today='true']");
+    if (todayEl) {
+      const offset = todayEl.offsetLeft - scrollerEl.clientWidth / 2 + todayEl.clientWidth / 2;
+      scrollerEl.scrollTo({ left: offset, behavior: "auto" });
+    }
+  }, [scrollerEl]);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!scrollerEl) return;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    setDrag({ active: true, startX: e.clientX, startScroll: scrollerEl.scrollLeft, moved: 0 });
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.active || !scrollerEl) return;
+    const delta = e.clientX - drag.startX;
+    scrollerEl.scrollLeft = drag.startScroll - delta;
+    if (Math.abs(delta) > 4) {
+      setDrag({ ...drag, moved: Math.abs(delta) });
+    }
+  };
+  const onPointerUp = () => setDrag({ ...drag, active: false });
+
+  const openIfNotDragged = (e: React.MouseEvent) => {
+    if (drag.moved > 5) {
+      e.preventDefault();
+      e.stopPropagation();
+      setDrag({ active: false, startX: 0, startScroll: 0, moved: 0 });
+    }
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <div
+          ref={setScrollerEl}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClickCapture={openIfNotDragged}
+          role="button"
+          tabIndex={0}
           aria-label="Abrir calendario de notas"
-          className="group flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-xl hover:bg-muted/60 transition-colors"
+          className={cn(
+            "group flex items-stretch gap-1 w-full overflow-x-auto py-1.5 px-2 rounded-xl",
+            "hover:bg-muted/40 transition-colors select-none cursor-grab",
+            drag.active && "cursor-grabbing bg-muted/40",
+            "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]",
+          )}
         >
-          {compassDays.map((d, i) => {
+          {stripDays.map((d) => {
             const isToday = isSameDay(d, today);
             const marked = hasNoteOn(d);
-            const distance = Math.abs(i - 3); // 0 center, up to 3 edges
-            const opacity = isToday ? 1 : distance === 1 ? 0.85 : distance === 2 ? 0.6 : 0.4;
+            const dow = d.getDay(); // 0 sun, 6 sat
+            const isWeekend = dow === 0 || dow === 6;
             return (
               <div
                 key={d.toISOString()}
-                style={{ opacity }}
+                data-today={isToday || undefined}
                 className={cn(
-                  "relative flex flex-col items-center justify-center rounded-lg transition-all",
+                  "relative flex flex-col items-center justify-center rounded-lg shrink-0 min-w-[36px] px-1.5 py-0.5 transition-colors",
                   isToday
-                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/30 px-2 py-1 scale-110"
-                    : "px-1.5 py-0.5 text-foreground group-hover:scale-105",
-                  distance >= 3 && "hidden md:flex",
-                  distance === 2 && "hidden sm:flex",
+                    ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+                    : isWeekend
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-foreground/70 hover:text-foreground",
                 )}
               >
                 <span
                   className={cn(
                     "text-[9px] font-semibold uppercase tracking-wider leading-none",
-                    isToday ? "text-primary-foreground/90" : "text-muted-foreground",
+                    isToday
+                      ? "text-primary/80"
+                      : isWeekend
+                        ? "text-amber-600/80 dark:text-amber-400/80"
+                        : "text-muted-foreground",
                   )}
                 >
                   {format(d, "EEEEE", { locale: es })}
@@ -169,7 +229,7 @@ export function CalendarPopover() {
                 <span
                   className={cn(
                     "text-xs font-bold leading-tight mt-0.5",
-                    isToday && "text-base",
+                    isToday && "text-sm",
                   )}
                 >
                   {d.getDate()}
@@ -178,7 +238,7 @@ export function CalendarPopover() {
                   <span
                     className={cn(
                       "absolute -bottom-0.5 h-1 w-1 rounded-full",
-                      isToday ? "bg-primary-foreground" : "bg-primary",
+                      isToday ? "bg-primary" : isWeekend ? "bg-amber-500" : "bg-primary",
                     )}
                     aria-hidden
                   />
@@ -186,8 +246,7 @@ export function CalendarPopover() {
               </div>
             );
           })}
-          <CalendarIcon className="h-3.5 w-3.5 ml-1 text-muted-foreground group-hover:text-primary transition-colors" />
-        </button>
+        </div>
       </PopoverTrigger>
       <PopoverContent
         align="end"
