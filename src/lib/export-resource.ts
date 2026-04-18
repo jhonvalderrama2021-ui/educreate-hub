@@ -234,7 +234,8 @@ export async function exportToPdf(
 
       // ---- Answer sheet on its own page (teacher only) ----
       if (content.questions?.length) {
-        newPage();
+        // Only break to new page if there isn't enough room left
+        if (y > topOffset + 20) newPage();
         addText("HOJA DE RESPUESTAS — USO DEL DOCENTE", 14, true);
         y += 4;
         const cols = 4;
