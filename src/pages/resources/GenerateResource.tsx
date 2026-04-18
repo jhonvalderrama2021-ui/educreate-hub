@@ -120,6 +120,7 @@ const RESOURCE_FIELDS: Record<string, string[]> = {
 
 export default function GenerateResource() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
 

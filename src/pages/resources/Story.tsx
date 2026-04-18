@@ -29,6 +29,7 @@ export interface StoryContent {
 
 export default function Story() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [character, setCharacter] = useState("");
   const [characterType, setCharacterType] = useState("humano");

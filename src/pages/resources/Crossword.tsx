@@ -44,6 +44,7 @@ export interface CrosswordContent {
 
 export default function Crossword() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [theme, setTheme] = useState("");
   const [totalWords, setTotalWords] = useState(10);
   const [acrossCount, setAcrossCount] = useState(5);
