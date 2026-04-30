@@ -147,7 +147,7 @@ export default function TakeCourseExam() {
   if (submitted && result) {
     return (
       <div className="max-w-3xl mx-auto animate-fade-in space-y-6">
-        <button onClick={() => navigate(`/courses/${courseId}/student`)} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+        <button onClick={() => navigate(`/resources/courses/${courseId}/student`)} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" /> Volver al curso
         </button>
         <div className="glass-card rounded-xl p-8 text-center">
@@ -189,7 +189,7 @@ export default function TakeCourseExam() {
               })}
             </div>
           )}
-          <Button onClick={() => navigate(`/courses/${courseId}/student`)} className="mt-6 gradient-primary">Volver al curso</Button>
+          <Button onClick={() => navigate(`/resources/courses/${courseId}/student`)} className="mt-6 gradient-primary">Volver al curso</Button>
         </div>
       </div>
     );
@@ -198,7 +198,7 @@ export default function TakeCourseExam() {
   return (
     <div className="max-w-3xl mx-auto animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
-        <button onClick={() => { if (confirm("¿Salir? Tus respuestas no se guardarán.")) navigate(`/courses/${courseId}/student`); }}
+        <button onClick={() => { if (confirm("¿Salir? Tus respuestas no se guardarán.")) navigate(`/resources/courses/${courseId}/student`); }}
           className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" /> Salir
         </button>

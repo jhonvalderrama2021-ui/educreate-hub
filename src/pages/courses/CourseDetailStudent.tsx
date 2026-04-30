@@ -59,9 +59,9 @@ export default function CourseDetailStudent() {
 
   const open = (r: CourseResource) => {
     if (EVALUABLE.includes(r.resource_type)) {
-      navigate(`/courses/${courseId}/take/${r.id}`);
+      navigate(`/resources/courses/${courseId}/take/${r.id}`);
     } else {
-      navigate(`/courses/${courseId}/view/${r.id}`);
+      navigate(`/resources/courses/${courseId}/view/${r.id}`);
     }
   };
 
@@ -69,7 +69,7 @@ export default function CourseDetailStudent() {
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
-      <button onClick={() => navigate("/courses")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+      <button onClick={() => navigate("/resources/courses")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Mis cursos
       </button>
 

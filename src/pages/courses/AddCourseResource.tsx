@@ -65,7 +65,7 @@ export default function AddCourseResource() {
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
-      <button onClick={() => navigate(`/courses/${courseId}`)} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+      <button onClick={() => navigate(`/resources/courses/${courseId}`)} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Volver al curso
       </button>
 

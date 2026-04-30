@@ -107,7 +107,7 @@ export default function CourseDetailTeacher() {
     const { error } = await (supabase as any).from("mini_courses").delete().eq("id", courseId);
     if (error) { toast.error(error.message); return; }
     toast.success("Curso eliminado");
-    navigate("/courses");
+    navigate("/resources/courses");
   };
 
   const copyCode = () => {
@@ -120,7 +120,7 @@ export default function CourseDetailTeacher() {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
-      <button onClick={() => navigate("/courses")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+      <button onClick={() => navigate("/resources/courses")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
         <ArrowLeft className="h-4 w-4" /> Volver
       </button>
 
@@ -144,7 +144,7 @@ export default function CourseDetailTeacher() {
 
         <TabsContent value="resources" className="space-y-4 mt-4">
           <div className="flex justify-end">
-            <Button onClick={() => navigate(`/courses/${courseId}/add-resource`)} className="gradient-primary">
+            <Button onClick={() => navigate(`/resources/courses/${courseId}/add-resource`)} className="gradient-primary">
               <Plus className="h-4 w-4 mr-2" />Agregar recurso
             </Button>
           </div>
@@ -207,7 +207,7 @@ export default function CourseDetailTeacher() {
                     <TableCell className="text-muted-foreground">{e.profile?.email || "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">{new Date(e.enrolled_at).toLocaleDateString()}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/courses/${courseId}/student-report/${e.student_id}`)}>
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/resources/courses/${courseId}/student-report/${e.student_id}`)}>
                         Ver detalle
                       </Button>
                     </TableCell>

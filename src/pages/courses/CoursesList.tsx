@@ -70,7 +70,7 @@ export default function CoursesList() {
       queryClient.invalidateQueries({ queryKey: ["mini_courses_own", user!.id] });
       setOpenCreate(false);
       setName(""); setDescription(""); setCode(generateAccessCode());
-      navigate(`/courses/${data.id}`);
+      navigate(`/resources/courses/${data.id}`);
     } catch (e: any) {
       toast.error(e.message || "Error al crear curso");
     } finally { setSaving(false); }
@@ -87,7 +87,7 @@ export default function CoursesList() {
       toast.success("¡Inscripción exitosa!");
       queryClient.invalidateQueries({ queryKey: ["mini_courses_enrolled", user!.id] });
       setOpenJoin(false); setJoinCode("");
-      navigate(`/courses/${data}/student`);
+      navigate(`/resources/courses/${data}/student`);
     } catch (e: any) {
       toast.error(e.message || "Clave inválida");
     } finally { setSaving(false); }
@@ -167,7 +167,7 @@ export default function CoursesList() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {ownCourses.map((c) => (
-                <button key={c.id} onClick={() => navigate(`/courses/${c.id}`)}
+                <button key={c.id} onClick={() => navigate(`/resources/courses/${c.id}`)}
                   className="glass-card rounded-xl p-5 text-left hover:border-primary/40 transition-colors">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <BookOpen className="h-5 w-5 text-primary" />
@@ -194,7 +194,7 @@ export default function CoursesList() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {enrolled.map((c) => (
-              <button key={c.id} onClick={() => navigate(`/courses/${c.id}/student`)}
+              <button key={c.id} onClick={() => navigate(`/resources/courses/${c.id}/student`)}
                 className="glass-card rounded-xl p-5 text-left hover:border-primary/40 transition-colors">
                 <BookOpen className="h-5 w-5 text-primary mb-2" />
                 <h3 className="font-semibold text-foreground mb-1 line-clamp-1">{c.name}</h3>
