@@ -31,7 +31,12 @@ function normalizeQuestions(content: any): Question[] {
 }
 
 function getOptions(q: Question): string[] {
-  return q.options || q.opciones || [];
+  const raw: any = q.options ?? q.opciones ?? [];
+  if (Array.isArray(raw)) return raw.map((o) => (typeof o === "string" ? o : o?.text ?? o?.label ?? String(o)));
+  if (raw && typeof raw === "object") {
+    return Object.values(raw).map((o: any) => (typeof o === "string" ? o : o?.text ?? o?.label ?? String(o)));
+  }
+  return [];
 }
 function getText(q: Question): string {
   return q.text || q.question || q.enunciado || "";
