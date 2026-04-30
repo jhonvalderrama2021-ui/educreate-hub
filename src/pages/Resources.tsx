@@ -14,6 +14,13 @@ import BotList from "@/pages/resources/BotList";
 import BotChat from "@/pages/resources/BotChat";
 import Crossword from "@/pages/resources/Crossword";
 import Story from "@/pages/resources/Story";
+import CoursesList from "@/pages/courses/CoursesList";
+import CourseDetailTeacher from "@/pages/courses/CourseDetailTeacher";
+import CourseDetailStudent from "@/pages/courses/CourseDetailStudent";
+import AddCourseResource from "@/pages/courses/AddCourseResource";
+import TakeCourseExam from "@/pages/courses/TakeCourseExam";
+import ViewCourseResource from "@/pages/courses/ViewCourseResource";
+import StudentReport from "@/pages/courses/StudentReport";
 
 function ResourcesHome() {
   return (
@@ -94,6 +101,13 @@ export default function Resources() {
               <Route path="bot-chat/:botId" element={<BotChat />} />
               <Route path="crossword" element={<Crossword />} />
               <Route path="story" element={<Story />} />
+              <Route path="courses" element={<CoursesList />} />
+              <Route path="courses/:courseId" element={<CourseDetailTeacher />} />
+              <Route path="courses/:courseId/student" element={<CourseDetailStudent />} />
+              <Route path="courses/:courseId/add-resource" element={<AddCourseResource />} />
+              <Route path="courses/:courseId/take/:courseResourceId" element={<TakeCourseExam />} />
+              <Route path="courses/:courseId/view/:courseResourceId" element={<ViewCourseResource />} />
+              <Route path="courses/:courseId/student-report/:studentId" element={<StudentReport />} />
             </Routes>
           </main>
         </div>
