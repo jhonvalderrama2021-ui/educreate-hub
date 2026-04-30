@@ -106,6 +106,107 @@ export type Database = {
         }
         Relationships: []
       }
+      course_enrollments: {
+        Row: {
+          course_id: string
+          enrolled_at: string
+          enrolled_by: string | null
+          id: string
+          student_id: string
+        }
+        Insert: {
+          course_id: string
+          enrolled_at?: string
+          enrolled_by?: string | null
+          id?: string
+          student_id: string
+        }
+        Update: {
+          course_id?: string
+          enrolled_at?: string
+          enrolled_by?: string | null
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "mini_courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_resources: {
+        Row: {
+          closes_at: string | null
+          course_id: string
+          created_at: string
+          id: string
+          max_attempts: number
+          opens_at: string | null
+          position: number
+          resource_id: string
+          resource_type: string
+          show_feedback: boolean
+          show_grade: boolean
+          shuffle_questions: boolean
+          time_limit_minutes: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          closes_at?: string | null
+          course_id: string
+          created_at?: string
+          id?: string
+          max_attempts?: number
+          opens_at?: string | null
+          position?: number
+          resource_id: string
+          resource_type: string
+          show_feedback?: boolean
+          show_grade?: boolean
+          shuffle_questions?: boolean
+          time_limit_minutes?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          closes_at?: string | null
+          course_id?: string
+          created_at?: string
+          id?: string
+          max_attempts?: number
+          opens_at?: string | null
+          position?: number
+          resource_id?: string
+          resource_type?: string
+          show_feedback?: boolean
+          show_grade?: boolean
+          shuffle_questions?: boolean
+          time_limit_minutes?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_resources_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "mini_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_resources_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "generated_resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_resources: {
         Row: {
           content: Json
@@ -139,6 +240,39 @@ export type Database = {
           title?: string
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      mini_courses: {
+        Row: {
+          access_code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          teacher_id?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -189,6 +323,69 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      resource_submissions: {
+        Row: {
+          answers: Json
+          attempt_number: number
+          course_id: string
+          course_resource_id: string
+          feedback: Json | null
+          id: string
+          max_score: number | null
+          resource_type: string
+          score: number | null
+          started_at: string
+          student_id: string
+          submitted_at: string
+          time_spent_seconds: number | null
+        }
+        Insert: {
+          answers?: Json
+          attempt_number?: number
+          course_id: string
+          course_resource_id: string
+          feedback?: Json | null
+          id?: string
+          max_score?: number | null
+          resource_type: string
+          score?: number | null
+          started_at?: string
+          student_id: string
+          submitted_at?: string
+          time_spent_seconds?: number | null
+        }
+        Update: {
+          answers?: Json
+          attempt_number?: number
+          course_id?: string
+          course_resource_id?: string
+          feedback?: Json | null
+          id?: string
+          max_score?: number | null
+          resource_type?: string
+          score?: number | null
+          started_at?: string
+          student_id?: string
+          submitted_at?: string
+          time_spent_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_submissions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "mini_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "resource_submissions_course_resource_id_fkey"
+            columns: ["course_resource_id"]
+            isOneToOne: false
+            referencedRelation: "course_resources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_ai_preferences: {
         Row: {
@@ -251,6 +448,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_course_teacher: {
+        Args: { _course_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_enrolled: {
+        Args: { _course_id: string; _user_id: string }
+        Returns: boolean
+      }
+      join_course_by_code: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "docente" | "estudiante"
