@@ -4,12 +4,18 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu,
   SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar,
 } from "@/components/ui/sidebar";
+import { useUserRole } from "@/hooks/useUserRole";
 
-const modules = [
+// Modules visible only to docentes/admins
+const teacherModules = [
   { title: "Plan de clase", url: "/resources/generate?type=lesson_plan", icon: ClipboardList, description: "Genera planes de clase con IA" },
   { title: "Rúbricas", url: "/resources/generate?type=rubric", icon: Table2, description: "Genera rúbricas de evaluación con IA" },
   { title: "Exámenes", url: "/resources/generate?type=icfes", icon: FileCheck, description: "Genera exámenes con IA" },
   { title: "Talleres", url: "/resources/generate?type=workshop", icon: FileEdit, description: "Genera talleres educativos con IA" },
+];
+
+// Modules visible to everyone (including students)
+const sharedCreateModules = [
   { title: "Diapositivas", url: "/resources/generate?type=slides", icon: Presentation, description: "Genera presentaciones con IA" },
   { title: "Crear Bot", url: "/resources/bots", icon: Bot, description: "Crea bots educativos especializados" },
 ];
@@ -27,6 +33,14 @@ const managementModules = [
 export function ResourcesSidebar() {
   const { state, toggleSidebar } = useSidebar();
   const collapsed = state === "collapsed";
+  const { isDocente, loading: roleLoading } = useUserRole();
+
+  // Students see only shared creation modules; teachers/admins see all
+  const modules = roleLoading
+    ? []
+    : isDocente
+    ? [...teacherModules, ...sharedCreateModules]
+    : sharedCreateModules;
 
   return (
     <Sidebar
