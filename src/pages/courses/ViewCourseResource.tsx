@@ -39,7 +39,7 @@ export default function ViewCourseResource() {
       </button>
       <div className="glass-card rounded-xl p-6">
         <h1 className="text-2xl font-bold text-foreground mb-4">{cr.title}</h1>
-        <ResourceContentViewer resource={resource} />
+        <ResourceContentViewer type={resource.resource_type} content={resource.content} />
       </div>
     </div>
   );
