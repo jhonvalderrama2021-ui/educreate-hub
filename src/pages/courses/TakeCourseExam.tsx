@@ -59,24 +59,28 @@ export default function TakeCourseExam() {
   const [result, setResult] = useState<{ score: number; max: number } | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
 
-  const { data: cr } = useQuery({
+  const { data: cr, error: crError, isLoading: crLoading } = useQuery({
     queryKey: ["take_cr", courseResourceId],
     enabled: !!courseResourceId,
+    retry: false,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("course_resources").select("*").eq("id", courseResourceId).single();
+        .from("course_resources").select("*").eq("id", courseResourceId).maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("Recurso del curso no encontrado o sin acceso.");
       return data as CourseResource;
     },
   });
 
-  const { data: resource } = useQuery({
+  const { data: resource, error: resError, isLoading: resLoading } = useQuery({
     queryKey: ["take_resource", cr?.resource_id],
     enabled: !!cr,
+    retry: false,
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("generated_resources").select("*").eq("id", cr!.resource_id).single();
+        .from("generated_resources").select("*").eq("id", cr!.resource_id).maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error("El contenido del examen no está disponible. Pide al docente que verifique los permisos.");
       return data;
     },
   });
