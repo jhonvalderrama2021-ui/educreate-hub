@@ -146,7 +146,30 @@ export default function TakeCourseExam() {
     setResult({ score, max });
   };
 
-  if (!cr || !resource) return <div className="p-8 text-muted-foreground">Cargando…</div>;
+  if (crError || resError) {
+    return (
+      <div className="max-w-2xl mx-auto animate-fade-in space-y-4 p-8">
+        <button onClick={() => navigate(`/resources/courses/${courseId}/student`)} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <ArrowLeft className="h-4 w-4" /> Volver al curso
+        </button>
+        <div className="glass-card rounded-xl p-6 text-center">
+          <XCircle className="h-10 w-10 text-destructive mx-auto mb-3" />
+          <h2 className="text-lg font-semibold mb-2">No se pudo cargar el examen</h2>
+          <p className="text-sm text-muted-foreground">
+            {(crError as Error)?.message || (resError as Error)?.message || "Error desconocido"}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  if (crLoading || resLoading || !cr || !resource) {
+    return (
+      <div className="p-8 flex items-center justify-center gap-3 text-muted-foreground">
+        <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        Cargando examen…
+      </div>
+    );
+  }
 
   if (submitted && result) {
     return (
