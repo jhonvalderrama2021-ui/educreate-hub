@@ -97,7 +97,7 @@ export default function CourseDetailTeacher() {
 
   const updateCourse = async (patch: Partial<MiniCourse>) => {
     const { error } = await (supabase as any).from("mini_courses").update(patch).eq("id", courseId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Curso actualizado");
     qc.invalidateQueries({ queryKey: ["mini_course", courseId] });
   };
@@ -105,7 +105,7 @@ export default function CourseDetailTeacher() {
   const deleteCourse = async () => {
     if (!confirm("Esto eliminará el curso y todas sus inscripciones, recursos y entregas. ¿Continuar?")) return;
     const { error } = await (supabase as any).from("mini_courses").delete().eq("id", courseId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Curso eliminado");
     navigate("/courses");
   };
