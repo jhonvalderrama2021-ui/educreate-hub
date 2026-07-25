@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Teachers manage course resources" ON public.course_resources;
