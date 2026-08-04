@@ -45,7 +45,7 @@ export default function Auth() {
   const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (!authLoading && user) navigate("/dashboard");
+    if (!authLoading && user) navigate("/resources");
   }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -61,7 +61,7 @@ export default function Auth() {
         });
         if (error) throw error;
         toast.success("¡Bienvenido de nuevo!");
-        navigate("/dashboard");
+        navigate("/resources");
       } else {
         const parsed = signupSchema.parse({
           username, name, email, password, confirmPassword, role, dataConsent,

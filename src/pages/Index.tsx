@@ -123,7 +123,7 @@ export default function Index() {
             className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in"
             style={{ animationDelay: "0.3s" }}
           >
-            <Link to={user ? "/dashboard" : "/auth?mode=signup"}>
+            <Link to={user ? "/resources" : "/auth?mode=signup"}>
               <Button size="lg" className="gradient-primary text-base px-8">
                 Comenzar
                 <ArrowRight className="h-4 w-4 ml-1" />
@@ -285,7 +285,7 @@ export default function Index() {
           <p className="text-muted-foreground mb-8">
             Únete a los docentes que ya están ahorrando horas de trabajo gracias a la inteligencia artificial.
           </p>
-          <Link to={user ? "/dashboard" : "/auth?mode=signup"}>
+          <Link to={user ? "/resources" : "/auth?mode=signup"}>
             <Button size="lg" className="gradient-primary text-base px-8">
               Comenzar gratis
               <ArrowRight className="h-4 w-4 ml-1" />
