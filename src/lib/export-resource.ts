@@ -319,19 +319,85 @@ export async function exportToPdf(
       if (content.summary) { addText("Resumen", 12, true); addText(content.summary, 10); }
       break;
 
-    case "lesson_plan":
+    case "lesson_plan": {
+      const list = (items: any, indent = 5, prefix = "• ") => {
+        if (!Array.isArray(items)) return;
+        items.forEach((it: string) => addText(`${prefix}${it}`, 10, false, indent));
+      };
+
       if (content.grade) addText(`Grado: ${content.grade}`, 10);
       if (content.duration) addText(`Duración: ${content.duration}`, 10);
+      if (content.topic) addText(`Tema: ${content.topic}`, 10);
+      if (content.standard) addText(`Estándar: ${content.standard}`, 9);
+      if (content.dba) addText(`DBA: ${content.dba}`, 9);
       if (content.objective) addText(`Objetivo: ${content.objective}`, 10);
       y += 3;
+
+      if (Array.isArray(content.learningGoals) && content.learningGoals.length) {
+        addText("Metas de aprendizaje", 12, true);
+        list(content.learningGoals);
+        y += 3;
+      }
+      if (Array.isArray(content.priorKnowledge) && content.priorKnowledge.length) {
+        addText("Saberes previos", 12, true);
+        list(content.priorKnowledge);
+        y += 3;
+      }
+      if (Array.isArray(content.materials) && content.materials.length) {
+        addText("Materiales", 12, true);
+        list(content.materials);
+        y += 3;
+      }
+
       content.phases?.forEach((p: any) => {
         addText(`${p.name} (${p.duration})`, 12, true);
-        addText(p.activities, 10, false, 5);
+        if (p.purpose) addText(p.purpose, 9, false, 5);
+        if (Array.isArray(p.teacherActions) && p.teacherActions.length) {
+          addText("Docente:", 10, true, 5);
+          list(p.teacherActions, 10, "- ");
+        }
+        if (Array.isArray(p.studentActions) && p.studentActions.length) {
+          addText("Estudiantes:", 10, true, 5);
+          list(p.studentActions, 10, "- ");
+        }
+        if (Array.isArray(p.questions) && p.questions.length) {
+          addText("Preguntas orientadoras:", 10, true, 5);
+          list(p.questions, 10, "- ");
+        }
+        // Formato anterior
+        if (p.activities) addText(p.activities, 10, false, 5);
         if (p.resources) addText(`Recursos: ${p.resources}`, 9, false, 5);
         y += 3;
       });
-      if (content.evaluation) { addText("Evaluación", 12, true); addText(content.evaluation, 10); }
+
+      if (content.differentiation?.support || content.differentiation?.extension) {
+        addText("Atención a la diversidad", 12, true);
+        if (content.differentiation.support) addText(`Apoyo: ${content.differentiation.support}`, 10, false, 5);
+        if (content.differentiation.extension) addText(`Profundización: ${content.differentiation.extension}`, 10, false, 5);
+        y += 3;
+      }
+
+      if (content.evaluation) {
+        addText("Evaluación", 12, true);
+        if (typeof content.evaluation === "string") {
+          addText(content.evaluation, 10);
+        } else {
+          if (content.evaluation.type) addText(`Tipo: ${content.evaluation.type}`, 10, false, 5);
+          if (content.evaluation.instrument) addText(`Instrumento: ${content.evaluation.instrument}`, 10, false, 5);
+          content.evaluation.criteria?.forEach((c: any) => {
+            addText(`• ${c.criterion}: ${c.indicator}`, 10, false, 5);
+          });
+        }
+        y += 3;
+      }
+
+      if (content.homework) { addText("Tarea", 12, true); addText(content.homework, 10); y += 3; }
+      if (Array.isArray(content.references) && content.references.length) {
+        addText("Referencias", 12, true);
+        list(content.references);
+      }
       break;
+    }
 
     case "rubric":
       if (content.objective) addText(`Objetivo: ${content.objective}`, 10);
@@ -685,17 +751,86 @@ async function buildDocxContent(title: string, resourceType: string, content: an
       }
       break;
 
-    case "lesson_plan":
-      if (content.grade) children.push(new Paragraph({ children: [new TextRun(`Grado: ${content.grade}`)] }));
-      if (content.duration) children.push(new Paragraph({ children: [new TextRun(`Duración: ${content.duration}`)] }));
-      if (content.objective) children.push(new Paragraph({ children: [new TextRun(`Objetivo: ${content.objective}`)] }));
+    case "lesson_plan": {
+      const meta = (label: string, value?: string) => {
+        if (value) children.push(new Paragraph({ children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun(value)] }));
+      };
+      const heading = (text: string) =>
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(text)] }));
+      const bullets = (items: any, indent = 400) => {
+        if (!Array.isArray(items)) return;
+        items.forEach((it: string) =>
+          children.push(new Paragraph({ indent: { left: indent }, children: [new TextRun(`• ${it}`)] })));
+      };
+
+      meta("Grado", content.grade);
+      meta("Duración", content.duration);
+      meta("Tema", content.topic);
+      meta("Estándar", content.standard);
+      meta("DBA", content.dba);
+      meta("Objetivo", content.objective);
       children.push(new Paragraph({ children: [] }));
+
+      if (Array.isArray(content.learningGoals) && content.learningGoals.length) {
+        heading("Metas de aprendizaje");
+        bullets(content.learningGoals);
+      }
+      if (Array.isArray(content.priorKnowledge) && content.priorKnowledge.length) {
+        heading("Saberes previos");
+        bullets(content.priorKnowledge);
+      }
+      if (Array.isArray(content.materials) && content.materials.length) {
+        heading("Materiales");
+        bullets(content.materials);
+      }
+
       content.phases?.forEach((p: any) => {
-        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun(`${p.name} (${p.duration})`)] }));
-        children.push(new Paragraph({ children: [new TextRun(p.activities)] }));
+        heading(`${p.name} (${p.duration})`);
+        if (p.purpose) children.push(new Paragraph({ children: [new TextRun({ text: p.purpose, italics: true })] }));
+        if (Array.isArray(p.teacherActions) && p.teacherActions.length) {
+          children.push(new Paragraph({ children: [new TextRun({ text: "Docente", bold: true })] }));
+          bullets(p.teacherActions);
+        }
+        if (Array.isArray(p.studentActions) && p.studentActions.length) {
+          children.push(new Paragraph({ children: [new TextRun({ text: "Estudiantes", bold: true })] }));
+          bullets(p.studentActions);
+        }
+        if (Array.isArray(p.questions) && p.questions.length) {
+          children.push(new Paragraph({ children: [new TextRun({ text: "Preguntas orientadoras", bold: true })] }));
+          bullets(p.questions);
+        }
+        // Formato anterior
+        if (p.activities) children.push(new Paragraph({ children: [new TextRun(p.activities)] }));
         if (p.resources) children.push(new Paragraph({ children: [new TextRun({ text: `Recursos: ${p.resources}`, italics: true })] }));
       });
+
+      if (content.differentiation?.support || content.differentiation?.extension) {
+        heading("Atención a la diversidad");
+        meta("Apoyo", content.differentiation.support);
+        meta("Profundización", content.differentiation.extension);
+      }
+
+      if (content.evaluation) {
+        heading("Evaluación");
+        if (typeof content.evaluation === "string") {
+          children.push(new Paragraph({ children: [new TextRun(content.evaluation)] }));
+        } else {
+          meta("Tipo", content.evaluation.type);
+          meta("Instrumento", content.evaluation.instrument);
+          bullets(content.evaluation.criteria?.map((c: any) => `${c.criterion}: ${c.indicator}`));
+        }
+      }
+
+      if (content.homework) {
+        heading("Tarea");
+        children.push(new Paragraph({ children: [new TextRun(content.homework)] }));
+      }
+      if (Array.isArray(content.references) && content.references.length) {
+        heading("Referencias");
+        bullets(content.references);
+      }
       break;
+    }
 
     case "rubric":
       if (content.objective) children.push(new Paragraph({ children: [new TextRun(`Objetivo: ${content.objective}`)] }));

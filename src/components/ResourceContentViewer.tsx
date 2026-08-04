@@ -231,38 +231,160 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
         </div>
       );
 
-    case "lesson_plan":
+    case "lesson_plan": {
+      // Lista simple reutilizable para los campos que ahora son arreglos.
+      const Bullets = ({ items, icon }: { items?: string[]; icon?: string }) =>
+        Array.isArray(items) && items.length > 0 ? (
+          <ul className="space-y-1 text-sm text-foreground">
+            {items.map((it: string, i: number) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-primary shrink-0">{icon || "•"}</span>
+                <span>{it}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null;
+
       return (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm">
             {content.grade && <p><strong>Grado:</strong> <EditableText value={content.grade} path={["grade"]} /></p>}
             {content.duration && <p><strong>Duración:</strong> <EditableText value={content.duration} path={["duration"]} /></p>}
+            {content.topic && <p><strong>Tema:</strong> <EditableText value={content.topic} path={["topic"]} /></p>}
+            {content.subject && <p><strong>Área:</strong> <EditableText value={content.subject} path={["subject"]} /></p>}
           </div>
+
+          {(content.standard || content.dba) && (
+            <div className="text-xs text-muted-foreground space-y-1 border-l-2 border-primary/30 pl-3">
+              {content.standard && <p><strong>Estándar:</strong> {content.standard}</p>}
+              {content.dba && <p><strong>DBA:</strong> {content.dba}</p>}
+            </div>
+          )}
+
           {content.objective && (
             <div className="text-sm bg-primary/5 p-3 rounded-lg">
               <strong>Objetivo:</strong>{" "}
               <EditableText value={content.objective} path={["objective"]} multiline />
             </div>
           )}
+
+          {Array.isArray(content.learningGoals) && content.learningGoals.length > 0 && (
+            <div className="p-3 border border-border rounded-lg">
+              <h3 className="font-semibold text-foreground text-sm mb-2">Metas de aprendizaje</h3>
+              <Bullets items={content.learningGoals} icon="✓" />
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {Array.isArray(content.priorKnowledge) && content.priorKnowledge.length > 0 && (
+              <div className="p-3 border border-border rounded-lg">
+                <h3 className="font-semibold text-foreground text-sm mb-2">Saberes previos</h3>
+                <Bullets items={content.priorKnowledge} />
+              </div>
+            )}
+            {Array.isArray(content.materials) && content.materials.length > 0 && (
+              <div className="p-3 border border-border rounded-lg">
+                <h3 className="font-semibold text-foreground text-sm mb-2">Materiales</h3>
+                <Bullets items={content.materials} icon="▪" />
+              </div>
+            )}
+          </div>
+
           {content.phases?.map((p: any, i: number) => (
             <div key={i} className="p-4 border border-border rounded-lg">
-              <h3 className="font-semibold text-foreground mb-2">
+              <h3 className="font-semibold text-foreground mb-1">
                 <EditableText value={p.name} path={["phases", String(i), "name"]} /> ({p.duration})
               </h3>
-              <div className="text-sm text-foreground">
-                <EditableText value={p.activities} path={["phases", String(i), "activities"]} multiline />
-              </div>
+              {p.purpose && <p className="text-xs text-muted-foreground italic mb-3">{p.purpose}</p>}
+
+              {/* Formato nuevo: acciones separadas por actor */}
+              {Array.isArray(p.teacherActions) && p.teacherActions.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Docente</p>
+                  <Bullets items={p.teacherActions} icon="→" />
+                </div>
+              )}
+              {Array.isArray(p.studentActions) && p.studentActions.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Estudiantes</p>
+                  <Bullets items={p.studentActions} icon="→" />
+                </div>
+              )}
+              {Array.isArray(p.questions) && p.questions.length > 0 && (
+                <div className="mb-3 bg-muted/30 rounded-md p-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Preguntas orientadoras</p>
+                  <Bullets items={p.questions} icon="?" />
+                </div>
+              )}
+
+              {/* Formato anterior: un único bloque de texto */}
+              {p.activities && (
+                <div className="text-sm text-foreground">
+                  <EditableText value={p.activities} path={["phases", String(i), "activities"]} multiline />
+                </div>
+              )}
+
               {p.resources && <p className="text-xs text-muted-foreground mt-1">📚 {editable ? <EditableText value={p.resources} path={["phases", String(i), "resources"]} /> : p.resources}</p>}
             </div>
           ))}
+
+          {content.differentiation && (content.differentiation.support || content.differentiation.extension) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {content.differentiation.support && (
+                <div className="p-3 border border-border rounded-lg">
+                  <h3 className="font-semibold text-foreground text-sm mb-1">Apoyo adicional</h3>
+                  <p className="text-sm text-foreground">{content.differentiation.support}</p>
+                </div>
+              )}
+              {content.differentiation.extension && (
+                <div className="p-3 border border-border rounded-lg">
+                  <h3 className="font-semibold text-foreground text-sm mb-1">Reto de profundización</h3>
+                  <p className="text-sm text-foreground">{content.differentiation.extension}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* La evaluación puede ser texto (formato anterior) u objeto (formato nuevo) */}
           {content.evaluation && (
-            <div className="text-sm p-3 bg-muted/30 rounded-lg">
-              <strong>Evaluación:</strong>{" "}
-              <EditableText value={content.evaluation} path={["evaluation"]} multiline />
+            <div className="text-sm p-3 bg-muted/30 rounded-lg space-y-2">
+              <strong>Evaluación</strong>
+              {typeof content.evaluation === "string" ? (
+                <EditableText value={content.evaluation} path={["evaluation"]} multiline />
+              ) : (
+                <div className="space-y-2">
+                  {content.evaluation.type && <p><span className="text-muted-foreground">Tipo:</span> {content.evaluation.type}</p>}
+                  {content.evaluation.instrument && <p><span className="text-muted-foreground">Instrumento:</span> {content.evaluation.instrument}</p>}
+                  {Array.isArray(content.evaluation.criteria) && content.evaluation.criteria.length > 0 && (
+                    <ul className="space-y-1">
+                      {content.evaluation.criteria.map((c: any, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-primary shrink-0">•</span>
+                          <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {content.homework && (
+            <div className="text-sm p-3 border border-border rounded-lg">
+              <strong>Tarea:</strong> {content.homework}
+            </div>
+          )}
+
+          {Array.isArray(content.references) && content.references.length > 0 && (
+            <div className="p-3 border border-border rounded-lg">
+              <h3 className="font-semibold text-foreground text-sm mb-2">Referencias</h3>
+              <Bullets items={content.references} />
             </div>
           )}
         </div>
       );
+    }
 
     case "rubric":
       return (
