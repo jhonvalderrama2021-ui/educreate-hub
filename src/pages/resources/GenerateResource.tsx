@@ -365,7 +365,7 @@ export default function GenerateResource() {
     const contentToSave = isEditing ? editableContent : generatedContent;
 
     try {
-      let sourcePdfUrl = null;
+      let sourcePdfUrl: string | null = null;
       if (uploadedFile) {
         const filePath = `${user.id}/${Date.now()}_${uploadedFile.name}`;
         const { error: uploadError } = await supabase.storage
