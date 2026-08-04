@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate, Routes, Route } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -8,19 +8,24 @@ import { UserMenu } from "@/components/UserMenu";
 import { CalendarPopover } from "@/components/CalendarPopover";
 import { Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import GenerateResource from "@/pages/resources/GenerateResource";
-import ResourceHistory from "@/pages/resources/ResourceHistory";
-import BotList from "@/pages/resources/BotList";
-import BotChat from "@/pages/resources/BotChat";
-import Crossword from "@/pages/resources/Crossword";
-import Story from "@/pages/resources/Story";
-import CoursesList from "@/pages/courses/CoursesList";
-import CourseDetailTeacher from "@/pages/courses/CourseDetailTeacher";
-import CourseDetailStudent from "@/pages/courses/CourseDetailStudent";
-import AddCourseResource from "@/pages/courses/AddCourseResource";
-import TakeCourseExam from "@/pages/courses/TakeCourseExam";
-import ViewCourseResource from "@/pages/courses/ViewCourseResource";
-import StudentReport from "@/pages/courses/StudentReport";
+import { RouteFallback } from "@/components/RouteFallback";
+
+// Cargadas de forma diferida: estas páginas arrastran librerías pesadas
+// (docx, jspdf, pptxgenjs, html2canvas, pdfjs-dist) que no deben entrar
+// en el bundle inicial.
+const GenerateResource = lazy(() => import("@/pages/resources/GenerateResource"));
+const ResourceHistory = lazy(() => import("@/pages/resources/ResourceHistory"));
+const BotList = lazy(() => import("@/pages/resources/BotList"));
+const BotChat = lazy(() => import("@/pages/resources/BotChat"));
+const Crossword = lazy(() => import("@/pages/resources/Crossword"));
+const Story = lazy(() => import("@/pages/resources/Story"));
+const CoursesList = lazy(() => import("@/pages/courses/CoursesList"));
+const CourseDetailTeacher = lazy(() => import("@/pages/courses/CourseDetailTeacher"));
+const CourseDetailStudent = lazy(() => import("@/pages/courses/CourseDetailStudent"));
+const AddCourseResource = lazy(() => import("@/pages/courses/AddCourseResource"));
+const TakeCourseExam = lazy(() => import("@/pages/courses/TakeCourseExam"));
+const ViewCourseResource = lazy(() => import("@/pages/courses/ViewCourseResource"));
+const StudentReport = lazy(() => import("@/pages/courses/StudentReport"));
 
 function ResourcesHome() {
   return (
@@ -93,6 +98,7 @@ export default function Resources() {
             </div>
           </header>
           <main className="flex-1 p-6 md:p-10 overflow-auto">
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route index element={<ResourcesHome />} />
               <Route path="generate" element={<GenerateResource />} />
@@ -109,6 +115,7 @@ export default function Resources() {
               <Route path="courses/:courseId/view/:courseResourceId" element={<ViewCourseResource />} />
               <Route path="courses/:courseId/student-report/:studentId" element={<StudentReport />} />
             </Routes>
+            </Suspense>
           </main>
         </div>
       </div>
