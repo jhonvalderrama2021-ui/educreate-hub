@@ -535,20 +535,56 @@ Formato JSON requerido:
 
     case "lesson_plan":
       return `${base}
-Genera un plan de clase completo y detallado.
+Genera un plan de clase COMPLETO y LISTO PARA APLICAR EN EL AULA, como el que entregaría un docente experimentado a un colega que va a dictar la clase sin conocer el tema de antemano.
+
+REGLAS OBLIGATORIAS:
+1. Nada de generalidades. Prohibido escribir "el docente explica el tema" o "los estudiantes participan". Di EXACTAMENTE qué se explica, con qué ejemplo concreto y qué se pregunta.
+2. Cada acción del docente debe ser un paso ejecutable y observable, redactado en infinitivo o presente ("Proyectar el esquema X", "Formar grupos de 4 y entregar la tarjeta Y").
+3. Incluye SIEMPRE preguntas literales, escritas tal cual las diría el docente en voz alta.
+4. Los tiempos de las fases deben sumar exactamente la duración total de la clase.
+5. Usa el contexto colombiano: Estándares Básicos de Competencias y Derechos Básicos de Aprendizaje (DBA) del MEN. Si no conoces el DBA exacto del grado, describe el aprendizaje esperado sin inventar un código.
+6. Los materiales deben ser concretos y realistas para un aula pública (cantidades incluidas).
+7. Mínimo 3 fases (Inicio, Desarrollo, Cierre). Si la clase es larga, subdivide el Desarrollo.
+8. Cada fase necesita entre 3 y 6 acciones del docente y entre 2 y 4 de los estudiantes.
+
 Formato JSON requerido:
 {
-  "title": "Título del plan de clase",
-  "subject": "Asignatura",
+  "title": "Título específico y atractivo de la clase",
+  "subject": "Área o asignatura",
   "grade": "Grado",
-  "duration": "Duración",
-  "objective": "Objetivo de aprendizaje",
-  "competencies": ["competencia 1"],
+  "duration": "Duración total (ej: 60 minutos)",
+  "topic": "Tema puntual que se aborda",
+  "standard": "Estándar Básico de Competencia del MEN que se trabaja",
+  "dba": "Aprendizaje esperado según los DBA del grado",
+  "objective": "Objetivo general, medible, iniciando con un verbo observable",
+  "learningGoals": ["Meta específica 1 que el estudiante podrá demostrar al final", "Meta 2", "Meta 3"],
+  "competencies": ["Competencia 1", "Competencia 2"],
+  "priorKnowledge": ["Saber previo que el estudiante ya debe traer", "Otro saber previo"],
+  "materials": ["Material concreto con cantidad (ej: 30 tarjetas de cartulina)", "Otro material"],
   "phases": [
-    { "name": "Inicio", "duration": "Tiempo", "activities": "Descripción de actividades", "resources": "Recursos necesarios" }
+    {
+      "name": "Inicio",
+      "duration": "10 minutos",
+      "purpose": "Para qué sirve esta fase dentro de la clase",
+      "teacherActions": ["Paso concreto 1 que ejecuta el docente", "Paso 2", "Paso 3"],
+      "studentActions": ["Lo que hacen los estudiantes en esta fase", "Otra acción"],
+      "questions": ["¿Pregunta literal que el docente formula en voz alta?", "¿Otra pregunta?"],
+      "resources": "Recursos específicos que se usan en esta fase"
+    }
   ],
-  "evaluation": "Estrategia de evaluación",
-  "homework": "Tarea o actividad extra"
+  "differentiation": {
+    "support": "Ajuste concreto para estudiantes que necesitan apoyo adicional o tienen ritmos distintos",
+    "extension": "Reto adicional concreto para quienes terminan antes o requieren mayor exigencia"
+  },
+  "evaluation": {
+    "type": "Formativa, sumativa o ambas",
+    "instrument": "Instrumento concreto (lista de chequeo, rúbrica, ficha de salida, etc.)",
+    "criteria": [
+      { "criterion": "Qué se evalúa", "indicator": "Indicador observable de logro, redactado de forma verificable" }
+    ]
+  },
+  "homework": "Tarea concreta con producto entregable y tiempo estimado. Escribe 'Ninguna' si no aplica.",
+  "references": ["Fuente, texto guía o recurso digital de apoyo"]
 }`;
 
     case "rubric":
