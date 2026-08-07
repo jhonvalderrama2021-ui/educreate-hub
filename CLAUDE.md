@@ -141,6 +141,24 @@ Costo medido con los prompts actuales: examen ICFES ~$0,065 · taller ~$0,035 ·
 
 Estos modelos consumen tokens internos de razonamiento que cuentan contra `max_completion_tokens`: déjalo holgado (mínimo 4000) o la respuesta llega truncada. Si algún día se vuelve a un modelo GPT-4, hay que revertir ambos parámetros.
 
+### 🔴 Cambiar un prompt es cambiar un contrato
+
+El JSON que devuelve la IA lo consumen **tres** lugares. Si modificas la estructura en el prompt, tienes que actualizar los tres o la aplicación se rompe:
+
+1. `supabase/functions/generate-resource/index.ts` — el prompt
+2. `src/components/ResourceContentViewer.tsx` — el visor
+3. `src/lib/export-resource.ts` — exportación a PDF **y** a DOCX (dos `case` distintos por tipo)
+
+Esto ya rompió el taller en producción: `evaluation` pasó de texto a objeto, el visor lo seguía pasando como texto, React lanzó *"Objects are not valid as a React child"* y la pantalla quedó **en blanco**, sin mensaje de error.
+
+**Siempre soporta ambos formatos.** En `generated_resources` conviven recursos viejos y nuevos: comprueba `typeof x === "string"` o `Array.isArray(x)` antes de renderizar. Y agrega el caso a `src/test/resource-viewer.test.tsx`, que existe justo para esto.
+
+### Extracción de PDF
+
+`src/lib/pdf-extract.ts` empaqueta el worker de PDF.js con la aplicación (`new URL(...)`), **no lo descarga de un CDN**: dependía de `unpkg.com` y fallaba con conectividad intermitente, que es el escenario de las instituciones rurales del proyecto.
+
+Si un PDF no produce texto, la función **lanza `PdfSinTextoError`** en vez de devolver `""`. Antes devolvía vacío en silencio, el recurso se generaba ignorando el documento y el docente no entendía por qué el resultado no tenía relación con su material. No vuelvas a hacer que falle en silencio.
+
 ### Calidad de los prompts
 
 Un prompt que solo describe la estructura JSON produce contenido mínimo y genérico. Todo prompt de generación debe además:

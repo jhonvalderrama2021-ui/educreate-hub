@@ -151,8 +151,22 @@ serve(async (req) => {
     // ============================================================
     const systemPrompt = getSystemPrompt(resourceType, numItems || 10);
     const userParts: string[] = [];
-    if (instructions) userParts.push(`Instrucciones: ${instructions}`);
-    if (pdfContent) userParts.push(`\nContenido fuente del documento:\n${pdfContent}`);
+    if (instructions) userParts.push(`Instrucciones del docente: ${instructions}`);
+
+    // Cuando hay documento fuente, el recurso debe salir de él. Sin esta
+    // instrucción explícita el modelo tendía a producir contenido genérico
+    // sobre el tema y a ignorar el material que el docente había cargado.
+    if (pdfContent) {
+      userParts.push(
+        `\n=== DOCUMENTO FUENTE ===\n` +
+        `El siguiente material fue cargado por el docente y es la BASE OBLIGATORIA del recurso.\n` +
+        `Genera el contenido a partir de la información, los conceptos, los datos y los ejemplos que aparecen aquí.\n` +
+        `No produzcas contenido genérico sobre el tema: usa ESTE documento.\n` +
+        `Si el documento no alcanza para cubrir todo lo solicitado, apóyate en él en lo que sí cubre y complementa el resto de forma coherente con su enfoque.\n\n` +
+        `${pdfContent}\n` +
+        `=== FIN DEL DOCUMENTO FUENTE ===`,
+      );
+    }
     if (!pdfContent && !instructions)
       userParts.push("Genera contenido educativo de ejemplo sobre un tema general apropiado.");
 

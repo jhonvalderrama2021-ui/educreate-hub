@@ -244,8 +244,11 @@ export default function GenerateResource() {
       setFileText(text);
       toast.success(`Archivo procesado: ${text.length} caracteres extraídos`);
     } catch (e: any) {
-      toast.error("Error al procesar el archivo: " + e.message);
+      // Si no se pudo leer el archivo, se retira: dejarlo visible hacía creer
+      // al docente que el recurso se generaría a partir de él.
+      setUploadedFile(null);
       setFileText("");
+      toast.error(e.message || "No se pudo procesar el archivo", { duration: 12000 });
     } finally {
       setExtractingFile(false);
     }
