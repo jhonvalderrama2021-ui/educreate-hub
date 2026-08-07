@@ -9,6 +9,7 @@ import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
+import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -822,6 +823,9 @@ export default function GenerateResource() {
           </div>
 
           <div className="p-6">
+            <div className="mb-4">
+              <AvisoContenidoIA meta={displayContent?._meta} />
+            </div>
             {resourceType === "slides" ? (
               <SlideViewer
                 slides={displayContent?.slides || []}

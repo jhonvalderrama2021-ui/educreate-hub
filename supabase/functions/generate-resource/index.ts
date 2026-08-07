@@ -185,6 +185,17 @@ serve(async (req) => {
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
 
+    // Trazabilidad del contenido generado (Marco Ético para la IA en Colombia,
+    // MinTIC 2023, y CONPES 3975 de 2019): se acompaña el recurso con el origen
+    // de su generación para que el docente sepa qué lo produjo y lo valide.
+    content._meta = {
+      generadoPorIA: true,
+      modelo: pickModel(resourceType),
+      proveedor: "OpenAI",
+      fecha: new Date().toISOString(),
+      requiereValidacionDocente: true,
+    };
+
     return new Response(JSON.stringify(content), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

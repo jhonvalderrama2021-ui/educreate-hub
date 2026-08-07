@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
+import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -212,6 +213,9 @@ export default function ResourceHistory() {
                       <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteResource(r.id)}>
                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
                       </Button>
+                    </div>
+                    <div className="mb-3">
+                      <AvisoContenidoIA meta={(r.content as any)?._meta} />
                     </div>
                     <div className={r.resource_type === "slides" ? "" : "bg-muted/10 p-4 rounded-lg overflow-auto max-h-[500px]"}>
                       <ResourceContentViewer type={r.resource_type} content={r.content} />
