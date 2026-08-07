@@ -339,7 +339,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-5.4",
+        model: "gpt-5.4-mini",
         max_completion_tokens: 8000,
         messages: [
           { role: "system", content: systemPrompt },

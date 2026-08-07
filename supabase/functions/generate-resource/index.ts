@@ -7,10 +7,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Modelo de generación. La familia GPT-5 exige `max_completion_tokens`
+// Modelos de generación. La familia GPT-5 exige `max_completion_tokens`
 // y NO admite `temperature`: si se cambia a un modelo GPT-4, hay que
 // revertir ambos parámetros en las tres llamadas de este archivo.
-const MODEL = "gpt-5.4";
+//
+// Se reserva el modelo mayor para lo que más exige calidad y donde un
+// resultado pobre se nota de inmediato: los exámenes (construcción de
+// distractores plausibles) y las diapositivas. El resto usa el modelo
+// rápido, unas 3 veces más económico.
+const MODEL_ALTA_EXIGENCIA = "gpt-5.4";
+const MODEL_ECONOMICO = "gpt-5.4-mini";
+
+const TIPOS_ALTA_EXIGENCIA = new Set(["icfes", "true_false", "mixed", "slides"]);
+
+function pickModel(resourceType: string): string {
+  return TIPOS_ALTA_EXIGENCIA.has(resourceType) ? MODEL_ALTA_EXIGENCIA : MODEL_ECONOMICO;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -139,8 +151,22 @@ serve(async (req) => {
     // ============================================================
     const systemPrompt = getSystemPrompt(resourceType, numItems || 10);
     const userParts: string[] = [];
-    if (instructions) userParts.push(`Instrucciones: ${instructions}`);
-    if (pdfContent) userParts.push(`\nContenido fuente del documento:\n${pdfContent}`);
+    if (instructions) userParts.push(`Instrucciones del docente: ${instructions}`);
+
+    // Cuando hay documento fuente, el recurso debe salir de él. Sin esta
+    // instrucción explícita el modelo tendía a producir contenido genérico
+    // sobre el tema y a ignorar el material que el docente había cargado.
+    if (pdfContent) {
+      userParts.push(
+        `\n=== DOCUMENTO FUENTE ===\n` +
+        `El siguiente material fue cargado por el docente y es la BASE OBLIGATORIA del recurso.\n` +
+        `Genera el contenido a partir de la información, los conceptos, los datos y los ejemplos que aparecen aquí.\n` +
+        `No produzcas contenido genérico sobre el tema: usa ESTE documento.\n` +
+        `Si el documento no alcanza para cubrir todo lo solicitado, apóyate en él en lo que sí cubre y complementa el resto de forma coherente con su enfoque.\n\n` +
+        `${pdfContent}\n` +
+        `=== FIN DEL DOCUMENTO FUENTE ===`,
+      );
+    }
     if (!pdfContent && !instructions)
       userParts.push("Genera contenido educativo de ejemplo sobre un tema general apropiado.");
 
@@ -148,7 +174,7 @@ serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model: pickModel(resourceType),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userParts.join("\n") },
@@ -172,6 +198,17 @@ serve(async (req) => {
 
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
+
+    // Trazabilidad del contenido generado (Marco Ético para la IA en Colombia,
+    // MinTIC 2023, y CONPES 3975 de 2019): se acompaña el recurso con el origen
+    // de su generación para que el docente sepa qué lo produjo y lo valide.
+    content._meta = {
+      generadoPorIA: true,
+      modelo: pickModel(resourceType),
+      proveedor: "OpenAI",
+      fecha: new Date().toISOString(),
+      requiereValidacionDocente: true,
+    };
 
     return new Response(JSON.stringify(content), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -227,7 +264,7 @@ REGLAS:
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_ALTA_EXIGENCIA,
       messages: [
         { role: "system", content: sysPrompt },
         { role: "user", content: userPrompt },
@@ -322,7 +359,7 @@ Genera la slide JSON ahora.`;
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_ALTA_EXIGENCIA,
       messages: [
         { role: "system", content: sys },
         { role: "user", content: user },

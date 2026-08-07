@@ -26,6 +26,7 @@ const AddCourseResource = lazy(() => import("@/pages/courses/AddCourseResource")
 const TakeCourseExam = lazy(() => import("@/pages/courses/TakeCourseExam"));
 const ViewCourseResource = lazy(() => import("@/pages/courses/ViewCourseResource"));
 const StudentReport = lazy(() => import("@/pages/courses/StudentReport"));
+const Ayuda = lazy(() => import("@/pages/resources/Ayuda"));
 
 function ResourcesHome() {
   return (
@@ -114,6 +115,7 @@ export default function Resources() {
               <Route path="courses/:courseId/take/:courseResourceId" element={<TakeCourseExam />} />
               <Route path="courses/:courseId/view/:courseResourceId" element={<ViewCourseResource />} />
               <Route path="courses/:courseId/student-report/:studentId" element={<StudentReport />} />
+              <Route path="ayuda" element={<Ayuda />} />
             </Routes>
             </Suspense>
           </main>

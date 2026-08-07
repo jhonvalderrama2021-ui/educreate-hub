@@ -9,6 +9,7 @@ import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
+import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -243,8 +244,11 @@ export default function GenerateResource() {
       setFileText(text);
       toast.success(`Archivo procesado: ${text.length} caracteres extraídos`);
     } catch (e: any) {
-      toast.error("Error al procesar el archivo: " + e.message);
+      // Si no se pudo leer el archivo, se retira: dejarlo visible hacía creer
+      // al docente que el recurso se generaría a partir de él.
+      setUploadedFile(null);
       setFileText("");
+      toast.error(e.message || "No se pudo procesar el archivo", { duration: 12000 });
     } finally {
       setExtractingFile(false);
     }
@@ -822,6 +826,9 @@ export default function GenerateResource() {
           </div>
 
           <div className="p-6">
+            <div className="mb-4">
+              <AvisoContenidoIA meta={displayContent?._meta} />
+            </div>
             {resourceType === "slides" ? (
               <SlideViewer
                 slides={displayContent?.slides || []}

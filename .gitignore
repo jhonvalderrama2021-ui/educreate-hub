@@ -26,6 +26,9 @@ playwright-report
 blob-report
 playwright/.cache
 
+# Guia interna del agente (no se versiona por ahora)
+CLAUDE.md
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
