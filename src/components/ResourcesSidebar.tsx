@@ -1,4 +1,4 @@
-import { ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot, Presentation, BookOpen, Puzzle, BookText, GraduationCap } from "lucide-react";
+import { ClipboardList, Table2, FileCheck, History, FileEdit, ChevronLeft, ChevronRight, Bot, Presentation, BookOpen, Puzzle, BookText, GraduationCap, HelpCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu,
@@ -28,6 +28,7 @@ const gameModules = [
 const managementModules = [
   { title: "Mini Cursos", url: "/resources/courses", icon: GraduationCap, description: "Crea cursos, inscribe estudiantes y haz seguimiento" },
   { title: "Historial", url: "/resources/history", icon: History, description: "Ver recursos generados anteriormente" },
+  { title: "Ayuda", url: "/resources/ayuda", icon: HelpCircle, description: "Guía de uso de la plataforma" },
 ];
 
 export function ResourcesSidebar() {
