@@ -301,8 +301,24 @@ serve(async (req) => {
     const across = Math.max(1, Math.min(total - 1, Number(acrossCount) || Math.ceil(total / 2)));
     const down = Math.max(1, Math.min(total - across, Number(downCount) || total - across));
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY no configurada");
+    // La clave de OpenAI la administra el panel de administración (tabla platform_settings)
+    const { createClient: createAdminClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const supabaseAdmin = createAdminClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: setting } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "openai_api_key")
+      .single();
+
+    if (!setting?.value) {
+      return new Response(JSON.stringify({
+        error: "API Key de OpenAI no configurada. El administrador debe configurarla en el panel de administración.",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const apiKey = setting.value as string;
 
     const difficultyLabel = difficulty || "medio";
     const sourceContext = pdfContent
@@ -316,14 +332,15 @@ serve(async (req) => {
 
     const userPrompt = `Tema: ${theme}\nGenera ${poolSize} palabras con sus pistas para un crucigrama (necesitamos un pool grande para encontrar combinaciones que se crucen)${sourceContext}`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-5.4",
+        max_completion_tokens: 8000,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -366,8 +383,13 @@ serve(async (req) => {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (aiResp.status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos agotados. Agrega fondos en tu workspace de Lovable." }), {
+      if (aiResp.status === 401) {
+        return new Response(JSON.stringify({ error: "La API Key de OpenAI no es válida. El administrador debe revisarla en el panel." }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (aiResp.status === 402 || aiResp.status === 403) {
+        return new Response(JSON.stringify({ error: "Sin créditos disponibles en la cuenta de OpenAI." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
