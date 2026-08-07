@@ -287,17 +287,48 @@ export async function exportToPdf(
 
     case "workshop":
       if (content.objective) addText(`Objetivo: ${content.objective}`, 11);
+      if (content.grade) addText(`Grado: ${content.grade}`, 10);
+      if (content.methodology) addText(`Metodología: ${content.methodology}`, 10);
       if (content.duration) addText(`Duración: ${content.duration}`, 10);
+      if (content.groupOrganization) addText(`Organización: ${content.groupOrganization}`, 10);
+      if (Array.isArray(content.learningGoals) && content.learningGoals.length) {
+        addText("Metas de aprendizaje", 12, true);
+        content.learningGoals.forEach((m: string) => addText(`• ${m}`, 10, false, 5));
+      }
       if (content.materials?.length) addText(`Materiales: ${content.materials.join(", ")}`, 10);
       y += 3;
       content.activities?.forEach((a: any) => {
         addText(`Actividad ${a.number}: ${a.title}`, 12, true);
-        addText(a.description, 10, false, 5);
-        if (a.instructions) addText(`Instrucciones: ${a.instructions}`, 10, false, 5);
+        if (a.purpose) addText(a.purpose, 9, false, 5);
+        if (a.description) addText(a.description, 10, false, 5);
+        if (Array.isArray(a.instructions)) {
+          a.instructions.forEach((paso: string, i: number) => addText(`${i + 1}. ${paso}`, 10, false, 10));
+        } else if (a.instructions) {
+          addText(`Instrucciones: ${a.instructions}`, 10, false, 5);
+        }
+        if (Array.isArray(a.questions) && a.questions.length) {
+          addText("Preguntas orientadoras:", 10, true, 5);
+          a.questions.forEach((q: string) => addText(`- ${q}`, 10, false, 10));
+        }
+        if (a.product) addText(`Producto: ${a.product}`, 10, false, 5);
         if (a.duration) addText(`Duración: ${a.duration}`, 9, false, 5);
         y += 3;
       });
-      if (content.evaluation) { addText("Evaluación", 12, true); addText(content.evaluation, 10); }
+      if (content.differentiation?.support || content.differentiation?.extension) {
+        addText("Atención a la diversidad", 12, true);
+        if (content.differentiation.support) addText(`Apoyo: ${content.differentiation.support}`, 10, false, 5);
+        if (content.differentiation.extension) addText(`Profundización: ${content.differentiation.extension}`, 10, false, 5);
+        y += 3;
+      }
+      if (content.evaluation) {
+        addText("Evaluación", 12, true);
+        if (typeof content.evaluation === "string") {
+          addText(content.evaluation, 10);
+        } else {
+          if (content.evaluation.instrument) addText(`Instrumento: ${content.evaluation.instrument}`, 10, false, 5);
+          content.evaluation.criteria?.forEach((c: any) => addText(`• ${c.criterion}: ${c.indicator}`, 10, false, 5));
+        }
+      }
       break;
 
     case "guide":
@@ -721,19 +752,69 @@ async function buildDocxContent(title: string, resourceType: string, content: an
       }
       break;
 
-    case "workshop":
-      if (content.objective) children.push(new Paragraph({ children: [new TextRun({ text: `Objetivo: ${content.objective}` })] }));
-      if (content.duration) children.push(new Paragraph({ children: [new TextRun({ text: `Duración: ${content.duration}` })] }));
+    case "workshop": {
+      const linea = (label: string, valor?: string) => {
+        if (valor) children.push(new Paragraph({ children: [new TextRun({ text: `${label}: `, bold: true }), new TextRun(valor)] }));
+      };
+      const vinetas = (items: any, indent = 400) => {
+        if (!Array.isArray(items)) return;
+        items.forEach((it: string) =>
+          children.push(new Paragraph({ indent: { left: indent }, children: [new TextRun(`• ${it}`)] })));
+      };
+
+      linea("Objetivo", content.objective);
+      linea("Grado", content.grade);
+      linea("Metodología", content.methodology);
+      linea("Duración", content.duration);
+      linea("Organización", content.groupOrganization);
+      if (Array.isArray(content.learningGoals) && content.learningGoals.length) {
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Metas de aprendizaje")] }));
+        vinetas(content.learningGoals);
+      }
+      if (Array.isArray(content.materials) && content.materials.length) {
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Materiales")] }));
+        vinetas(content.materials);
+      }
       children.push(new Paragraph({ children: [] }));
+
       content.activities?.forEach((a: any) => {
         children.push(new Paragraph({
           heading: HeadingLevel.HEADING_2,
           children: [new TextRun({ text: `Actividad ${a.number}: ${a.title}` })],
         }));
-        children.push(new Paragraph({ children: [new TextRun(a.description)] }));
-        if (a.instructions) children.push(new Paragraph({ children: [new TextRun({ text: `Instrucciones: ${a.instructions}`, italics: true })] }));
+        if (a.purpose) children.push(new Paragraph({ children: [new TextRun({ text: a.purpose, italics: true })] }));
+        if (a.description) children.push(new Paragraph({ children: [new TextRun(a.description)] }));
+        if (Array.isArray(a.instructions)) {
+          a.instructions.forEach((paso: string, i: number) =>
+            children.push(new Paragraph({ indent: { left: 400 }, children: [new TextRun(`${i + 1}. ${paso}`)] })));
+        } else if (a.instructions) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Instrucciones: ${a.instructions}`, italics: true })] }));
+        }
+        if (Array.isArray(a.questions) && a.questions.length) {
+          children.push(new Paragraph({ children: [new TextRun({ text: "Preguntas orientadoras", bold: true })] }));
+          vinetas(a.questions);
+        }
+        linea("Producto", a.product);
+        linea("Duración", a.duration);
       });
+
+      if (content.differentiation?.support || content.differentiation?.extension) {
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Atención a la diversidad")] }));
+        linea("Apoyo", content.differentiation.support);
+        linea("Profundización", content.differentiation.extension);
+      }
+
+      if (content.evaluation) {
+        children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun("Evaluación")] }));
+        if (typeof content.evaluation === "string") {
+          children.push(new Paragraph({ children: [new TextRun(content.evaluation)] }));
+        } else {
+          linea("Instrumento", content.evaluation.instrument);
+          vinetas(content.evaluation.criteria?.map((c: any) => `${c.criterion}: ${c.indicator}`));
+        }
+      }
       break;
+    }
 
     case "guide":
       if (content.introduction) children.push(new Paragraph({ children: [new TextRun(content.introduction)] }));

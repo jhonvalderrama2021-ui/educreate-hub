@@ -159,22 +159,93 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
                 Actividad {a.number || idx + 1}:{" "}
                 <EditableText value={a.title} path={["activities", String(idx), "title"]} />
               </h3>
-              <div className="text-sm text-foreground mb-2">
-                <EditableText value={a.description} path={["activities", String(idx), "description"]} multiline />
-              </div>
-              {a.instructions && (
+              {a.purpose && <p className="text-xs text-muted-foreground italic mb-2">{a.purpose}</p>}
+
+              {/* Formato anterior: descripción como texto */}
+              {a.description && (
+                <div className="text-sm text-foreground mb-2">
+                  <EditableText value={a.description} path={["activities", String(idx), "description"]} multiline />
+                </div>
+              )}
+
+              {/* Las instrucciones pueden ser texto (formato anterior) o lista de pasos */}
+              {Array.isArray(a.instructions) ? (
+                <ol className="space-y-1 text-sm text-foreground mb-2">
+                  {a.instructions.map((paso: string, i: number) => (
+                    <li key={i} className="flex gap-2">
+                      <span className="shrink-0 h-5 w-5 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      <span>{paso}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : a.instructions ? (
                 <div className="text-sm text-muted-foreground italic">
                   <EditableText value={a.instructions} path={["activities", String(idx), "instructions"]} multiline />
                 </div>
+              ) : null}
+
+              {Array.isArray(a.questions) && a.questions.length > 0 && (
+                <div className="bg-muted/30 rounded-md p-2 mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Preguntas orientadoras</p>
+                  <ul className="space-y-1 text-sm">
+                    {a.questions.map((q: string, i: number) => (
+                      <li key={i} className="flex gap-2"><span className="text-primary shrink-0">?</span><span>{q}</span></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {a.product && (
+                <p className="text-xs text-foreground bg-primary/5 rounded-md p-2">
+                  <strong>Producto:</strong> {a.product}
+                </p>
               )}
               {a.duration && <p className="text-xs text-muted-foreground mt-1">⏱ {a.duration}</p>}
             </div>
           ))}
+
+          {content.differentiation && (content.differentiation.support || content.differentiation.extension) && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {content.differentiation.support && (
+                <div className="p-3 border border-border rounded-lg">
+                  <h3 className="font-semibold text-foreground text-sm mb-1">Apoyo adicional</h3>
+                  <p className="text-sm text-foreground">{content.differentiation.support}</p>
+                </div>
+              )}
+              {content.differentiation.extension && (
+                <div className="p-3 border border-border rounded-lg">
+                  <h3 className="font-semibold text-foreground text-sm mb-1">Reto de profundización</h3>
+                  <p className="text-sm text-foreground">{content.differentiation.extension}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* La evaluación puede ser texto (formato anterior) u objeto (formato nuevo) */}
           {content.evaluation && (
-            <div className="p-3 bg-muted/30 rounded-lg">
-              <p className="text-sm"><strong>Evaluación:</strong>{" "}
+            <div className="p-3 bg-muted/30 rounded-lg space-y-2 text-sm">
+              <strong>Evaluación</strong>
+              {typeof content.evaluation === "string" ? (
                 <EditableText value={content.evaluation} path={["evaluation"]} multiline />
-              </p>
+              ) : (
+                <div className="space-y-2">
+                  {content.evaluation.instrument && (
+                    <p><span className="text-muted-foreground">Instrumento:</span> {content.evaluation.instrument}</p>
+                  )}
+                  {Array.isArray(content.evaluation.criteria) && content.evaluation.criteria.length > 0 && (
+                    <ul className="space-y-1">
+                      {content.evaluation.criteria.map((c: any, i: number) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="text-primary shrink-0">•</span>
+                          <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
