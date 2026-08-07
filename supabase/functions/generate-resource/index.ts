@@ -7,6 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Modelo de generación. La familia GPT-5 exige `max_completion_tokens`
+// y NO admite `temperature`: si se cambia a un modelo GPT-4, hay que
+// revertir ambos parámetros en las tres llamadas de este archivo.
+const MODEL = "gpt-5.4";
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
@@ -143,14 +148,13 @@ serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userParts.join("\n") },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 16000,
+        max_completion_tokens: 20000,
       }),
     });
 
@@ -223,14 +227,13 @@ REGLAS:
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: MODEL,
       messages: [
         { role: "system", content: sysPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.8,
-      max_tokens: 3000,
+      max_completion_tokens: 8000,
     }),
   });
   if (!res.ok) throw new Error(`Outline failed: ${res.status} ${await res.text()}`);
@@ -319,14 +322,13 @@ Genera la slide JSON ahora.`;
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: MODEL,
       messages: [
         { role: "system", content: sys },
         { role: "user", content: user },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.75,
-      max_tokens: 1500,
+      max_completion_tokens: 6000,
     }),
   });
   if (!res.ok) throw new Error(`Slide ${slideIndex} failed: ${res.status}`);
@@ -467,70 +469,154 @@ const DEFAULT_THEME = {
 // SYSTEM PROMPTS for non-slide resource types (UNCHANGED)
 // ============================================================
 function getSystemPrompt(type: string, numItems: number): string {
-  const base = "Eres un experto pedagogo colombiano. Genera contenido educativo de alta calidad en español. Responde SIEMPRE en formato JSON válido según la estructura indicada.";
+  const base = `Eres un pedagogo experto del sistema educativo colombiano, con dominio de los Estándares Básicos de Competencias (EBC) y los Derechos Básicos de Aprendizaje (DBA) del Ministerio de Educación Nacional.
+
+Generas material listo para llevar al aula, no borradores. Responde SIEMPRE en JSON válido según la estructura indicada, sin ningún texto fuera del JSON.
+
+PRINCIPIOS OBLIGATORIOS:
+1. Alinea el contenido con los EBC y los DBA del grado indicado. Si no conoces el código exacto del DBA, describe el aprendizaje esperado sin inventar códigos.
+2. Escribe en español de Colombia. Usa contextos y ejemplos del país cuando aporten al aprendizaje (geografía, historia, economía, cultura, situaciones cotidianas).
+3. PROHIBIDO EL RELLENO. Cada elemento debe aportar valor pedagógico verificable. Nada de frases genéricas, vagas o intercambiables entre temas.
+4. Si recibes un documento fuente, el contenido debe basarse en él: no lo contradigas ni lo ignores.
+5. Ajusta el vocabulario y la exigencia cognitiva al grado indicado.`;
 
   switch (type) {
     case "icfes":
       return `${base}
-Genera un examen tipo ICFES (Saber 11) con exactamente ${numItems} preguntas de selección múltiple con única respuesta.
-IMPORTANTE: NO resaltes ni marques la respuesta correcta en las opciones. Las respuestas correctas se mostrarán al final del examen.
+Genera un examen tipo ICFES (Saber 11) con exactamente ${numItems} preguntas de selección múltiple con única respuesta, con la calidad técnica de un ítem real del ICFES.
+
+REGLAS DE CONSTRUCCIÓN DEL ÍTEM:
+1. TODA pregunta parte de un CONTEXTO (campo "context"): un texto, una situación, una tabla descrita en palabras, un experimento, un caso o un fragmento. Entre 40 y 120 palabras. Nunca dejes "context" vacío ni escribas ahí la pregunta.
+2. El ICFES NO evalúa memorización. Prohibido preguntar "¿qué es X?" o "¿en qué año ocurrió X?". Cada pregunta debe exigir interpretar, analizar, inferir, comparar, aplicar un concepto o evaluar un argumento sobre el contexto dado.
+3. Declara en "competency" la competencia evaluada, propia del área (ejemplos: "Interpretación y representación" o "Formulación y ejecución" en Matemáticas; "Identificar" o "Explicar" o "Indagar" en Ciencias Naturales; "Identificar y comprender" o "Reflexionar y evaluar" en Lectura Crítica; "Pensamiento social" o "Multiperspectivismo" en Sociales).
+4. Declara en "level" el nivel de desempeño del 1 al 4 (1 el más básico, 4 el más exigente). Distribuye las preguntas en distintos niveles; no las hagas todas fáciles ni todas difíciles.
+
+REGLAS DE LOS DISTRACTORES — LO MÁS IMPORTANTE:
+5. Cada opción incorrecta debe representar un ERROR CONCEPTUAL TÍPICO y reconocible de un estudiante: una confusión frecuente, un error de procedimiento, una lectura parcial del contexto o una generalización indebida.
+6. PROHIBIDAS las opciones absurdas, obviamente falsas o de relleno. Un estudiante que no domine el tema debe poder dudar entre al menos dos opciones.
+7. Todas las opciones deben tener extensión y estructura gramatical similares. La correcta no puede ser la más larga ni la más detallada.
+8. Explica en "distractorRationale" qué error específico comete quien elige cada opción incorrecta.
+9. Prohibido usar "todas las anteriores", "ninguna de las anteriores" o negaciones dobles.
+10. NO marques ni resaltes la respuesta correcta dentro de las opciones. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
+
 Formato JSON requerido:
 {
   "title": "Título del examen",
   "subject": "Área o asignatura",
+  "grade": "Grado al que se dirige",
   "questions": [
     {
       "number": 1,
-      "context": "Contexto o texto de lectura (si aplica)",
-      "question": "Enunciado de la pregunta",
+      "competency": "Competencia del área que se evalúa",
+      "level": 2,
+      "context": "Texto, situación o caso de 40 a 120 palabras sobre el cual se pregunta",
+      "question": "Enunciado que exige razonar sobre el contexto",
       "options": { "A": "opción A", "B": "opción B", "C": "opción C", "D": "opción D" },
       "correct": "A",
-      "explanation": "Explicación de por qué es la respuesta correcta"
+      "explanation": "Por qué la respuesta correcta lo es, con referencia al contexto",
+      "distractorRationale": { "B": "Error conceptual de quien elige B", "C": "Error de quien elige C", "D": "Error de quien elige D" }
     }
   ]
 }`;
 
     case "true_false":
       return `${base}
-Genera un examen de Verdadero o Falso con exactamente ${numItems} preguntas.
-IMPORTANTE: NO resaltes ni marques la respuesta correcta en el enunciado.
+Genera un examen de Verdadero o Falso con exactamente ${numItems} afirmaciones de calidad evaluativa real.
+
+REGLAS OBLIGATORIAS:
+1. Cada afirmación evalúa UN SOLO concepto. Prohibido encadenar dos ideas donde una sea verdadera y otra falsa.
+2. PROHIBIDAS las afirmaciones triviales u obvias. Si un estudiante puede responder sin haber estudiado el tema, el ítem no sirve.
+3. Prohibidos los absolutos delatores ("siempre", "nunca", "todos", "ninguno") salvo que la afirmación sea genuinamente universal, porque el estudiante aprende a marcarlos como falsos sin razonar.
+4. Prohibidas las dobles negaciones y las afirmaciones ambiguas: cada enunciado debe ser inequívocamente verdadero o falso, sin depender de interpretación.
+5. EQUILIBRIO: aproximadamente la mitad verdaderas y la mitad falsas, en orden mezclado. No agrupes las verdaderas al inicio.
+6. Las afirmaciones FALSAS deben serlo por un ERROR CONCEPTUAL PLAUSIBLE — una confusión que un estudiante realmente cometería — no por un absurdo evidente.
+7. Todas las afirmaciones deben tener extensión similar. Las verdaderas no pueden ser sistemáticamente más largas.
+8. La explicación debe decir POR QUÉ es verdadera o falsa, y en las falsas debe precisar cuál es el dato correcto.
+9. Redacta afirmaciones, no preguntas. Escribe "El sistema circulatorio transporta...", no "¿El sistema circulatorio transporta...?".
+
 Formato JSON requerido:
 {
   "title": "Título del examen",
   "subject": "Área o asignatura",
+  "grade": "Grado al que se dirige",
   "questions": [
-    { "number": 1, "type": "true_false", "question": "Enunciado", "correct": "Verdadero", "explanation": "Explicación" }
+    { "number": 1, "type": "true_false", "question": "Afirmación evaluable sobre un solo concepto", "correct": "Verdadero", "explanation": "Por qué lo es; si es falsa, cuál es el dato correcto" }
   ]
 }`;
 
     case "mixed":
       return `${base}
-Genera un examen mixto con exactamente ${numItems} preguntas. Alterna entre preguntas tipo ICFES (selección múltiple) y preguntas de Verdadero o Falso.
-IMPORTANTE: NO resaltes ni marques la respuesta correcta.
+Genera un examen mixto con exactamente ${numItems} preguntas, alternando selección múltiple y Verdadero/Falso. Aproximadamente 60 % de selección múltiple y 40 % de Verdadero/Falso.
+
+REGLAS PARA LAS PREGUNTAS DE SELECCIÓN MÚLTIPLE:
+1. Parten de un CONTEXTO de 40 a 120 palabras (texto, situación o caso). Nunca dejes "context" vacío.
+2. Exigen razonar sobre ese contexto: interpretar, analizar, inferir o aplicar. Prohibida la memorización pura.
+3. Cada opción incorrecta representa un ERROR CONCEPTUAL TÍPICO y plausible, no un absurdo. Un estudiante que no domine el tema debe dudar entre al menos dos opciones.
+4. Las cuatro opciones tienen extensión y estructura similares; la correcta no puede ser la más larga.
+5. Prohibido "todas las anteriores" y "ninguna de las anteriores".
+6. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
+
+REGLAS PARA LAS PREGUNTAS DE VERDADERO O FALSO:
+7. Cada afirmación evalúa UN SOLO concepto y es inequívocamente verdadera o falsa.
+8. Prohibidas las afirmaciones triviales, los absolutos delatores ("siempre", "nunca") y las dobles negaciones.
+9. Las falsas lo son por un error conceptual plausible, no por un absurdo evidente.
+10. Equilibra verdaderas y falsas.
+
+GENERAL:
+11. Mezcla los dos tipos a lo largo del examen; no agrupes primero todas las de selección múltiple.
+12. Sube progresivamente la exigencia cognitiva a lo largo del examen.
+13. NO marques ni resaltes la respuesta correcta.
+
 Formato JSON requerido:
 {
   "title": "Título del examen",
   "subject": "Área o asignatura",
+  "grade": "Grado al que se dirige",
   "questions": [
-    { "number": 1, "type": "multiple_choice", "question": "Enunciado", "options": { "A": "opción A", "B": "opción B", "C": "opción C", "D": "opción D" }, "correct": "A", "explanation": "Explicación" },
-    { "number": 2, "type": "true_false", "question": "Enunciado", "correct": "Falso", "explanation": "Explicación" }
+    { "number": 1, "type": "multiple_choice", "context": "Situación o texto de 40 a 120 palabras", "question": "Enunciado que exige razonar sobre el contexto", "options": { "A": "opción A", "B": "opción B", "C": "opción C", "D": "opción D" }, "correct": "A", "explanation": "Por qué la correcta lo es", "distractorRationale": { "B": "Error de quien elige B", "C": "Error de quien elige C", "D": "Error de quien elige D" } },
+    { "number": 2, "type": "true_false", "question": "Afirmación sobre un solo concepto", "correct": "Falso", "explanation": "Por qué lo es y cuál es el dato correcto" }
   ]
 }`;
 
     case "workshop":
       return `${base}
-Genera un taller educativo completo con actividades prácticas.
+Genera un taller educativo LISTO PARA APLICAR, como el que entregaría un docente experimentado a un colega que va a dirigirlo sin conocer el tema de antemano.
+
+REGLAS OBLIGATORIAS:
+1. Si en las instrucciones se indica una METODOLOGÍA (ABP, aula invertida, gamificación, aprendizaje cooperativo, STEM, etc.), el taller debe estructurarse REALMENTE según esa metodología, no solo mencionarla. La organización de las actividades tiene que reflejarla.
+2. PROHIBIDAS las generalidades. Nunca escribas "los estudiantes trabajan en grupo" o "se socializa el tema". Di cuántos estudiantes por grupo, qué recibe cada grupo, qué produce y cómo se socializa.
+3. Cada actividad debe tener instrucciones ejecutables paso a paso, numeradas, redactadas como órdenes concretas ("Formar grupos de 4", "Entregar a cada grupo la ficha con...", "Pedir que registren en la tabla...").
+4. Cada actividad declara un PRODUCTO observable: qué queda hecho al terminar (un cartel, una tabla llena, una maqueta, una conclusión escrita).
+5. Los materiales deben ser concretos, con cantidades, y realistas para un aula pública colombiana. Prioriza material reciclable o de bajo costo. Si algo requiere tecnología, ofrece una alternativa sin ella.
+6. Los tiempos de las actividades deben sumar la duración total del taller.
+7. Incluye entre 3 y 5 actividades con secuencia lógica: activación, desarrollo y cierre.
+8. Incluye preguntas orientadoras redactadas literalmente, tal como las diría el docente.
+9. La evaluación debe tener criterios observables, no "se evaluará la participación".
+
 Formato JSON requerido:
 {
-  "title": "Título del taller",
+  "title": "Título específico y motivador del taller",
   "subject": "Área o asignatura",
-  "objective": "Objetivo general",
-  "duration": "Duración estimada",
-  "materials": ["material 1", "material 2"],
+  "grade": "Grado al que se dirige",
+  "methodology": "Metodología pedagógica aplicada",
+  "objective": "Objetivo general, medible, con verbo observable",
+  "learningGoals": ["Lo que el estudiante podrá demostrar al terminar", "Otra meta"],
+  "duration": "Duración total",
+  "groupOrganization": "Cómo se organiza el curso (individual, parejas, grupos de N)",
+  "materials": ["Material concreto con cantidad (ej: 30 fichas de cartulina)", "Otro material"],
   "activities": [
-    { "number": 1, "title": "Título de la actividad", "description": "Descripción detallada", "instructions": "Instrucciones paso a paso", "duration": "Tiempo estimado" }
+    {
+      "number": 1,
+      "title": "Título de la actividad",
+      "duration": "Tiempo",
+      "purpose": "Para qué sirve dentro de la secuencia",
+      "instructions": ["Paso 1 concreto y ejecutable", "Paso 2", "Paso 3"],
+      "questions": ["¿Pregunta literal que formula el docente?"],
+      "product": "Qué queda hecho al terminar la actividad"
+    }
   ],
-  "evaluation": "Criterios de evaluación"
+  "differentiation": { "support": "Ajuste para quienes necesitan apoyo", "extension": "Reto para quienes terminan antes" },
+  "evaluation": { "instrument": "Instrumento concreto", "criteria": [ { "criterion": "Qué se evalúa", "indicator": "Indicador observable de logro" } ] }
 }`;
 
     case "lesson_plan":
@@ -589,19 +675,40 @@ Formato JSON requerido:
 
     case "rubric":
       return `${base}
-Genera una rúbrica de evaluación completa y detallada según el tipo y niveles especificados en las instrucciones.
-Los niveles de desempeño que aparecen en las instrucciones deben usarse exactamente como se indican.
+Genera una rúbrica de evaluación aplicable por cualquier docente y defendible ante un estudiante que reclame su nota.
+Usa EXACTAMENTE el tipo de rúbrica y los niveles de desempeño que aparezcan en las instrucciones, con esos mismos nombres.
+
+REGLAS OBLIGATORIAS:
+1. Los descriptores deben ser OBSERVABLES Y MEDIBLES. Prohibido evaluar lo que no se puede ver: "demuestra interés", "comprende el tema", "se esfuerza". Describe conductas o productos verificables.
+2. PROHIBIDO describir los niveles por grado de adverbio. No sirve "excelente / bueno / regular", ni "siempre / a veces / nunca", ni "muy bien / bien / mal". Cada nivel debe describir QUÉ HACE o QUÉ PRODUCE el estudiante en ese nivel, de forma diferente y reconocible.
+3. Debe existir un SALTO CUALITATIVO claro entre niveles consecutivos: dos docentes distintos que evalúen el mismo trabajo deben ubicarlo en el mismo nivel.
+4. Cada descriptor debe usar, cuando aplique, cantidades o condiciones concretas (número de ideas, de fuentes, de errores admisibles, grado de autonomía requerido).
+5. LOS PESOS DEBEN SUMAR EXACTAMENTE 100. Verifícalo antes de responder. Asigna más peso a los criterios más relacionados con el objetivo.
+6. Incluye entre 4 y 6 criterios. Cada uno evalúa una dimensión DISTINTA: no repitas la misma habilidad con otro nombre.
+7. Los criterios deben derivarse del objetivo declarado y ser coherentes con los EBC del área.
+8. Todos los descriptores de un mismo criterio deben tener extensión similar.
+9. En "observations", indica al docente cómo aplicarla y cómo convertir los niveles en calificación.
+
 Formato JSON requerido:
 {
   "title": "Título de la rúbrica",
-  "subject": "Asignatura",
-  "rubricType": "Tipo de rúbrica",
-  "objective": "Objetivo o competencia a evaluar",
-  "levels": ["Nivel1", "Nivel2", "Nivel3"],
+  "subject": "Área o asignatura",
+  "grade": "Grado al que se dirige",
+  "rubricType": "Tipo de rúbrica indicado",
+  "objective": "Competencia o desempeño que se evalúa",
+  "levels": ["Nombre del nivel más alto", "Nivel intermedio", "Nivel más bajo"],
   "criteria": [
-    { "name": "Criterio de evaluación", "descriptions": { "Nivel1": "Descripción detallada", "Nivel2": "Descripción detallada", "Nivel3": "Descripción detallada" }, "weight": 25 }
+    {
+      "name": "Criterio de evaluación",
+      "descriptions": {
+        "Nombre del nivel más alto": "Qué hace o produce observablemente el estudiante en este nivel",
+        "Nivel intermedio": "Qué hace en este nivel, distinguible del anterior",
+        "Nivel más bajo": "Qué hace en este nivel"
+      },
+      "weight": 25
+    }
   ],
-  "observations": "Observaciones adicionales para el evaluador"
+  "observations": "Cómo aplicar la rúbrica y cómo traducir los niveles a calificación"
 }`;
 
     default:

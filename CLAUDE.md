@@ -116,6 +116,32 @@ Patrón establecido en [supabase/functions/generate-resource/index.ts](supabase/
 
 La `SERVICE_ROLE_KEY` es exclusiva del servidor: **jamás** debe aparecer en `src/`. Las claves de IA se guardan en secretos de Supabase, nunca en el repositorio.
 
+### Modelo de IA — reglas de la familia GPT-5
+
+Las cuatro funciones que llaman a la IA usan **`gpt-5.4`** con la clave de OpenAI que el administrador guarda en la tabla `platform_settings` (clave `openai_api_key`). No hay otro proveedor: todo pasa por ahí.
+
+⚠️ **La familia GPT-5 cambió parámetros respecto a GPT-4.** Verificado contra la API real:
+
+| Parámetro | GPT-5 |
+|---|---|
+| `max_tokens` | ❌ rechazado — usa `max_completion_tokens` |
+| `temperature` | ❌ rechazado — no lo envíes |
+| `response_format: json_object` | ✅ funciona |
+| Tool calling | ✅ funciona |
+
+Estos modelos consumen tokens internos de razonamiento que cuentan contra `max_completion_tokens`: déjalo holgado (mínimo 4000) o la respuesta llega truncada. Si algún día se vuelve a un modelo GPT-4, hay que revertir ambos parámetros.
+
+### Calidad de los prompts
+
+Un prompt que solo describe la estructura JSON produce contenido mínimo y genérico. Todo prompt de generación debe además:
+
+- Fijar **longitudes mínimas** por campo ("25-50 palabras CADA UNA, no frases sueltas").
+- **Prohibir explícitamente** las generalidades, con ejemplos de lo que no se acepta.
+- Exigir **concreción verificable**: pasos ejecutables, preguntas literales, cantidades.
+- Alinearse con **EBC y DBA** del MEN (ya está en el prompt base compartido).
+
+Referencias buenas dentro del repo: `slides` (generación en dos fases) y `lesson_plan`.
+
 ### Archivos autogenerados — no editar a mano
 
 `src/integrations/supabase/client.ts` y `types.ts`. Tras cambiar el esquema, regenera:

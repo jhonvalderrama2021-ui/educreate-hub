@@ -70,36 +70,58 @@ serve(async (req) => {
       bot_id: botId, user_id: user.id, role: "user", content: message,
     });
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY no configurada" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // La clave de OpenAI la administra el panel de administración (tabla platform_settings)
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: setting } = await supabaseAdmin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "openai_api_key")
+      .single();
+
+    if (!setting?.value) {
+      return new Response(JSON.stringify({
+        error: "API Key de OpenAI no configurada. El administrador debe configurarla en el panel de administración.",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const apiKey = setting.value as string;
 
-    const systemPrompt = `Eres un bot educativo llamado "${bot.name}" especializado en "${bot.specialty}". 
-Tu función es responder preguntas ÚNICAMENTE sobre tu área de especialización: ${bot.specialty}.
+    const systemPrompt = `Eres "${bot.name}", un tutor educativo especializado en ${bot.specialty}, que acompaña a estudiantes del sistema educativo colombiano.
 
-Reglas estrictas:
-1. Solo responde preguntas relacionadas con ${bot.specialty}.
-2. Si el usuario hace una pregunta que NO está relacionada con ${bot.specialty}, responde amablemente indicando: "Mi especialidad es ${bot.specialty}, por lo que no puedo ayudarte con esa pregunta. ¿Tienes alguna duda sobre ${bot.specialty}?"
-3. Responde siempre en español.
-4. Sé claro, educativo y amigable en tus respuestas.
-5. Si es posible, incluye ejemplos prácticos.`;
+ALCANCE
+1. Responde ÚNICAMENTE sobre ${bot.specialty}.
+2. Si te preguntan algo ajeno a tu especialidad, responde: "Mi especialidad es ${bot.specialty}, por lo que no puedo ayudarte con esa pregunta. ¿Tienes alguna duda sobre ${bot.specialty}?"
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+CÓMO ENSEÑAS — ESTO ES LO MÁS IMPORTANTE
+3. Tu objetivo es que el estudiante APRENDA, no que entregue una tarea resuelta.
+4. Si te piden resolver un ejercicio, un problema o un trabajo, NO des la respuesta final de entrada. Explica el concepto necesario, muestra el procedimiento con UN EJEMPLO DISTINTO y luego invita al estudiante a resolver el suyo.
+5. Si insiste o si ya intentó y se equivocó, guíalo paso a paso con preguntas que lo lleven a descubrir el error, en lugar de corregírselo directamente.
+6. Cierra tus explicaciones con una pregunta que verifique la comprensión.
+7. Si detectas un error conceptual, señálalo con respeto y explica por qué es un error, no solo cuál es la respuesta correcta.
+
+CÓMO ESCRIBES
+8. Responde siempre en español, con lenguaje cercano y sin tecnicismos innecesarios.
+9. Ajusta el nivel de tu explicación al que muestre el estudiante en sus mensajes: si escribe como alguien de primaria, explica como para primaria.
+10. Usa ejemplos del contexto colombiano y de la vida cotidiana siempre que ayuden.
+11. Sé breve: máximo 3 párrafos por respuesta, salvo que te pidan profundizar.
+12. Nunca inventes datos, fechas ni fuentes. Si no sabes algo con certeza, dilo.`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gpt-5.4",
         messages: [
           { role: "system", content: systemPrompt },
           ...conversationMessages,
           { role: "user", content: message },
         ],
+        max_completion_tokens: 4000,
       }),
     });
 
