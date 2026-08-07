@@ -7,10 +7,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Modelo de generación. La familia GPT-5 exige `max_completion_tokens`
+// Modelos de generación. La familia GPT-5 exige `max_completion_tokens`
 // y NO admite `temperature`: si se cambia a un modelo GPT-4, hay que
 // revertir ambos parámetros en las tres llamadas de este archivo.
-const MODEL = "gpt-5.4";
+//
+// Se reserva el modelo mayor para lo que más exige calidad y donde un
+// resultado pobre se nota de inmediato: los exámenes (construcción de
+// distractores plausibles) y las diapositivas. El resto usa el modelo
+// rápido, unas 3 veces más económico.
+const MODEL_ALTA_EXIGENCIA = "gpt-5.4";
+const MODEL_ECONOMICO = "gpt-5.4-mini";
+
+const TIPOS_ALTA_EXIGENCIA = new Set(["icfes", "true_false", "mixed", "slides"]);
+
+function pickModel(resourceType: string): string {
+  return TIPOS_ALTA_EXIGENCIA.has(resourceType) ? MODEL_ALTA_EXIGENCIA : MODEL_ECONOMICO;
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS")
@@ -148,7 +160,7 @@ serve(async (req) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
+        model: pickModel(resourceType),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userParts.join("\n") },
@@ -227,7 +239,7 @@ REGLAS:
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_ALTA_EXIGENCIA,
       messages: [
         { role: "system", content: sysPrompt },
         { role: "user", content: userPrompt },
@@ -322,7 +334,7 @@ Genera la slide JSON ahora.`;
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_ALTA_EXIGENCIA,
       messages: [
         { role: "system", content: sys },
         { role: "user", content: user },

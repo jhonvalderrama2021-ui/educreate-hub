@@ -118,7 +118,17 @@ La `SERVICE_ROLE_KEY` es exclusiva del servidor: **jamás** debe aparecer en `sr
 
 ### Modelo de IA — reglas de la familia GPT-5
 
-Las cuatro funciones que llaman a la IA usan **`gpt-5.4`** con la clave de OpenAI que el administrador guarda en la tabla `platform_settings` (clave `openai_api_key`). No hay otro proveedor: todo pasa por ahí.
+Todas las funciones usan la clave de OpenAI que el administrador guarda en la tabla `platform_settings` (clave `openai_api_key`). No hay otro proveedor: todo pasa por ahí.
+
+**El modelo se asigna según lo que exige cada recurso** (`pickModel()` en [generate-resource/index.ts](supabase/functions/generate-resource/index.ts)):
+
+| Modelo | Módulos | Por qué |
+|---|---|---|
+| `gpt-5.4` | Exámenes (`icfes`, `true_false`, `mixed`) y `slides` | Construir distractores plausibles y contenido visual denso es donde un modelo flojo se nota de inmediato |
+| `gpt-5.4-mini` | `workshop`, `lesson_plan`, `rubric`, chatbot, crucigrama, cuento | ~3 veces más barato y suficiente cuando el prompt ya impone la estructura |
+| `gpt-image-1-mini` | Ilustraciones del cuento | ~$0,011 por imagen; cada cuento genera 4 |
+
+Costo medido con los prompts actuales: examen ICFES ~$0,065 · taller ~$0,035 · rúbrica ~$0,020. Un PDF adjunto de 150 KB suma ~$0,09 de entrada. **Antes de agregar un módulo nuevo, decide en qué grupo entra.**
 
 ⚠️ **La familia GPT-5 cambió parámetros respecto a GPT-4.** Verificado contra la API real:
 
