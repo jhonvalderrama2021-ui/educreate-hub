@@ -13,6 +13,8 @@ const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const Resources = lazy(() => import("./pages/Resources"));
+const Privacidad = lazy(() => import("./pages/Privacidad"));
+const MisDatos = lazy(() => import("./pages/MisDatos"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/admin" element={<AdminPanel />} />
             <Route path="/resources/*" element={<Resources />} />
+            <Route path="/privacidad" element={<Privacidad />} />
+            <Route path="/mis-datos" element={<MisDatos />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

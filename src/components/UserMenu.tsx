@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate } from "react-router-dom";
-import { LogOut, ChevronDown, Home, LayoutDashboard, BookOpen, Shield, Settings } from "lucide-react";
+import { LogOut, ChevronDown, Home, LayoutDashboard, BookOpen, Shield, Settings, ShieldCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +68,10 @@ export function UserMenu() {
         <DropdownMenuItem onClick={() => navigate("/resources")} className="cursor-pointer">
           <BookOpen className="h-4 w-4 mr-2" />
           Recursos
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/mis-datos")} className="cursor-pointer">
+          <ShieldCheck className="h-4 w-4 mr-2" />
+          Mis datos
         </DropdownMenuItem>
         {isAdmin && (
           <>

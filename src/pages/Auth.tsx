@@ -214,7 +214,16 @@ export default function Auth() {
                       onCheckedChange={(checked) => setDataConsent(checked === true)}
                     />
                     <Label htmlFor="dataConsent" className="text-sm font-normal leading-snug cursor-pointer text-muted-foreground">
-                      Autorizo el manejo de mis datos personales de acuerdo con la política de privacidad.
+                      Autorizo el tratamiento de mis datos personales conforme a la{" "}
+                      <Link
+                        to="/privacidad"
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-primary hover:underline"
+                      >
+                        Política de Tratamiento de Datos Personales
+                      </Link>{" "}
+                      y a la Ley 1581 de 2012.
                     </Label>
                   </div>
                 </>
