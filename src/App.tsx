@@ -15,6 +15,7 @@ const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const Resources = lazy(() => import("./pages/Resources"));
 const Privacidad = lazy(() => import("./pages/Privacidad"));
 const MisDatos = lazy(() => import("./pages/MisDatos"));
+const RestablecerClave = lazy(() => import("./pages/RestablecerClave"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/resources/*" element={<Resources />} />
             <Route path="/privacidad" element={<Privacidad />} />
             <Route path="/mis-datos" element={<MisDatos />} />
+            <Route path="/restablecer" element={<RestablecerClave />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
