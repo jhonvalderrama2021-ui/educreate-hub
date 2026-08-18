@@ -109,8 +109,8 @@ export default function MisDatos() {
     }
     setCorreoNuevo("");
     toast.success(
-      `Enviamos un enlace de confirmación a ${correo}. El cambio se aplica cuando lo abras.`,
-      { duration: 12000 },
+      `Revisa tu correo actual y ${correo}: enviamos un enlace a cada uno. El cambio se aplica cuando abras ambos.`,
+      { duration: 14000 },
     );
   };
 
@@ -273,9 +273,10 @@ export default function MisDatos() {
             Cambiar correo electrónico
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Se enviará un enlace de confirmación al correo nuevo. El cambio se
-            aplica cuando abras ese enlace; hasta entonces sigues entrando con
-            el correo actual.
+            Por seguridad se enviará un enlace de confirmación <strong>a los dos
+            correos</strong>: al actual y al nuevo. El cambio se aplica cuando
+            abras ambos enlaces; hasta entonces sigues entrando con el correo
+            actual.
           </p>
           <div className="space-y-1.5">
             <Label htmlFor="correoNuevo">Correo nuevo</Label>
