@@ -17,6 +17,10 @@ const loginSchema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
 });
 
+const recuperarSchema = z.object({
+  email: z.string().trim().email("Correo electrónico inválido"),
+});
+
 const signupSchema = z.object({
   username: z.string().trim().min(3, "El nombre de usuario debe tener al menos 3 caracteres").max(50),
   name: z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres").max(100),
@@ -30,9 +34,15 @@ const signupSchema = z.object({
   path: ["confirmPassword"],
 });
 
+/** Modos de la pantalla: acceder, registrarse o recuperar la contraseña. */
+type Modo = "login" | "signup" | "recuperar";
+
 export default function Auth() {
   const [searchParams] = useSearchParams();
-  const [isLogin, setIsLogin] = useState(searchParams.get("mode") !== "signup");
+  const [modo, setModo] = useState<Modo>(
+    searchParams.get("mode") === "signup" ? "signup" : "login",
+  );
+  const isLogin = modo === "login";
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -53,7 +63,20 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      if (isLogin) {
+      if (modo === "recuperar") {
+        const parsed = recuperarSchema.parse({ email });
+        const { error } = await supabase.auth.resetPasswordForEmail(parsed.email, {
+          redirectTo: `${window.location.origin}/restablecer`,
+        });
+        if (error) throw error;
+        // No se revela si el correo existe: informar lo contrario permitiría
+        // averiguar qué cuentas están registradas en la plataforma.
+        toast.success(
+          "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña. Revisa también la carpeta de correo no deseado.",
+          { duration: 10000 },
+        );
+        setModo("login");
+      } else if (isLogin) {
         const parsed = loginSchema.parse({ email, password });
         const { error } = await supabase.auth.signInWithPassword({
           email: parsed.email,
@@ -112,16 +135,18 @@ export default function Auth() {
             </Link>
 
             <h1 className="text-2xl font-bold text-foreground mb-1">
-              {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+              {modo === "recuperar" ? "Recuperar contraseña" : isLogin ? "Iniciar sesión" : "Crear cuenta"}
             </h1>
             <p className="text-muted-foreground mb-6 text-sm">
-              {isLogin
+              {modo === "recuperar"
+                ? "Escribe el correo con el que te registraste y te enviaremos un enlace para crear una contraseña nueva."
+                : isLogin
                 ? "Ingresa a tu cuenta para continuar"
                 : "Únete y comienza a crear recursos educativos"}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!isLogin && (
+              {modo === "signup" && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="username">Nombre de usuario</Label>
@@ -161,20 +186,33 @@ export default function Auth() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
+              {modo !== "recuperar" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Contraseña</Label>
+                    {isLogin && (
+                      <button
+                        type="button"
+                        onClick={() => setModo("recuperar")}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    )}
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+              )}
 
-              {!isLogin && (
+              {modo === "signup" && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Repetir contraseña</Label>
@@ -231,20 +269,32 @@ export default function Auth() {
 
               <Button type="submit" className="w-full gradient-primary" size="lg" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+                {modo === "recuperar" ? "Enviar enlace de recuperación" : isLogin ? "Iniciar sesión" : "Crear cuenta"}
               </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
-              {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
-              <button
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="text-primary font-medium hover:underline"
-              >
-                {isLogin ? "Regístrate" : "Inicia sesión"}
-              </button>
-            </p>
+            {modo === "recuperar" ? (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => setModo("login")}
+                  className="text-primary font-medium hover:underline"
+                >
+                  Volver a iniciar sesión
+                </button>
+              </p>
+            ) : (
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
+                <button
+                  type="button"
+                  onClick={() => setModo(isLogin ? "signup" : "login")}
+                  className="text-primary font-medium hover:underline"
+                >
+                  {isLogin ? "Regístrate" : "Inicia sesión"}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </main>

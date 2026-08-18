@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArrowLeft, ShieldCheck, Save, Loader2, Download, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Save, Loader2, Download, AlertTriangle, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 /**
@@ -25,6 +25,12 @@ export default function MisDatos() {
   const [nombre, setNombre] = useState("");
   const [usuario, setUsuario] = useState("");
   const [conteos, setConteos] = useState({ recursos: 0, bots: 0, cursos: 0, notas: 0 });
+
+  const [correoNuevo, setCorreoNuevo] = useState("");
+  const [cambiandoCorreo, setCambiandoCorreo] = useState(false);
+  const [claveNueva, setClaveNueva] = useState("");
+  const [claveConfirmar, setClaveConfirmar] = useState("");
+  const [cambiandoClave, setCambiandoClave] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -78,6 +84,56 @@ export default function MisDatos() {
 
     if (error) toast.error("No se pudieron guardar los cambios");
     else toast.success("Datos actualizados");
+  };
+
+  const cambiarCorreo = async () => {
+    const correo = correoNuevo.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+      toast.error("Escribe un correo electrónico válido");
+      return;
+    }
+    if (correo === user?.email?.toLowerCase()) {
+      toast.error("Ese ya es tu correo actual");
+      return;
+    }
+    setCambiandoCorreo(true);
+    const { error } = await supabase.auth.updateUser(
+      { email: correo },
+      { emailRedirectTo: `${window.location.origin}/mis-datos` },
+    );
+    setCambiandoCorreo(false);
+
+    if (error) {
+      toast.error(error.message || "No se pudo iniciar el cambio de correo");
+      return;
+    }
+    setCorreoNuevo("");
+    toast.success(
+      `Revisa tu correo actual y ${correo}: enviamos un enlace a cada uno. El cambio se aplica cuando abras ambos.`,
+      { duration: 14000 },
+    );
+  };
+
+  const cambiarClave = async () => {
+    if (claveNueva.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    if (claveNueva !== claveConfirmar) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+    setCambiandoClave(true);
+    const { error } = await supabase.auth.updateUser({ password: claveNueva });
+    setCambiandoClave(false);
+
+    if (error) {
+      toast.error(error.message || "No se pudo actualizar la contraseña");
+      return;
+    }
+    setClaveNueva("");
+    setClaveConfirmar("");
+    toast.success("Contraseña actualizada");
   };
 
   const descargarDatos = async () => {
@@ -207,6 +263,70 @@ export default function MisDatos() {
           <Button onClick={guardar} disabled={guardando} size="sm">
             {guardando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Guardar cambios
+          </Button>
+        </section>
+
+        {/* Cambiar correo electrónico */}
+        <section className="border border-border rounded-lg p-5 space-y-4">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <Mail className="h-4 w-4 text-primary" />
+            Cambiar correo electrónico
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Por seguridad se enviará un enlace de confirmación <strong>a los dos
+            correos</strong>: al actual y al nuevo. El cambio se aplica cuando
+            abras ambos enlaces; hasta entonces sigues entrando con el correo
+            actual.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="correoNuevo">Correo nuevo</Label>
+            <Input
+              id="correoNuevo"
+              type="email"
+              placeholder="nuevo@correo.com"
+              value={correoNuevo}
+              onChange={(e) => setCorreoNuevo(e.target.value)}
+            />
+          </div>
+          <Button onClick={cambiarCorreo} disabled={cambiandoCorreo} size="sm" variant="outline">
+            {cambiandoCorreo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+            Enviar confirmación
+          </Button>
+        </section>
+
+        {/* Cambiar contraseña */}
+        <section className="border border-border rounded-lg p-5 space-y-4">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-primary" />
+            Cambiar contraseña
+          </h2>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="claveNueva">Contraseña nueva</Label>
+              <Input
+                id="claveNueva"
+                type="password"
+                placeholder="••••••••"
+                value={claveNueva}
+                onChange={(e) => setClaveNueva(e.target.value)}
+                minLength={6}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="claveConfirmar">Repetir contraseña nueva</Label>
+              <Input
+                id="claveConfirmar"
+                type="password"
+                placeholder="••••••••"
+                value={claveConfirmar}
+                onChange={(e) => setClaveConfirmar(e.target.value)}
+                minLength={6}
+              />
+            </div>
+          </div>
+          <Button onClick={cambiarClave} disabled={cambiandoClave} size="sm" variant="outline">
+            {cambiandoClave ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
+            Actualizar contraseña
           </Button>
         </section>
 
