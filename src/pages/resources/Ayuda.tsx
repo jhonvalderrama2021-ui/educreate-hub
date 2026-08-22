@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   HelpCircle, ChevronDown, FileCheck, ClipboardList, Table2, FileEdit,
   Presentation, Bot, Puzzle, BookText, GraduationCap, History, Upload,
   Pencil, Download, ShieldCheck, Sparkles, X, Check, Lightbulb,
 } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { urlImagenAyuda } from "@/components/GestorImagenesAyuda";
+import { supabase } from "@/integrations/supabase/client";
 
 /* ─────────────────────────── Tipos ─────────────────────────── */
 
@@ -315,7 +317,14 @@ const PROBLEMAS = [
 
 /* ─────────────────────── Componentes ─────────────────────── */
 
-function Acordeon({ modulo }: { modulo: Modulo }) {
+interface ImagenAyuda {
+  id: string;
+  seccion: string;
+  ruta: string;
+  descripcion: string | null;
+}
+
+function Acordeon({ modulo, imagenes }: { modulo: Modulo; imagenes: ImagenAyuda[] }) {
   const [abierto, setAbierto] = useState(false);
   const Icono = modulo.icono;
 
@@ -418,6 +427,32 @@ function Acordeon({ modulo }: { modulo: Modulo }) {
               <p className="text-sm text-muted-foreground leading-relaxed">{modulo.consejo}</p>
             </div>
           )}
+
+          {/* Capturas que el administrador sube desde su panel */}
+          {imagenes.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">
+                Así se ve en la plataforma
+              </p>
+              <div className="space-y-3">
+                {imagenes.map((img) => (
+                  <figure key={img.id} className="space-y-1">
+                    <img
+                      src={urlImagenAyuda(img.ruta)}
+                      alt={img.descripcion || modulo.titulo}
+                      className="w-full rounded-lg border border-border"
+                      loading="lazy"
+                    />
+                    {img.descripcion && (
+                      <figcaption className="text-xs text-muted-foreground text-center">
+                        {img.descripcion}
+                      </figcaption>
+                    )}
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -425,6 +460,18 @@ function Acordeon({ modulo }: { modulo: Modulo }) {
 }
 
 export default function Ayuda() {
+  const [imagenes, setImagenes] = useState<ImagenAyuda[]>([]);
+
+  useEffect(() => {
+    (supabase as any)
+      .from("ayuda_imagenes")
+      .select("id, seccion, ruta, descripcion")
+      .order("orden")
+      .then(({ data }: any) => setImagenes(data || []));
+  }, []);
+
+  const deSeccion = (id: string) => imagenes.filter((i) => i.seccion === id);
+
   return (
     <div className="max-w-3xl mx-auto space-y-8 animate-fade-in">
       <header className="text-center">
@@ -443,7 +490,7 @@ export default function Ayuda() {
         <p className="text-sm text-muted-foreground">
           Si es tu primera vez, empieza por aquí.
         </p>
-        {PRIMEROS_PASOS.map((m) => <Acordeon key={m.id} modulo={m} />)}
+        {PRIMEROS_PASOS.map((m) => <Acordeon key={m.id} modulo={m} imagenes={deSeccion(m.id)} />)}
       </section>
 
       <section className="space-y-3">
@@ -451,7 +498,7 @@ export default function Ayuda() {
         <p className="text-sm text-muted-foreground">
           Qué hace, cuándo usar cada opción y un ejemplo de qué escribir.
         </p>
-        {MODULOS.map((m) => <Acordeon key={m.id} modulo={m} />)}
+        {MODULOS.map((m) => <Acordeon key={m.id} modulo={m} imagenes={deSeccion(m.id)} />)}
       </section>
 
       <section className="space-y-3">

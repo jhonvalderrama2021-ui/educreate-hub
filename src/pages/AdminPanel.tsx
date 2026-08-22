@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/select";
 import {
   FileText, Shield, ArrowLeft, Key, Eye, EyeOff, Save, CheckCircle,
-  Users, Settings, BarChart3, Search, MessageSquare
+  Users, Settings, BarChart3, Search, MessageSquare, ImagePlus
 } from "lucide-react";
 import { toast } from "sonner";
 import { PanelObservaciones } from "@/components/PanelObservaciones";
+import { GestorImagenesAyuda } from "@/components/GestorImagenesAyuda";
 
 type UserWithRole = {
   id: string;
@@ -234,6 +235,10 @@ export default function AdminPanel() {
               <Settings className="h-4 w-4" />
               Configuración IA
             </TabsTrigger>
+            <TabsTrigger value="imagenes-ayuda" className="gap-1.5">
+              <ImagePlus className="h-4 w-4" />
+              Imágenes de ayuda
+            </TabsTrigger>
             <TabsTrigger value="observaciones" className="gap-1.5">
               <MessageSquare className="h-4 w-4" />
               Observaciones
@@ -376,6 +381,20 @@ export default function AdminPanel() {
                   </p>
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Capturas que ilustran el centro de ayuda */}
+          <TabsContent value="imagenes-ayuda" className="mt-4">
+            <div className="rounded-xl border border-border bg-card shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="font-semibold text-foreground">Imágenes del centro de ayuda</h2>
+                <p className="text-sm text-muted-foreground">
+                  Sube capturas de pantalla para ilustrar cada sección. Se ven de inmediato
+                  en la ayuda, sin necesidad de publicar una versión nueva de la plataforma.
+                </p>
+              </div>
+              <GestorImagenesAyuda />
             </div>
           </TabsContent>
 
