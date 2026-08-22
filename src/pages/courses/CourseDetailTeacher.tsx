@@ -382,17 +382,31 @@ function ManualEnrollButton({ courseId, onAdded }: { courseId: string; onAdded: 
     if (!email.trim()) return;
     setSaving(true);
     try {
-      const { data: profiles, error: pErr } = await (supabase as any)
-        .from("profiles").select("id").eq("email", email.trim().toLowerCase()).limit(1);
+      // Se resuelve el correo mediante una función del servidor: consultar
+      // `profiles` directamente devolvía cero filas al docente, porque solo
+      // puede ver su propio perfil.
+      const { data: estudianteId, error: pErr } = await (supabase as any)
+        .rpc("buscar_usuario_por_correo", { _correo: email.trim() });
       if (pErr) throw pErr;
-      if (!profiles || profiles.length === 0) {
-        toast.error("No se encontró un usuario con ese email");
+
+      if (!estudianteId) {
+        toast.error(
+          "No hay ninguna cuenta registrada con ese correo. El estudiante debe crear su cuenta antes de que puedas inscribirlo.",
+          { duration: 8000 },
+        );
         return;
       }
+
       const { error } = await (supabase as any).from("course_enrollments").insert({
-        course_id: courseId, student_id: profiles[0].id,
+        course_id: courseId, student_id: estudianteId,
       });
-      if (error) throw error;
+      if (error) {
+        if (/duplicate key|unique/i.test(error.message)) {
+          toast.error("Ese estudiante ya está inscrito en el curso");
+          return;
+        }
+        throw error;
+      }
       toast.success("Estudiante inscrito");
       setEmail(""); setOpen(false); onAdded();
     } catch (e: any) {
