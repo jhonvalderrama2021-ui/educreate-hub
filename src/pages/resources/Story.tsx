@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Loader2, Download, Save, RefreshCcw } from "lucide-react";
+import { BookOpen, Sparkles, Loader2, Download, Save, RefreshCcw } from "lucide-react";
+import { CampoObservacion } from "@/components/CampoObservacion";
 
 export interface StoryChapter {
   title: string;
@@ -183,6 +184,9 @@ export default function Story() {
           }}
         />
       )}
+      <div className="mt-6">
+        <CampoObservacion modulo="cuento" />
+      </div>
     </div>
   );
 }

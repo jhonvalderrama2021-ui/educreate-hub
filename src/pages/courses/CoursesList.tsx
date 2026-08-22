@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { GraduationCap, Plus, KeyRound, Users, BookOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
+import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
+import { CampoObservacion } from "@/components/CampoObservacion";
 
 export default function CoursesList() {
   const { user } = useAuth();
@@ -204,6 +205,9 @@ export default function CoursesList() {
           </div>
         )}
       </section>
+      <div className="mt-6">
+        <CampoObservacion modulo="mini_cursos" />
+      </div>
     </div>
   );
 }

@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/select";
 import {
   FileText, Shield, ArrowLeft, Key, Eye, EyeOff, Save, CheckCircle,
-  Users, Settings, BarChart3, Search
+  Users, Settings, BarChart3, Search, MessageSquare
 } from "lucide-react";
 import { toast } from "sonner";
+import { PanelObservaciones } from "@/components/PanelObservaciones";
 
 type UserWithRole = {
   id: string;
@@ -233,6 +234,10 @@ export default function AdminPanel() {
               <Settings className="h-4 w-4" />
               Configuración IA
             </TabsTrigger>
+            <TabsTrigger value="observaciones" className="gap-1.5">
+              <MessageSquare className="h-4 w-4" />
+              Observaciones
+            </TabsTrigger>
           </TabsList>
 
           {/* Users Tab */}
@@ -371,6 +376,19 @@ export default function AdminPanel() {
                   </p>
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Observaciones recogidas durante la prueba piloto */}
+          <TabsContent value="observaciones" className="mt-4">
+            <div className="rounded-xl border border-border bg-card shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="font-semibold text-foreground">Observaciones de los docentes</h2>
+                <p className="text-sm text-muted-foreground">
+                  Retroalimentación que dejan los docentes desde cada módulo durante la prueba piloto
+                </p>
+              </div>
+              <PanelObservaciones />
             </div>
           </TabsContent>
         </Tabs>

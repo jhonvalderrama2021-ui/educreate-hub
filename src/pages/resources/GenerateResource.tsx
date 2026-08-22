@@ -10,6 +10,7 @@ import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { CampoObservacion } from "@/components/CampoObservacion";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -868,6 +869,12 @@ export default function GenerateResource() {
           }}
         />
       )}
+
+      {/* El módulo se identifica por el tipo de recurso, para poder analizar
+          después qué sección concentra más observaciones. */}
+      <div className="mt-6">
+        <CampoObservacion modulo={resourceType} />
+      </div>
     </div>
   );
 }

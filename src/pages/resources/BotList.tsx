@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Bot, Plus, Trash2, MessageCircle, Sparkles } from "lucide-react";
+import { Bot, Plus, Trash2, MessageCircle, Sparkles } from "lucide-react";
+import { CampoObservacion } from "@/components/CampoObservacion";
 
 interface BotItem {
   id: string;
@@ -173,6 +174,9 @@ export default function BotList() {
           ))}
         </div>
       )}
+      <div className="mt-6">
+        <CampoObservacion modulo="bots" />
+      </div>
     </div>
   );
 }

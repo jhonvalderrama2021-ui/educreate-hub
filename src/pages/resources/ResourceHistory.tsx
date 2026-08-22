@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
-import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { CampoObservacion } from "@/components/CampoObservacion";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -240,6 +241,9 @@ export default function ResourceHistory() {
           }}
         />
       )}
+      <div className="mt-6">
+        <CampoObservacion modulo="historial" />
+      </div>
     </div>
   );
 }

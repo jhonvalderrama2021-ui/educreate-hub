@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
+import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
+import { CampoObservacion } from "@/components/CampoObservacion";
 
 export interface CrosswordClue {
   number: number;
@@ -263,6 +264,9 @@ export default function Crossword() {
           }}
         />
       )}
+      <div className="mt-6">
+        <CampoObservacion modulo="crucigrama" />
+      </div>
     </div>
   );
 }
