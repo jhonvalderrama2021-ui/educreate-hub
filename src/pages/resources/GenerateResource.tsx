@@ -90,6 +90,18 @@ const METHODOLOGIES = [
   "Clase magistral",
 ];
 
+/**
+ * Nivel de exigencia del examen. Lo decide el docente, no el sistema: puede
+ * querer un diagnóstico sencillo al inicio del tema y una prueba exigente al
+ * cierre, sobre el mismo contenido.
+ */
+const COMPLEXITY_LEVELS = [
+  { value: "basico", label: "Básico", desc: "Reconocer e identificar. Para diagnóstico o inicio de tema" },
+  { value: "intermedio", label: "Intermedio", desc: "Interpretar y aplicar en situaciones conocidas" },
+  { value: "avanzado", label: "Avanzado", desc: "Analizar, comparar y resolver situaciones nuevas" },
+  { value: "icfes", label: "Como prueba Saber 11", desc: "Mezcla los tres niveles, igual que la prueba oficial" },
+];
+
 const EXAM_TYPES = [
   { value: "icfes", label: "Tipo ICFES", desc: "Selección múltiple con única respuesta" },
   { value: "true_false", label: "Falso y Verdadero", desc: "Preguntas con opción V/F" },
@@ -113,7 +125,7 @@ const PERFORMANCE_LEVELS = [
 ];
 
 const RESOURCE_FIELDS: Record<string, string[]> = {
-  icfes: ["numItems", "examType"],
+  icfes: ["numItems", "examType", "examComplexity"],
   workshop: ["methodology", "duration"],
   slides: ["numSlides"],
   lesson_plan: ["methodology", "duration"],
@@ -141,6 +153,7 @@ export default function GenerateResource() {
   const [instructions, setInstructions] = useState("");
   const [numItems, setNumItems] = useState<number | "">(10);
   const [examType, setExamType] = useState("icfes");
+  const [examComplexity, setExamComplexity] = useState("icfes");
   const [numSlides, setNumSlides] = useState<number | "">(8);
   const [slidePalette, setSlidePalette] = useState<string>("academic");
 
@@ -301,6 +314,8 @@ export default function GenerateResource() {
     if (resourceType === "icfes" && examType) {
       const examLabel = EXAM_TYPES.find(t => t.value === examType)?.label || examType;
       parts.push(`Tipo de examen: ${examLabel}`);
+      const nivel = COMPLEXITY_LEVELS.find(c => c.value === examComplexity);
+      if (nivel) parts.push(`Nivel de complejidad: ${nivel.label}. ${nivel.desc}`);
     }
     if (resourceType === "rubric") {
       const resolvedRubricType = rubricType === "otro" ? customRubricType : RUBRIC_TYPES.find(r => r.value === rubricType)?.label || rubricType;
@@ -508,6 +523,27 @@ export default function GenerateResource() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        )}
+
+        {/* Nivel de complejidad: lo decide el docente según el momento del tema */}
+        {resourceType === "icfes" && (
+          <div className="space-y-2">
+            <Label>Nivel de complejidad <span className="text-destructive">*</span></Label>
+            <Select value={examComplexity} onValueChange={setExamComplexity}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {COMPLEXITY_LEVELS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>
+                    {c.label} — {c.desc}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Puedes aplicar un examen básico al inicio del tema y uno avanzado al cierre,
+              para comparar el avance del grupo.
+            </p>
           </div>
         )}
 

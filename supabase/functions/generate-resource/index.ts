@@ -528,13 +528,21 @@ REGLAS DE CONSTRUCCIÓN DEL ÍTEM:
 3. Declara en "competency" la competencia evaluada, propia del área (ejemplos: "Interpretación y representación" o "Formulación y ejecución" en Matemáticas; "Identificar" o "Explicar" o "Indagar" en Ciencias Naturales; "Identificar y comprender" o "Reflexionar y evaluar" en Lectura Crítica; "Pensamiento social" o "Multiperspectivismo" en Sociales).
 4. Declara en "level" el nivel de desempeño del 1 al 4 (1 el más básico, 4 el más exigente). Distribuye las preguntas en distintos niveles; no las hagas todas fáciles ni todas difíciles.
 
+NIVEL DE COMPLEJIDAD:
+5. Las instrucciones del docente indican el nivel de complejidad. Respétalo, porque determina el tipo de razonamiento que se exige:
+   - Básico: predomina reconocer, identificar y relacionar información explícita en el contexto. Concentra las preguntas en niveles 1 y 2.
+   - Intermedio: predomina interpretar y aplicar un procedimiento conocido a una situación similar a las trabajadas en clase. Concentra las preguntas en niveles 2 y 3.
+   - Avanzado: predomina analizar, comparar, inferir y resolver situaciones nuevas que exigen transferir lo aprendido. Concentra las preguntas en niveles 3 y 4.
+   - Como prueba Saber 11: distribuye las preguntas entre los cuatro niveles, como en la prueba oficial.
+6. El nivel de complejidad cambia la exigencia cognitiva, NO el tema ni la extensión del contexto. Un examen básico sigue partiendo de un contexto y sigue exigiendo comprender: nunca se reduce a memorizar definiciones.
+
 REGLAS DE LOS DISTRACTORES — LO MÁS IMPORTANTE:
-5. Cada opción incorrecta debe representar un ERROR CONCEPTUAL TÍPICO y reconocible de un estudiante: una confusión frecuente, un error de procedimiento, una lectura parcial del contexto o una generalización indebida.
-6. PROHIBIDAS las opciones absurdas, obviamente falsas o de relleno. Un estudiante que no domine el tema debe poder dudar entre al menos dos opciones.
-7. Todas las opciones deben tener extensión y estructura gramatical similares. La correcta no puede ser la más larga ni la más detallada.
-8. Explica en "distractorRationale" qué error específico comete quien elige cada opción incorrecta.
-9. Prohibido usar "todas las anteriores", "ninguna de las anteriores" o negaciones dobles.
-10. NO marques ni resaltes la respuesta correcta dentro de las opciones. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
+7. Cada opción incorrecta debe representar un ERROR CONCEPTUAL TÍPICO y reconocible de un estudiante: una confusión frecuente, un error de procedimiento, una lectura parcial del contexto o una generalización indebida.
+8. PROHIBIDAS las opciones absurdas, obviamente falsas o de relleno. Un estudiante que no domine el tema debe poder dudar entre al menos dos opciones.
+9. Todas las opciones deben tener extensión y estructura gramatical similares. La correcta no puede ser la más larga ni la más detallada.
+10. Explica en "distractorRationale" qué error específico comete quien elige cada opción incorrecta.
+11. Prohibido usar "todas las anteriores", "ninguna de las anteriores" o negaciones dobles.
+12. NO marques ni resaltes la respuesta correcta dentro de las opciones. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
 
 Formato JSON requerido:
 {
