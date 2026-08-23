@@ -17,12 +17,12 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, Download, CopyPlus,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAccessCode } from "@/lib/courses-types";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
-import { revisarEntrega, notaColombiana, formatearDuracion, descargarCSV } from "@/lib/examen-respuestas";
+import { PanelEstudiantesCurso } from "@/components/PanelEstudiantesCurso";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -101,47 +101,6 @@ export default function CourseDetailTeacher() {
       return Object.fromEntries((data || []).map((r: any) => [r.id, r.content])) as Record<string, any>;
     },
   });
-
-  /**
-   * "O una opcion que le de para extraer todos" — pedido del asesor.
-   * Una fila por pregunta y estudiante: asi el docente puede ordenar en Excel
-   * y ver que punto fallo el grupo entero, que es lo que sirve para
-   * reorientar la clase.
-   */
-  const exportarTodo = () => {
-    if (submissions.length === 0) return toast.error("Aun no hay entregas que exportar");
-    const filas: (string | number)[][] = [
-      ["Estudiante", "Correo", "Actividad", "Tipo", "Aciertos", "Total", "Nota (1-5)",
-       "Tiempo", "Fecha", "N° pregunta", "Enunciado", "Respondio", "Correcta", "¿Acerto?"],
-    ];
-    for (const s of submissions) {
-      const enr = enrollments.find((e: any) => e.student_id === s.student_id);
-      const cr = resources.find((r) => r.id === s.course_resource_id);
-      const preguntas = revisarEntrega(cr ? contenidos[cr.resource_id] : null, s);
-      const cabecera = [
-        enr?.profile?.full_name || s.student_id.slice(0, 8),
-        enr?.profile?.email || "",
-        cr?.title || "",
-        s.resource_type,
-        s.score ?? "",
-        s.max_score ?? "",
-        notaColombiana(s.score, s.max_score),
-        formatearDuracion(s.time_spent_seconds),
-        new Date(s.submitted_at).toLocaleString("es-CO"),
-      ];
-      if (preguntas.length === 0) { filas.push([...cabecera, "", "", "", "", ""]); continue; }
-      for (const p of preguntas) {
-        filas.push([
-          ...cabecera, p.numero, p.enunciado,
-          p.opciones[p.marcada]?.text ?? "(sin responder)",
-          p.opciones[p.correcta]?.text ?? "",
-          p.acerto ? "Si" : "No",
-        ]);
-      }
-    }
-    descargarCSV(`resultados-${(course?.name || "curso").replace(/s+/g, "_")}.csv`, filas);
-    toast.success("Archivo descargado");
-  };
 
   const removeResource = async (id: string) => {
     if (!confirm("¿Quitar este recurso del curso?")) return;
@@ -285,56 +244,17 @@ export default function CourseDetailTeacher() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4 mt-4">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-muted-foreground">
-              Pulsa sobre un estudiante para ver lo que respondio en cada pregunta.
-            </p>
-            <Button variant="outline" size="sm" onClick={exportarTodo} disabled={submissions.length === 0}>
-              <Download className="h-4 w-4 mr-2" /> Extraer todos
-            </Button>
-          </div>
-          {submissions.length === 0 ? (
-            <div className="glass-card rounded-xl p-8 text-center text-muted-foreground">
-              Aún no hay entregas.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Estudiante</TableHead>
-                  <TableHead>Recurso</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Nota</TableHead>
-                  <TableHead>Tiempo</TableHead>
-                  <TableHead>Fecha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {submissions.map((s) => {
-                  const enr = enrollments.find((e: any) => e.student_id === s.student_id);
-                  const res = resources.find((r) => r.id === s.course_resource_id);
-                  return (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/resources/courses/${courseId}/student-report/${s.student_id}`)}
-                          className="text-left hover:text-primary hover:underline transition-colors"
-                        >
-                          {enr?.profile?.full_name || s.student_id.slice(0, 8)}
-                        </button>
-                      </TableCell>
-                      <TableCell className="line-clamp-1">{res?.title || "—"}</TableCell>
-                      <TableCell><span className="text-xs">{s.resource_type}</span></TableCell>
-                      <TableCell>{s.score !== null ? `${s.score} / ${s.max_score ?? "?"}` : "—"}</TableCell>
-                      <TableCell className="text-xs">{s.time_spent_seconds ? `${Math.floor(s.time_spent_seconds / 60)}m ${s.time_spent_seconds % 60}s` : "—"}</TableCell>
-                      <TableCell className="text-xs">{new Date(s.submitted_at).toLocaleString()}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+          {/* En cuadrícula y no en tabla: con treinta estudiantes y cinco
+              actividades, una fila por entrega son ciento cincuenta filas
+              donde no se distingue quién va al día y quién no ha entrado. */}
+          <PanelEstudiantesCurso
+            courseId={courseId!}
+            nombreCurso={course.name}
+            inscripciones={enrollments}
+            recursos={resources}
+            entregas={submissions}
+            contenidos={contenidos}
+          />
         </TabsContent>
       </Tabs>
     </div>

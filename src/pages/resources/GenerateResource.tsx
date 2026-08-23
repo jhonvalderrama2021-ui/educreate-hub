@@ -13,6 +13,7 @@ import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { useCatalogo } from "@/hooks/useCatalogo";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
+import { DialogoEditarRecurso } from "@/components/DialogoEditarRecurso";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,7 +127,6 @@ export default function GenerateResource() {
   const [generating, setGenerating] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editableContent, setEditableContent] = useState<any>(null);
   const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -162,7 +162,6 @@ export default function GenerateResource() {
     setResourceType(typeParam || "icfes");
     if (recursoParam) return; // lo carga el efecto de abajo
     setGeneratedContent(null);
-    setEditableContent(null);
     setIsEditing(false);
     setRecursoId(null);
   }, [typeParam, recursoParam]);
@@ -329,7 +328,6 @@ export default function GenerateResource() {
 
     setGenerating(true);
     setGeneratedContent(null);
-    setEditableContent(null);
     setIsEditing(false);
 
     try {
@@ -352,7 +350,6 @@ export default function GenerateResource() {
 
       if (!title && result.title) setTitle(result.title);
       setGeneratedContent(result);
-      setEditableContent(JSON.parse(JSON.stringify(result)));
       setRecursoId(null);
 
       // Se guarda solo: hasta ahora, si el docente cerraba la pestana o se le
@@ -377,7 +374,11 @@ export default function GenerateResource() {
    * Separado de handleSave para poder reutilizarlo en el guardado
    * automatico sin arrastrar los avisos ni el estado del boton.
    */
-  const persistirRecurso = async (contenido: any, id: string | null): Promise<string | null> => {
+  const persistirRecurso = async (
+    contenido: any,
+    id: string | null,
+    tituloExplicito?: string,
+  ): Promise<string | null> => {
     if (!user || !contenido) return null;
     try {
       let sourcePdfUrl: string | null = null;
@@ -390,7 +391,7 @@ export default function GenerateResource() {
       }
 
       const datos: Record<string, any> = {
-        title: title || contenido.title || "Recurso sin título",
+        title: tituloExplicito?.trim() || title || contenido.title || "Recurso sin título",
         resource_type: resourceType,
         content: contenido,
         is_public: isPublic,
@@ -423,8 +424,7 @@ export default function GenerateResource() {
   const handleSave = async () => {
     if (!user || !generatedContent) return;
     setSaving(true);
-    const contenido = isEditing ? editableContent : generatedContent;
-    const id = await persistirRecurso(contenido, recursoId);
+    const id = await persistirRecurso(generatedContent, recursoId);
     if (id) {
       setRecursoId(id);
       toast.success(recursoId ? "Cambios guardados" : "Recurso guardado en tu historial");
@@ -440,7 +440,6 @@ export default function GenerateResource() {
     setTitle(r.title);
     setIsPublic(r.is_public);
     setGeneratedContent(r.content);
-    setEditableContent(JSON.parse(JSON.stringify(r.content)));
     setIsEditing(false);
     if (r.subject) setSubject(SUBJECTS.includes(r.subject) ? r.subject : "Otras");
     if (r.subject && !SUBJECTS.includes(r.subject)) setCustomSubject(r.subject);
@@ -453,7 +452,6 @@ export default function GenerateResource() {
     if (recursoParam) setSearchParams({ type: resourceType }, { replace: true });
     setRecursoId(null);
     setGeneratedContent(null);
-    setEditableContent(null);
     setIsEditing(false);
     setTitle("");
   };
@@ -474,7 +472,9 @@ export default function GenerateResource() {
   const currentType = RESOURCE_TYPES.find((t) => t.value === resourceType);
   const TypeIcon = currentType?.icon || Sparkles;
 
-  const displayContent = isEditing ? editableContent : generatedContent;
+  // El visor de la página siempre muestra lo guardado. La edición vive en su
+  // propio panel y solo escribe aquí cuando el docente guarda.
+  const displayContent = generatedContent;
 
   return (
     // El formulario a la izquierda y la franja con lo ya creado a la derecha,
@@ -872,18 +872,8 @@ export default function GenerateResource() {
                   <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
                   <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
                 </div>
-                <Button
-                  variant={isEditing ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => {
-                    if (!isEditing) {
-                      setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
-                    }
-                    setIsEditing(!isEditing);
-                  }}
-                >
-                  <Pencil className="h-4 w-4 mr-1" />
-                  {isEditing ? "Viendo edición" : "Editar"}
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Pencil className="h-4 w-4 mr-1" /> Editar
                 </Button>
                 <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
                   <Save className="h-4 w-4 mr-1" />
@@ -920,34 +910,44 @@ export default function GenerateResource() {
               <div className="mb-4">
                 <AvisoContenidoIA meta={displayContent?._meta} />
               </div>
+              {/* Solo lectura: la edición vive en su propio panel, y dejar
+                  los dos editables a la vez llevaría a que cada uno pisara
+                  los cambios del otro. */}
               {resourceType === "slides" ? (
                 <SlideViewer
                   slides={displayContent?.slides || []}
                   title={displayContent?.title}
                   theme={displayContent?.theme}
-                  editable={isEditing}
-                  onSlideChange={(idx, updated) => {
-                    setEditableContent((prev: any) => {
-                      const base = prev || JSON.parse(JSON.stringify(generatedContent));
-                      const nextSlides = [...(base.slides || [])];
-                      nextSlides[idx] = updated;
-                      return { ...base, slides: nextSlides };
-                    });
-                  }}
                 />
               ) : (
-                <ResourceContentViewer
-                  type={resourceType}
-                  content={displayContent}
-                  editable={isEditing}
-                  onContentChange={isEditing ? setEditableContent : undefined}
-                />
+                <ResourceContentViewer type={resourceType} content={displayContent} />
               )}
             </div>
           </div>
         )}
 
-        {exportDialog && resourceType !== "slides" && (
+        {/* La edición ocupa su propio panel: antes se abría debajo del recurso
+          y el docente tenía que desplazarse para encontrar los campos. */}
+      {isEditing && generatedContent && (
+        <DialogoEditarRecurso
+          abierto
+          onCerrar={() => setIsEditing(false)}
+          tipo={resourceType}
+          contenidoOriginal={generatedContent}
+          tituloOriginal={title || generatedContent?.title || ""}
+          onGuardar={async (contenido, nuevoTitulo) => {
+            const id = await persistirRecurso(contenido, recursoId, nuevoTitulo);
+            if (!id) { toast.error("No se pudieron guardar los cambios"); return false; }
+            setRecursoId(id);
+            setTitle(nuevoTitulo);
+            setGeneratedContent(contenido);
+            toast.success("Cambios guardados");
+            return true;
+          }}
+        />
+      )}
+
+      {exportDialog && resourceType !== "slides" && (
           <ExportOptionsDialog
             open={!!exportDialog}
             onOpenChange={(o) => !o && setExportDialog(null)}

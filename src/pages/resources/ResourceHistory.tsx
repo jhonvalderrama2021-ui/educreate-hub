@@ -6,9 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
@@ -19,6 +17,7 @@ import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { rutaDelRecurso } from "@/lib/ruta-modulo";
+import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -49,9 +48,11 @@ export default function ResourceHistory() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState("all");
-  const [filtroAsignatura, setFiltroAsignatura] = useState("all");
-  const [filtroGrado, setFiltroGrado] = useState("all");
+  // Selección múltiple: un docente que dicta la misma materia en varios
+  // grados tenía que mirar sus recursos de a un grado por vez.
+  const [tipos, setTipos] = useState<string[]>([]);
+  const [asignaturasSel, setAsignaturasSel] = useState<string[]>([]);
+  const [gradosSel, setGradosSel] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
@@ -88,14 +89,22 @@ export default function ResourceHistory() {
     return () => { supabase.removeChannel(channel); };
   }, [user, queryClient]);
 
-  // Valores disponibles, tomados de los recursos que el docente ya tiene
-  const asignaturas = [...new Set(allResources.map((r) => r.subject).filter(Boolean))].sort() as string[];
-  const grados = [...new Set(allResources.map((r) => r.grade).filter(Boolean))].sort() as string[];
+  // Las opciones salen de lo que el docente realmente tiene, con el conteo
+  // de cada una: un catálogo fijo mostraría asignaturas vacías.
+  const opcionesTipo = opcionesDe(allResources, (r) => r.resource_type,
+    (v) => TYPE_LABELS[v]?.label || v);
+  const opcionesAsignatura = opcionesDe(allResources, (r) => r.subject);
+  const opcionesGrado = opcionesDe(allResources, (r) => r.grade, (g) => `Grado ${g}`);
 
+  const hayFiltros = tipos.length > 0 || asignaturasSel.length > 0 || gradosSel.length > 0;
+
+  // Sin nada marcado no se filtra: la lista muestra todo, que es lo que
+  // espera quien abre la pantalla por primera vez.
   const resources = allResources.filter((r) =>
-    (filter === "all" || r.resource_type === filter) &&
-    (filtroAsignatura === "all" || r.subject === filtroAsignatura) &&
-    (filtroGrado === "all" || r.grade === filtroGrado));
+    (tipos.length === 0 || tipos.includes(r.resource_type)) &&
+    (asignaturasSel.length === 0 || (r.subject && asignaturasSel.includes(r.subject))) &&
+    (gradosSel.length === 0 || (r.grade && gradosSel.includes(r.grade))));
+
   // Only show full-screen spinner on first load (no cache yet)
   const loading = isLoading && allResources.length === 0;
 
@@ -143,54 +152,33 @@ export default function ResourceHistory() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs">Tipo de recurso</Label>
-          <Select value={filter} onValueChange={setFilter}>
-            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                <SelectItem key={k} value={k}>{v.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <FiltroMultiple
+          etiqueta="Módulo"
+          opciones={opcionesTipo}
+          seleccion={tipos}
+          onCambio={setTipos}
+          className="w-[210px]"
+        />
+        <FiltroMultiple
+          etiqueta="Asignatura"
+          opciones={opcionesAsignatura}
+          seleccion={asignaturasSel}
+          onCambio={setAsignaturasSel}
+          className="w-[210px]"
+        />
+        <FiltroMultiple
+          etiqueta="Grado"
+          opciones={opcionesGrado}
+          seleccion={gradosSel}
+          onCambio={setGradosSel}
+          className="w-[170px]"
+        />
 
-        {asignaturas.length > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Asignatura</Label>
-            <Select value={filtroAsignatura} onValueChange={setFiltroAsignatura}>
-              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {asignaturas.map((a) => (
-                  <SelectItem key={a} value={a}>{a}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {grados.length > 0 && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Grado</Label>
-            <Select value={filtroGrado} onValueChange={setFiltroGrado}>
-              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {grados.map((g) => (
-                  <SelectItem key={g} value={g}>Grado {g}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {(filter !== "all" || filtroAsignatura !== "all" || filtroGrado !== "all") && (
+        {hayFiltros && (
           <Button
             variant="ghost" size="sm"
-            onClick={() => { setFilter("all"); setFiltroAsignatura("all"); setFiltroGrado("all"); }}
+            onClick={() => { setTipos([]); setAsignaturasSel([]); setGradosSel([]); }}
           >
             Limpiar filtros
           </Button>
