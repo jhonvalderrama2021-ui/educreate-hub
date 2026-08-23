@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,9 +26,50 @@ function pickModel(resourceType: string): string {
   return TIPOS_ALTA_EXIGENCIA.has(resourceType) ? MODEL_ALTA_EXIGENCIA : MODEL_ECONOMICO;
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
+
+  // Fuera del try para poder devolverlo en el catch
+  let cobro: Cobro | null = null;
+  let idUsuario = "";
+  let tipoCobrado = "";
 
   try {
     // ─── AUTH CHECK ─────────────────────────────────────────────
@@ -47,9 +90,26 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba aqui, no solo en la interfaz.
+    {
+      const { createClient: crearClienteAdmin } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const revisor = crearClienteAdmin(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: userData.user.id });
+      if (activo === false) {
+        return new Response(JSON.stringify({ error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // ────────────────────────────────────────────────────────────
 
-    const { resourceType, pdfContent, instructions, numItems, theme } = await req.json();
+    const { resourceType, pdfContent, instructions, numItems, theme } = await leerJson(req);
 
     // ─── INPUT VALIDATION ───────────────────────────────────────
     const ALLOWED_TYPES = new Set([
@@ -101,17 +161,37 @@ serve(async (req) => {
 
     const apiKey = setting.value as string;
 
+    // ── Tokens ─────────────────────────────────────────────────────────
+    // Se cobra antes de llamar a OpenAI. Si algo falla despues, se devuelve
+    // en el catch: el docente no debe pagar una generacion que no recibio.
+    idUsuario = userData.user.id;
+    tipoCobrado = resourceType;
+    cobro = await cobrarTokens(supabaseAdmin, userData.user.id, resourceType,
+      typeof instructions === "string" ? instructions.slice(0, 200) : null);
+
+    // ── Del documento del docente, solo lo que viene al caso ────────────
+    // Antes se mandaba el PDF entero: si el docente cargaba la cartilla
+    // completa del area y pedia un taller de fracciones, el modelo tenia que
+    // encontrar esas tres paginas entre cien. Ahora se eligen los pasajes
+    // relacionados con lo que pidio.
+    const seleccion = await seleccionarPasajes({
+      texto: typeof pdfContent === "string" ? pdfContent : "",
+      consulta: typeof instructions === "string" ? instructions : "",
+      apiKey,
+    });
+    const documentoFuente = seleccion.texto;
+
     // ============================================================
     // SLIDES: 2-PHASE GENERATION (outline → slides in parallel)
     // ============================================================
     if (resourceType === "slides") {
       const total = Math.max(3, Math.min(20, numItems || 8));
-      const hasSourcePdf = !!(pdfContent && pdfContent.trim().length > 100);
+      const hasSourcePdf = documentoFuente.trim().length > 100;
 
       // Phase 1 — Outline (titles + layout assignment + image hints)
       const outline = await generateOutline(apiKey, {
         instructions: instructions || "",
-        pdfContent: hasSourcePdf ? pdfContent : "",
+        pdfContent: hasSourcePdf ? documentoFuente : "",
         total,
       });
 
@@ -124,7 +204,7 @@ serve(async (req) => {
           totalSlides: total,
           item,
           hasSourcePdf,
-          pdfExcerpt: hasSourcePdf ? pdfContent.slice(0, 4000) : "",
+          pdfExcerpt: hasSourcePdf ? documentoFuente.slice(0, 4000) : "",
         }).catch((e) => {
           console.warn(`Slide ${idx} fallback:`, e);
           return buildFallbackSlide(item, idx, total);
@@ -156,18 +236,18 @@ serve(async (req) => {
     // Cuando hay documento fuente, el recurso debe salir de él. Sin esta
     // instrucción explícita el modelo tendía a producir contenido genérico
     // sobre el tema y a ignorar el material que el docente había cargado.
-    if (pdfContent) {
+    if (documentoFuente) {
       userParts.push(
         `\n=== DOCUMENTO FUENTE ===\n` +
         `El siguiente material fue cargado por el docente y es la BASE OBLIGATORIA del recurso.\n` +
         `Genera el contenido a partir de la información, los conceptos, los datos y los ejemplos que aparecen aquí.\n` +
         `No produzcas contenido genérico sobre el tema: usa ESTE documento.\n` +
         `Si el documento no alcanza para cubrir todo lo solicitado, apóyate en él en lo que sí cubre y complementa el resto de forma coherente con su enfoque.\n\n` +
-        `${pdfContent}\n` +
+        `${documentoFuente}\n` +
         `=== FIN DEL DOCUMENTO FUENTE ===`,
       );
     }
-    if (!pdfContent && !instructions)
+    if (!documentoFuente && !instructions)
       userParts.push("Genera contenido educativo de ejemplo sobre un tema general apropiado.");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -208,6 +288,21 @@ serve(async (req) => {
       proveedor: "OpenAI",
       fecha: new Date().toISOString(),
       requiereValidacionDocente: true,
+      // Cuando el documento del docente es largo no entra entero: entran los
+      // pasajes relacionados con lo que pidió. Se deja constancia para que
+      // sepa sobre qué parte de su material se generó el recurso, en vez de
+      // recortarlo en silencio.
+      ...(seleccion.metodo !== "completo" && seleccion.caracteresOriginales > 0
+        ? {
+            documentoFuente: {
+              metodo: seleccion.metodo,
+              caracteresOriginales: seleccion.caracteresOriginales,
+              caracteresUsados: seleccion.caracteresUsados,
+              fragmentosTotales: seleccion.fragmentosTotales,
+              fragmentosUsados: seleccion.fragmentosUsados,
+            },
+          }
+        : {}),
     };
 
     return new Response(JSON.stringify(content), {
@@ -215,8 +310,31 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-resource error:", e);
-    return new Response(JSON.stringify({ error: "Error al generar el recurso. Intenta nuevamente." }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    if (e instanceof SinTokensError) {
+      return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // La generacion fallo: se devuelve lo cobrado
+    const cliente = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    await devolverTokens(cliente, idUsuario, cobro, tipoCobrado,
+      e instanceof Error ? e.message : "Error desconocido");
+
+    // Un error de la petición lleva su propio mensaje, que dice qué corregir.
+    // El genérico se reserva para los fallos del servidor, donde el detalle
+    // no le sirve al docente y podría exponer cómo está montado por dentro.
+    return new Response(JSON.stringify({
+      error: e instanceof ErrorDePeticion
+        ? e.message
+        : "Error al generar el recurso. Intenta nuevamente.",
+    }), {
+      status: e instanceof ErrorDePeticion ? e.estado : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
@@ -528,13 +646,21 @@ REGLAS DE CONSTRUCCIÓN DEL ÍTEM:
 3. Declara en "competency" la competencia evaluada, propia del área (ejemplos: "Interpretación y representación" o "Formulación y ejecución" en Matemáticas; "Identificar" o "Explicar" o "Indagar" en Ciencias Naturales; "Identificar y comprender" o "Reflexionar y evaluar" en Lectura Crítica; "Pensamiento social" o "Multiperspectivismo" en Sociales).
 4. Declara en "level" el nivel de desempeño del 1 al 4 (1 el más básico, 4 el más exigente). Distribuye las preguntas en distintos niveles; no las hagas todas fáciles ni todas difíciles.
 
+NIVEL DE COMPLEJIDAD:
+5. Las instrucciones del docente indican el nivel de complejidad. Respétalo, porque determina el tipo de razonamiento que se exige:
+   - Básico: predomina reconocer, identificar y relacionar información explícita en el contexto. Concentra las preguntas en niveles 1 y 2.
+   - Intermedio: predomina interpretar y aplicar un procedimiento conocido a una situación similar a las trabajadas en clase. Concentra las preguntas en niveles 2 y 3.
+   - Avanzado: predomina analizar, comparar, inferir y resolver situaciones nuevas que exigen transferir lo aprendido. Concentra las preguntas en niveles 3 y 4.
+   - Como prueba Saber 11: distribuye las preguntas entre los cuatro niveles, como en la prueba oficial.
+6. El nivel de complejidad cambia la exigencia cognitiva, NO el tema ni la extensión del contexto. Un examen básico sigue partiendo de un contexto y sigue exigiendo comprender: nunca se reduce a memorizar definiciones.
+
 REGLAS DE LOS DISTRACTORES — LO MÁS IMPORTANTE:
-5. Cada opción incorrecta debe representar un ERROR CONCEPTUAL TÍPICO y reconocible de un estudiante: una confusión frecuente, un error de procedimiento, una lectura parcial del contexto o una generalización indebida.
-6. PROHIBIDAS las opciones absurdas, obviamente falsas o de relleno. Un estudiante que no domine el tema debe poder dudar entre al menos dos opciones.
-7. Todas las opciones deben tener extensión y estructura gramatical similares. La correcta no puede ser la más larga ni la más detallada.
-8. Explica en "distractorRationale" qué error específico comete quien elige cada opción incorrecta.
-9. Prohibido usar "todas las anteriores", "ninguna de las anteriores" o negaciones dobles.
-10. NO marques ni resaltes la respuesta correcta dentro de las opciones. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
+7. Cada opción incorrecta debe representar un ERROR CONCEPTUAL TÍPICO y reconocible de un estudiante: una confusión frecuente, un error de procedimiento, una lectura parcial del contexto o una generalización indebida.
+8. PROHIBIDAS las opciones absurdas, obviamente falsas o de relleno. Un estudiante que no domine el tema debe poder dudar entre al menos dos opciones.
+9. Todas las opciones deben tener extensión y estructura gramatical similares. La correcta no puede ser la más larga ni la más detallada.
+10. Explica en "distractorRationale" qué error específico comete quien elige cada opción incorrecta.
+11. Prohibido usar "todas las anteriores", "ninguna de las anteriores" o negaciones dobles.
+12. NO marques ni resaltes la respuesta correcta dentro de las opciones. Distribuye las respuestas correctas entre A, B, C y D de forma equilibrada.
 
 Formato JSON requerido:
 {

@@ -44,12 +44,12 @@ export default function BotChat() {
   }, [messages]);
 
   const loadBot = async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("bots")
       .select("id, name, specialty")
-      .eq("id", botId)
+      .eq("id", botId!)
       .eq("user_id", user!.id)
-      .single();
+      .maybeSingle();
     if (error || !data) {
       toast.error("Bot no encontrado");
       navigate("/resources/bots");
@@ -60,13 +60,17 @@ export default function BotChat() {
 
   const loadMessages = async () => {
     setLoading(true);
-    const { data } = await (supabase as any)
+    const { data } = await supabase
       .from("bot_messages")
       .select("*")
-      .eq("bot_id", botId)
+      .eq("bot_id", botId!)
       .eq("user_id", user!.id)
       .order("created_at", { ascending: true });
-    setMessages(data || []);
+    // La columna guarda texto; en la interfaz solo existen estos dos roles.
+    setMessages((data || []).map((m) => ({
+      ...m,
+      role: m.role === "assistant" ? "assistant" as const : "user" as const,
+    })));
     setLoading(false);
   };
 

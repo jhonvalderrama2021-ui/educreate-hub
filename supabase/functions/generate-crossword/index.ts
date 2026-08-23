@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -262,8 +264,47 @@ function buildGrid(words: WordItem[], wantedAcross: number, wantedDown: number) 
   return { grid: cropped, placed: adjusted, numbered, rows, cols };
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
+
+  let cobro: Cobro | null = null;
+  let idCobrado = "";
 
   try {
     // Require authenticated caller to prevent abuse of the paid AI gateway
@@ -273,6 +314,7 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    let idUsuario = "";
     {
       const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const sb = createClient(
@@ -287,9 +329,27 @@ serve(async (req) => {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      idUsuario = data.claims.sub as string;
     }
 
-    const { theme, totalWords, acrossCount, downCount, difficulty, pdfContent } = await req.json();
+
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba aqui, no solo en la interfaz.
+    {
+      const { createClient: crearClienteAdmin } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const revisor = crearClienteAdmin(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: idUsuario });
+      if (activo === false) {
+        return new Response(JSON.stringify({ error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    const { theme, totalWords, acrossCount, downCount, difficulty, pdfContent } = await leerJson(req);
 
 
     if (typeof theme !== "string" || theme.trim().length < 2) {
@@ -321,8 +381,27 @@ serve(async (req) => {
     const apiKey = setting.value as string;
 
     const difficultyLabel = difficulty || "medio";
-    const sourceContext = pdfContent
-      ? `\n\nBasado en el siguiente material:\n${String(pdfContent).slice(0, 6000)}`
+    {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      idCobrado = idUsuario;
+      cobro = await cobrarTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idUsuario, "crossword", String(theme).slice(0, 200),
+      );
+    }
+
+    // Del documento solo se toman los pasajes que hablan del tema del
+    // crucigrama: con la cartilla entera las palabras salían de cualquier
+    // capítulo, no del que el docente está trabajando.
+    const seleccion = await seleccionarPasajes({
+      texto: typeof pdfContent === "string" ? pdfContent : "",
+      consulta: `Tema del crucigrama: ${theme}`,
+      apiKey,
+      presupuesto: 8000,
+    });
+
+    const sourceContext = seleccion.texto
+      ? `\n\nBasado en el siguiente material:\n${seleccion.texto}`
       : "";
 
     // Ask the AI for MANY more words than needed so the backtracking algorithm
@@ -447,8 +526,26 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("generate-crossword error:", e);
+
+    if (e instanceof SinTokensError) {
+      return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // La generacion fallo: se devuelve lo cobrado. El docente no debe pagar
+    // una generacion que no recibio.
+    if (cobro && idCobrado) {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      await devolverTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idCobrado, cobro, "crossword",
+        e instanceof Error ? e.message : "Error desconocido",
+      );
+    }
+
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: e instanceof ErrorDePeticion ? e.estado : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

@@ -126,3 +126,76 @@ describe("ResourceContentViewer", () => {
     }
   });
 });
+
+
+/**
+ * El examen es el módulo donde el docente más edita: pide muchas preguntas y
+ * descarta las que no le sirven. Al eliminar una, la numeración debe quedar
+ * corrida y la hoja de respuestas coincidir con las preguntas restantes.
+ */
+describe("Examen: eliminar preguntas", () => {
+  const examen = {
+    title: "Examen de prueba",
+    subject: "Ciencias",
+    questions: [
+      { number: 1, question: "Primera pregunta", options: { A: "a", B: "b" }, correct: "A" },
+      { number: 2, question: "Segunda pregunta", options: { A: "a", B: "b" }, correct: "B" },
+      { number: 3, question: "Tercera pregunta", options: { A: "a", B: "b" }, correct: "A" },
+    ],
+  };
+
+  it("muestra el boton de eliminar solo en modo edicion", () => {
+    const { unmount } = render(<ResourceContentViewer type="icfes" content={examen} />);
+    expect(screen.queryByLabelText(/eliminar la pregunta/i)).toBeNull();
+    unmount();
+
+    render(<ResourceContentViewer type="icfes" content={examen} editable onContentChange={() => {}} />);
+    expect(screen.getAllByLabelText(/eliminar la pregunta/i)).toHaveLength(3);
+  });
+
+  it("al eliminar una pregunta renumera las restantes", () => {
+    const original = window.confirm;
+    window.confirm = () => true;
+    let resultado: any = null;
+
+    render(
+      <ResourceContentViewer
+        type="icfes"
+        content={examen}
+        editable
+        onContentChange={(c) => { resultado = c; }}
+      />,
+    );
+
+    // Se elimina la segunda pregunta
+    screen.getAllByLabelText(/eliminar la pregunta/i)[1].click();
+    window.confirm = original;
+
+    expect(resultado.questions).toHaveLength(2);
+    expect(resultado.questions.map((q: any) => q.question)).toEqual([
+      "Primera pregunta",
+      "Tercera pregunta",
+    ]);
+    // La tercera pasa a ser la numero 2
+    expect(resultado.questions.map((q: any) => q.number)).toEqual([1, 2]);
+  });
+
+  it("no elimina nada si el docente cancela la confirmacion", () => {
+    const original = window.confirm;
+    window.confirm = () => false;
+    let resultado: any = null;
+
+    render(
+      <ResourceContentViewer
+        type="icfes"
+        content={examen}
+        editable
+        onContentChange={(c) => { resultado = c; }}
+      />,
+    );
+    screen.getAllByLabelText(/eliminar la pregunta/i)[0].click();
+    window.confirm = original;
+
+    expect(resultado).toBeNull();
+  });
+});

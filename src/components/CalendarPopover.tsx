@@ -52,7 +52,7 @@ export function CalendarPopover() {
   const fetchNotes = async () => {
     if (!user) return;
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("calendar_notes")
       .select("id, date, title, description, color")
       .eq("user_id", user.id)
@@ -90,7 +90,7 @@ export function CalendarPopover() {
     }
     setSaving(true);
     const dateStr = format(selected, "yyyy-MM-dd");
-    const { error } = await (supabase as any).from("calendar_notes").insert({
+    const { error } = await supabase.from("calendar_notes").insert({
       user_id: user.id,
       date: dateStr,
       title: title.trim(),
@@ -110,7 +110,7 @@ export function CalendarPopover() {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await (supabase as any).from("calendar_notes").delete().eq("id", id);
+    const { error } = await supabase.from("calendar_notes").delete().eq("id", id);
     if (error) {
       toast.error("Error al eliminar");
       return;

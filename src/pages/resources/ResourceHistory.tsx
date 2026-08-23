@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
+  History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation, Puzzle, BookText,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { CampoObservacion } from "@/components/CampoObservacion";
+import { rutaDelRecurso } from "@/lib/ruta-modulo";
+import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -36,14 +38,21 @@ interface Resource {
   content: any;
   is_public: boolean;
   created_at: string;
+  subject: string | null;
+  grade: string | null;
 }
 
 const RESOURCES_QK = (uid?: string) => ["generated_resources", uid] as const;
 
 export default function ResourceHistory() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [filter, setFilter] = useState("all");
+  // Selección múltiple: un docente que dicta la misma materia en varios
+  // grados tenía que mirar sus recursos de a un grado por vez.
+  const [tipos, setTipos] = useState<string[]>([]);
+  const [asignaturasSel, setAsignaturasSel] = useState<string[]>([]);
+  const [gradosSel, setGradosSel] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
@@ -56,7 +65,7 @@ export default function ResourceHistory() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources")
         .select("*")
         .eq("user_id", user!.id)
@@ -80,9 +89,22 @@ export default function ResourceHistory() {
     return () => { supabase.removeChannel(channel); };
   }, [user, queryClient]);
 
-  const resources = filter === "all"
-    ? allResources
-    : allResources.filter((r) => r.resource_type === filter);
+  // Las opciones salen de lo que el docente realmente tiene, con el conteo
+  // de cada una: un catálogo fijo mostraría asignaturas vacías.
+  const opcionesTipo = opcionesDe(allResources, (r) => r.resource_type,
+    (v) => TYPE_LABELS[v]?.label || v);
+  const opcionesAsignatura = opcionesDe(allResources, (r) => r.subject);
+  const opcionesGrado = opcionesDe(allResources, (r) => r.grade, (g) => `Grado ${g}`);
+
+  const hayFiltros = tipos.length > 0 || asignaturasSel.length > 0 || gradosSel.length > 0;
+
+  // Sin nada marcado no se filtra: la lista muestra todo, que es lo que
+  // espera quien abre la pantalla por primera vez.
+  const resources = allResources.filter((r) =>
+    (tipos.length === 0 || tipos.includes(r.resource_type)) &&
+    (asignaturasSel.length === 0 || (r.subject && asignaturasSel.includes(r.subject))) &&
+    (gradosSel.length === 0 || (r.grade && gradosSel.includes(r.grade))));
+
   // Only show full-screen spinner on first load (no cache yet)
   const loading = isLoading && allResources.length === 0;
 
@@ -90,7 +112,7 @@ export default function ResourceHistory() {
     queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (prev) =>
       (prev || []).map((r) => (r.id === id ? { ...r, is_public: !isPublic } : r)),
     );
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("generated_resources")
       .update({ is_public: !isPublic })
       .eq("id", id);
@@ -106,7 +128,7 @@ export default function ResourceHistory() {
     queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (cur) =>
       (cur || []).filter((r) => r.id !== id),
     );
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("generated_resources")
       .delete()
       .eq("id", id);
@@ -130,19 +152,41 @@ export default function ResourceHistory() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Label className="text-sm">Filtrar:</Label>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {Object.entries(TYPE_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center gap-2">
+        <FiltroMultiple
+          etiqueta="Módulo"
+          opciones={opcionesTipo}
+          seleccion={tipos}
+          onCambio={setTipos}
+          className="w-[210px]"
+        />
+        <FiltroMultiple
+          etiqueta="Asignatura"
+          opciones={opcionesAsignatura}
+          seleccion={asignaturasSel}
+          onCambio={setAsignaturasSel}
+          className="w-[210px]"
+        />
+        <FiltroMultiple
+          etiqueta="Grado"
+          opciones={opcionesGrado}
+          seleccion={gradosSel}
+          onCambio={setGradosSel}
+          className="w-[170px]"
+        />
+
+        {hayFiltros && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => { setTipos([]); setAsignaturasSel([]); setGradosSel([]); }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
+
+        <p className="ml-auto text-sm text-muted-foreground">
+          {resources.length} de {allResources.length}
+        </p>
       </div>
 
       {loading ? (
@@ -172,7 +216,10 @@ export default function ResourceHistory() {
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">{r.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {typeInfo.label} · {new Date(r.created_at).toLocaleDateString("es-CO")}
+                        {typeInfo.label}
+                        {r.subject && ` · ${r.subject}`}
+                        {r.grade && ` · Grado ${r.grade}`}
+                        {" · "}{new Date(r.created_at).toLocaleDateString("es-CO")}
                       </p>
                     </div>
                   </div>
@@ -210,6 +257,12 @@ export default function ResourceHistory() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => navigate(rutaDelRecurso(r.resource_type, r.id))}
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                      </Button>
                       <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteResource(r.id)}>
                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
                       </Button>
@@ -240,6 +293,9 @@ export default function ResourceHistory() {
           }}
         />
       )}
+      <div className="mt-6">
+        <CampoObservacion modulo="historial" />
+      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ export interface MiniCourse {
   name: string;
   description: string | null;
   access_code: string;
+  grado: string | null;
+  grupo: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -31,6 +33,9 @@ export interface CourseResource {
   opens_at: string | null;
   closes_at: string | null;
   shuffle_questions: boolean;
+  requiere_entrega: boolean;
+  instrucciones_entrega: string | null;
+  entrega_hasta: string | null;
   created_at: string;
   updated_at: string;
 }

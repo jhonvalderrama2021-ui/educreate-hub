@@ -48,7 +48,14 @@ async function getImageDims(dataUrl: string): Promise<{ w: number; h: number }> 
 }
 
 // ---------- DOCX ----------
-export async function exportToDocx(
+/**
+ * Construye el documento y devuelve el Blob, SIN descargarlo.
+ *
+ * Separado de la descarga a proposito: es la unica forma de comprobar en las
+ * pruebas que el archivo sale bien formado. Un DOCX corrupto solo se nota al
+ * abrirlo, y para entonces el docente ya esta delante de sus estudiantes.
+ */
+export async function construirDocx(
   title: string,
   resourceType: string,
   content: any,
@@ -119,12 +126,12 @@ export async function exportToDocx(
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFilename(title)}.docx`);
+  return await Packer.toBlob(doc);
 }
 
 // ---------- PDF ----------
-export async function exportToPdf(
+/** Construye el PDF y devuelve el Blob, sin descargarlo. */
+export async function construirPdf(
   title: string,
   resourceType: string,
   content: any,
@@ -637,7 +644,7 @@ export async function exportToPdf(
     }
   }
 
-  doc.save(`${sanitizeFilename(title)}.pdf`);
+  return doc.output("blob");
 }
 
 async function buildDocxContent(title: string, resourceType: string, content: any): Promise<(Paragraph | Table)[]> {
@@ -1097,3 +1104,28 @@ async function buildDocxContent(title: string, resourceType: string, content: an
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s-]/g, "").trim().replace(/\s+/g, "_").substring(0, 50);
 }
+
+/**
+ * Las dos envolturas que usa la interfaz. Se mantienen los nombres para no
+ * tocar las siete pantallas que ya las llaman.
+ */
+export async function exportToDocx(
+  title: string,
+  resourceType: string,
+  content: any,
+  options: ExportOptions = {},
+): Promise<void> {
+  const blob = await construirDocx(title, resourceType, content, options);
+  saveAs(blob, `${sanitizeFilename(title)}.docx`);
+}
+
+export async function exportToPdf(
+  title: string,
+  resourceType: string,
+  content: any,
+  options: ExportOptions = {},
+): Promise<void> {
+  const blob = await construirPdf(title, resourceType, content, options);
+  saveAs(blob, `${sanitizeFilename(title)}.pdf`);
+}
+

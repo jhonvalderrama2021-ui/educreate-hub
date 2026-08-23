@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
+import { ContadorTokens } from "@/components/ContadorTokens";
 import { CalendarPopover } from "@/components/CalendarPopover";
 import { Lightbulb } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -93,6 +94,7 @@ export default function Resources() {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
+                <ContadorTokens />
                 <ThemeToggle />
                 <UserMenu />
               </div>

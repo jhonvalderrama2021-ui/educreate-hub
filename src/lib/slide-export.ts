@@ -141,16 +141,15 @@ async function renderSlideToCanvas(
 // ============================================================
 // PUBLIC EXPORTERS
 // ============================================================
-export async function exportSlidesToPdf(content: any) {
+/** Construye el PDF de las diapositivas y devuelve el Blob, sin descargarlo. */
+export async function construirSlidesPdf(
+  content: any,
+  onProgreso?: (hecho: number, total: number) => void,
+): Promise<Blob> {
   const slides = content?.slides || [];
-  if (slides.length === 0) {
-    toast.error("No hay diapositivas para exportar");
-    return;
-  }
+  if (slides.length === 0) throw new Error("No hay diapositivas para exportar");
   const isStructured = isStructuredPresentation(content);
-  const toastId = toast.loading("Preparando imágenes...");
-
-  try {
+  {
     const inlined = isStructured ? await inlineAllImages(content) : content;
     const theme: SlideTheme = inlined?.theme || DEFAULT_THEME;
 
@@ -159,7 +158,7 @@ export async function exportSlidesToPdf(content: any) {
 
     const total = inlined.slides.length;
     for (let idx = 0; idx < total; idx++) {
-      toast.loading(`Generando PDF (${idx + 1}/${total})...`, { id: toastId });
+      onProgreso?.(idx + 1, total);
       if (idx > 0) doc.addPage();
 
       try {
@@ -175,24 +174,20 @@ export async function exportSlidesToPdf(content: any) {
       }
     }
 
-    doc.save(`${sanitizeFilename(inlined?.title || "Diapositivas")}.pdf`);
-    toast.success("PDF descargado", { id: toastId });
-  } catch (e: any) {
-    console.error("PDF export error:", e);
-    toast.error("Error al exportar PDF: " + e.message, { id: toastId });
+    return doc.output("blob");
   }
 }
 
-export async function exportSlidesToPptx(content: any) {
+/** Construye el PPTX y devuelve el Blob, sin descargarlo. */
+export async function construirSlidesPptx(
+  content: any,
+  onProgreso?: (hecho: number, total: number) => void,
+): Promise<Blob> {
   const slides = content?.slides || [];
-  if (slides.length === 0) {
-    toast.error("No hay diapositivas para exportar");
-    return;
-  }
+  if (slides.length === 0) throw new Error("No hay diapositivas para exportar");
   const isStructured = isStructuredPresentation(content);
-  const toastId = toast.loading("Preparando imágenes...");
 
-  try {
+  {
     const inlined = isStructured ? await inlineAllImages(content) : content;
     const theme: SlideTheme = inlined?.theme || DEFAULT_THEME;
 
@@ -203,7 +198,7 @@ export async function exportSlidesToPptx(content: any) {
 
     const total = inlined.slides.length;
     for (let idx = 0; idx < total; idx++) {
-      toast.loading(`Generando PPTX (${idx + 1}/${total})...`, { id: toastId });
+      onProgreso?.(idx + 1, total);
       const slide = pres.addSlide();
       try {
         const canvas = await renderSlideToCanvas(inlined.slides[idx], theme);
@@ -217,11 +212,32 @@ export async function exportSlidesToPptx(content: any) {
       }
     }
 
-    const fileName = sanitizeFilename(inlined?.title || "Diapositivas");
-    await pres.writeFile({ fileName: `${fileName}.pptx` });
-    toast.success("PPTX descargado", { id: toastId });
-  } catch (e: any) {
-    console.error("PPTX export error:", e);
-    toast.error("Error al exportar PPTX: " + e.message, { id: toastId });
+    return await pres.write({ outputType: "blob" }) as Blob;
   }
 }
+
+/**
+ * Envolturas que descargan. Aqui viven los avisos al docente: generar un
+ * PPTX de veinte diapositivas tarda, y sin aviso parece que no paso nada.
+ */
+async function descargar(
+  content: any,
+  extension: "pdf" | "pptx",
+  construir: (c: any, p?: (h: number, t: number) => void) => Promise<Blob>,
+): Promise<void> {
+  const aviso = toast.loading("Preparando imágenes...");
+  try {
+    const blob = await construir(content, (hecho, total) => {
+      toast.loading(`Generando ${extension.toUpperCase()} (${hecho}/${total})...`, { id: aviso });
+    });
+    const { saveAs } = await import("file-saver");
+    saveAs(blob, `${sanitizeFilename(content?.title || "Diapositivas")}.${extension}`);
+    toast.success(`${extension.toUpperCase()} descargado`, { id: aviso });
+  } catch (e: any) {
+    console.error(`${extension} export error:`, e);
+    toast.error(`Error al exportar ${extension.toUpperCase()}: ${e.message}`, { id: aviso });
+  }
+}
+
+export const exportSlidesToPdf = (content: any) => descargar(content, "pdf", construirSlidesPdf);
+export const exportSlidesToPptx = (content: any) => descargar(content, "pptx", construirSlidesPptx);

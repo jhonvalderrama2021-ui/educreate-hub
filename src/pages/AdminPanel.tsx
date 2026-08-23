@@ -8,6 +8,10 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GestorUsuarios } from "@/components/GestorUsuarios";
+import { GestorCatalogos } from "@/components/GestorCatalogos";
+import { PanelAuditoria } from "@/components/PanelAuditoria";
+import { GestorTokens } from "@/components/GestorTokens";
 import {
   Select,
   SelectContent,
@@ -17,29 +21,26 @@ import {
 } from "@/components/ui/select";
 import {
   FileText, Shield, ArrowLeft, Key, Eye, EyeOff, Save, CheckCircle,
-  Users, Settings, BarChart3, Search
+  Users, Settings, BarChart3, UserX, MessageSquare, ImagePlus, ListChecks, Clock, Coins
 } from "lucide-react";
 import { toast } from "sonner";
+import { PanelObservaciones } from "@/components/PanelObservaciones";
+import { GestorImagenesAyuda } from "@/components/GestorImagenesAyuda";
 
-type UserWithRole = {
-  id: string;
-  email: string | null;
-  full_name: string | null;
-  username: string | null;
-  role: string;
-};
+// Es la fila que devuelve admin_listar_usuarios. El tipo completo, con el
+// correo confirmado y el ultimo acceso, vive en GestorUsuarios; aqui solo
+// hacen falta el rol y el estado para las tarjetas de resumen.
+type UsuarioResumen = { id: string; rol: string; activo: boolean };
 
 export default function AdminPanel() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [users, setUsers] = useState<UsuarioResumen[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
 
   // Stats
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [totalResources, setTotalResources] = useState(0);
+  const totalUsers = users.length;
 
   // AI Settings
   const [apiKey, setApiKey] = useState("");
@@ -72,36 +73,17 @@ export default function AdminPanel() {
 
   const loadUsers = async () => {
     setLoadingUsers(true);
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, email, full_name, username");
-
-    if (error) {
-      toast.error("Error al cargar usuarios");
-      setLoadingUsers(false);
-      return;
-    }
-
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("user_id, role");
-
-    const roleMap = new Map<string, string>();
-    roles?.forEach((r) => roleMap.set(r.user_id, r.role));
-
-    const usersWithRoles: UserWithRole[] = (data || []).map((p) => ({
-      ...p,
-      role: roleMap.get(p.id) || "estudiante",
-    }));
-
-    setUsers(usersWithRoles);
-    setTotalUsers(usersWithRoles.length);
+    // Misma consulta que usa GestorUsuarios: las tarjetas de resumen y la
+    // lista deben contar lo mismo.
+    const { data, error } = await supabase.rpc("admin_listar_usuarios");
+    if (error) toast.error("Error al cargar usuarios");
+    setUsers((data || []) as UsuarioResumen[]);
     setLoadingUsers(false);
   };
 
   const loadAISettings = async () => {
     // Never fetch the raw key into the browser. Use a server-side check that returns only a boolean.
-    const { data, error } = await (supabase as any).rpc("admin_has_openai_key");
+    const { data, error } = await supabase.rpc("admin_has_openai_key");
     if (!error && data === true) setKeyConfigured(true);
   };
 
@@ -127,39 +109,12 @@ export default function AdminPanel() {
     setSavingKey(false);
   };
 
-  const changeRole = async (userId: string, newRole: string) => {
-    await supabase.from("user_roles").delete().eq("user_id", userId);
-
-    const { error } = await supabase
-      .from("user_roles")
-      .insert([{ user_id: userId, role: newRole as "admin" | "docente" | "estudiante" }]);
-
-    if (error) {
-      toast.error("Error al cambiar el rol");
-      return;
-    }
-
-    toast.success("Rol actualizado correctamente");
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
-  };
-
-  const filteredUsers = users.filter((u) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      u.email?.toLowerCase().includes(q) ||
-      u.full_name?.toLowerCase().includes(q) ||
-      u.username?.toLowerCase().includes(q)
-    );
-  });
-
   const roleCounts = {
-    admin: users.filter((u) => u.role === "admin").length,
-    docente: users.filter((u) => u.role === "docente").length,
-    estudiante: users.filter((u) => u.role === "estudiante").length,
+    admin: users.filter((u) => u.rol === "admin").length,
+    docente: users.filter((u) => u.rol === "docente").length,
+    estudiante: users.filter((u) => u.rol === "estudiante").length,
   };
+  const desactivados = users.filter((u) => !u.activo).length;
 
   if (loading || !isAdmin) {
     return (
@@ -203,12 +158,13 @@ export default function AdminPanel() {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 animate-fade-in" style={{ animationDelay: "0.05s" }}>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 animate-fade-in" style={{ animationDelay: "0.05s" }}>
           {[
             { label: "Total usuarios", value: totalUsers, icon: Users, color: "from-primary to-primary/80" },
             { label: "Administradores", value: roleCounts.admin, icon: Shield, color: "from-rose-500 to-rose-600" },
             { label: "Docentes", value: roleCounts.docente, icon: BarChart3, color: "from-emerald-500 to-emerald-600" },
             { label: "Estudiantes", value: roleCounts.estudiante, icon: Users, color: "from-amber-500 to-amber-600" },
+            { label: "Desactivados", value: desactivados, icon: UserX, color: "from-slate-500 to-slate-600" },
           ].map((s) => (
             <div key={s.label} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
@@ -229,86 +185,47 @@ export default function AdminPanel() {
               <Users className="h-4 w-4" />
               Usuarios
             </TabsTrigger>
+            <TabsTrigger value="tokens" className="gap-1.5">
+              <Coins className="h-4 w-4" />
+              <span className="hidden sm:inline">Tokens</span>
+            </TabsTrigger>
+            <TabsTrigger value="auditoria" className="gap-1.5">
+              <Clock className="h-4 w-4" />
+              <span className="hidden sm:inline">Auditoría</span>
+            </TabsTrigger>
+            <TabsTrigger value="catalogos" className="gap-1.5">
+              <ListChecks className="h-4 w-4" />
+              <span className="hidden sm:inline">Catálogos</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5">
               <Settings className="h-4 w-4" />
               Configuración IA
+            </TabsTrigger>
+            <TabsTrigger value="imagenes-ayuda" className="gap-1.5">
+              <ImagePlus className="h-4 w-4" />
+              Imágenes de ayuda
+            </TabsTrigger>
+            <TabsTrigger value="observaciones" className="gap-1.5">
+              <MessageSquare className="h-4 w-4" />
+              Observaciones
             </TabsTrigger>
           </TabsList>
 
           {/* Users Tab */}
           <TabsContent value="users" className="mt-4">
-            <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center gap-3">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar usuarios..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground hidden sm:block">
-                  {filteredUsers.length} usuario{filteredUsers.length !== 1 ? "s" : ""}
-                </p>
-              </div>
+            <GestorUsuarios />
+          </TabsContent>
 
-              {loadingUsers ? (
-                <div className="p-8 flex justify-center">
-                  <div className="h-6 w-6 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (
-                <div className="divide-y divide-border">
-                  {filteredUsers.map((u) => (
-                    <div key={u.id} className="flex items-center justify-between p-4 gap-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-sm font-semibold text-primary">
-                            {(u.full_name || u.username || "U")[0].toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-foreground truncate text-sm">
-                            {u.full_name || u.username || "Sin nombre"}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          u.role === "admin"
-                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
-                            : u.role === "docente"
-                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        }`}>
-                          {u.role}
-                        </span>
-                        <Select
-                          value={u.role}
-                          onValueChange={(val) => changeRole(u.id, val)}
-                          disabled={u.id === user?.id}
-                        >
-                          <SelectTrigger className="w-[130px] h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="docente">Docente</SelectItem>
-                            <SelectItem value="estudiante">Estudiante</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ))}
-                  {filteredUsers.length === 0 && (
-                    <p className="p-8 text-center text-muted-foreground text-sm">
-                      {searchQuery ? "No se encontraron usuarios" : "No hay usuarios registrados"}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+          <TabsContent value="tokens" className="mt-4">
+            <GestorTokens />
+          </TabsContent>
+
+          <TabsContent value="auditoria" className="mt-4">
+            <PanelAuditoria />
+          </TabsContent>
+
+          <TabsContent value="catalogos" className="mt-4">
+            <GestorCatalogos />
           </TabsContent>
 
           {/* Settings Tab */}
@@ -371,6 +288,33 @@ export default function AdminPanel() {
                   </p>
                 </div>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Capturas que ilustran el centro de ayuda */}
+          <TabsContent value="imagenes-ayuda" className="mt-4">
+            <div className="rounded-xl border border-border bg-card shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="font-semibold text-foreground">Imágenes del centro de ayuda</h2>
+                <p className="text-sm text-muted-foreground">
+                  Sube capturas de pantalla para ilustrar cada sección. Se ven de inmediato
+                  en la ayuda, sin necesidad de publicar una versión nueva de la plataforma.
+                </p>
+              </div>
+              <GestorImagenesAyuda />
+            </div>
+          </TabsContent>
+
+          {/* Observaciones recogidas durante la prueba piloto */}
+          <TabsContent value="observaciones" className="mt-4">
+            <div className="rounded-xl border border-border bg-card shadow-sm p-5">
+              <div className="mb-4">
+                <h2 className="font-semibold text-foreground">Observaciones de los docentes</h2>
+                <p className="text-sm text-muted-foreground">
+                  Retroalimentación que dejan los docentes desde cada módulo durante la prueba piloto
+                </p>
+              </div>
+              <PanelObservaciones />
             </div>
           </TabsContent>
         </Tabs>

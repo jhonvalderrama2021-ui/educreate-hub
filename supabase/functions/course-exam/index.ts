@@ -71,8 +71,44 @@ function getExplanation(q: any): string {
   return q.feedback || q.retroalimentacion || q.explanation || q.explicacion || "";
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -96,12 +132,29 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
+
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba aqui, no solo en la interfaz.
+    {
+      const { createClient: crearClienteAdmin } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const revisor = crearClienteAdmin(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: userId });
+      if (activo === false) {
+        return new Response(JSON.stringify({ error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    const body = await req.json();
+    const body = await leerJson(req);
     const { action, courseResourceId } = body;
     if (!courseResourceId || typeof courseResourceId !== "string") {
       return new Response(JSON.stringify({ error: "courseResourceId requerido" }), {
@@ -149,6 +202,43 @@ serve(async (req) => {
     }
 
     const questions = normalizeQuestions(resource.content);
+
+    // ── Ventana e intentos, comprobados AQUI ───────────────────────────
+    // Hasta ahora solo se miraban en el navegador, asi que bastaba llamar a
+    // esta funcion directamente para presentar fuera de plazo o repetir el
+    // examen tantas veces como se quisiera. En una evaluacion, eso no es un
+    // detalle: es la diferencia entre una nota que vale y una que no.
+    if (isStudent) {
+      const ahora = new Date();
+
+      if (cr.opens_at && new Date(cr.opens_at) > ahora) {
+        return new Response(JSON.stringify({
+          error: `Esta actividad abre el ${new Date(cr.opens_at).toLocaleString("es-CO")}.`,
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (cr.closes_at && new Date(cr.closes_at) < ahora) {
+        return new Response(JSON.stringify({
+          error: `El plazo termino el ${new Date(cr.closes_at).toLocaleString("es-CO")}. Ya no se admiten respuestas.`,
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "submit") {
+        const { count } = await admin
+          .from("resource_submissions")
+          .select("id", { count: "exact", head: true })
+          .eq("course_resource_id", cr.id)
+          .eq("student_id", userId);
+
+        const intentos = count ?? 0;
+        const permitidos = Math.max(1, cr.max_attempts ?? 1);
+        if (intentos >= permitidos) {
+          return new Response(JSON.stringify({
+            error: `Ya usaste tus ${permitidos} intento${permitidos === 1 ? "" : "s"} en esta actividad.`,
+          }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
 
     if (action === "get") {
       // Strip correct answers and explanations before returning to student
@@ -204,12 +294,19 @@ serve(async (req) => {
         };
       });
 
+      const { count: intentosPrevios } = await admin
+        .from("resource_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("course_resource_id", cr.id)
+        .eq("student_id", userId);
+      const numeroDeIntento = (intentosPrevios ?? 0) + 1;
+
       const { error: insErr } = await admin.from("resource_submissions").insert({
         course_resource_id: cr.id,
         course_id: cr.course_id,
         student_id: userId,
         resource_type: cr.resource_type,
-        attempt_number: 1,
+        attempt_number: numeroDeIntento,
         answers,
         score,
         max_score: max,
@@ -233,7 +330,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("course-exam error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: e instanceof ErrorDePeticion ? e.estado : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
