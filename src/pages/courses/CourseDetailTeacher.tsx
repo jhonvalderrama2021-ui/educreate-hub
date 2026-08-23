@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, Download,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, Download, CopyPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import { generateAccessCode } from "@/lib/courses-types";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
 import { revisarEntrega, notaColombiana, formatearDuracion, descargarCSV } from "@/lib/examen-respuestas";
 
@@ -181,13 +182,23 @@ export default function CourseDetailTeacher() {
 
       <div className="glass-card rounded-xl p-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">{course.name}</h1>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2 flex-wrap">
+            {course.name}
+            {(course.grado || course.grupo) && (
+              <span className="text-sm font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded">
+                {course.grado ? `${course.grado}°` : ""}{course.grupo || ""}
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">{course.description || "Sin descripción"}</p>
           <button onClick={copyCode} className="mt-3 inline-flex items-center gap-2 text-xs font-mono bg-primary/10 text-primary px-3 py-1.5 rounded hover:bg-primary/20 transition-colors">
             Clave: {course.access_code} <Copy className="h-3 w-3" />
           </button>
         </div>
-        <CourseSettingsButton course={course} onUpdate={updateCourse} onDelete={deleteCourse} />
+        <div className="flex items-center gap-2">
+          <BotonDuplicarGrupo curso={course} recursos={resources.length} />
+          <CourseSettingsButton course={course} onUpdate={updateCourse} onDelete={deleteCourse} />
+        </div>
       </div>
 
       <Tabs defaultValue="resources">
@@ -504,3 +515,87 @@ function ManualEnrollButton({ courseId, onAdded }: { courseId: string; onAdded: 
     </Dialog>
   );
 }
+
+/**
+ * Duplica el curso para otro grupo del mismo grado.
+ *
+ * "En los colegios hay sexto A, sexto B, sexto C". Sin esto, el docente que
+ * dicta la misma materia a tres grupos tiene que crear tres cursos y volver
+ * a agregar los mismos recursos uno por uno.
+ */
+function BotonDuplicarGrupo({ curso, recursos }: { curso: MiniCourse; recursos: number }) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [abierto, setAbierto] = useState(false);
+  const [grupo, setGrupo] = useState("");
+  const [clave, setClave] = useState(generateAccessCode());
+  const [duplicando, setDuplicando] = useState(false);
+
+  const duplicar = async () => {
+    if (!grupo.trim()) return toast.error("Indica el grupo del curso nuevo");
+    setDuplicando(true);
+    const { data, error } = await (supabase as any).rpc("duplicar_curso_para_grupo", {
+      p_curso_id: curso.id,
+      p_grupo: grupo.trim().toUpperCase(),
+      p_clave: clave.trim().toUpperCase(),
+    });
+    setDuplicando(false);
+    if (error) return toast.error(error.message || "No se pudo duplicar");
+
+    toast.success("Curso duplicado");
+    qc.invalidateQueries({ queryKey: ["mini_courses_own"] });
+    setAbierto(false);
+    navigate(`/resources/courses/${data}`);
+  };
+
+  return (
+    <Dialog open={abierto} onOpenChange={(o) => { setAbierto(o); if (o) setClave(generateAccessCode()); }}>
+      <DialogTrigger asChild>
+        <Button variant="outline"><CopyPlus className="h-4 w-4 mr-2" />Otro grupo</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Duplicar para otro grupo</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Se crea un curso nuevo con el mismo nombre, la misma descripción y
+            los mismos {recursos} recurso{recursos === 1 ? "" : "s"}. Los
+            estudiantes NO se copian: cada grupo se inscribe con su propia clave.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="nuevo-grupo">Grupo</Label>
+              <Input
+                id="nuevo-grupo"
+                value={grupo}
+                onChange={(e) => setGrupo(e.target.value.toUpperCase())}
+                maxLength={10}
+                placeholder={curso.grupo === "A" ? "B" : "A, B, C..."}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nueva-clave">Clave de acceso</Label>
+              <Input
+                id="nueva-clave"
+                value={clave}
+                onChange={(e) => setClave(e.target.value.toUpperCase())}
+                className="font-mono uppercase"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Las fechas de apertura y cierre no se copian: casi nunca coinciden
+            entre grupos y una fecha heredada podría cerrar el curso nuevo sin
+            que lo notes.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAbierto(false)}>Cancelar</Button>
+          <Button className="gradient-primary" onClick={duplicar} disabled={duplicando}>
+            {duplicando ? "Duplicando..." : "Duplicar curso"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

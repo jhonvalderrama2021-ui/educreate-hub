@@ -171,6 +171,10 @@ describe("Formato del informe", () => {
     expect(formatearDuracion(0)).toBe("0s");
     expect(formatearDuracion(45)).toBe("45s");
     expect(formatearDuracion(125)).toBe("2m 5s");
+    // A partir de una hora los segundos estorban: la auditoría acumula horas
+    expect(formatearDuracion(3600)).toBe("1h");
+    expect(formatearDuracion(18000)).toBe("5h");
+    expect(formatearDuracion(5445)).toBe("1h 30m");
     expect(formatearDuracion(null)).toBe("—");
   });
 

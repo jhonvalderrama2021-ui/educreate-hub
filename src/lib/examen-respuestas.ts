@@ -143,8 +143,13 @@ export function notaColombiana(aciertos: number | null, total: number | null): s
 
 export function formatearDuracion(segundos: number | null | undefined): string {
   if (!segundos && segundos !== 0) return "—";
-  const m = Math.floor(segundos / 60);
+  const h = Math.floor(segundos / 3600);
+  const m = Math.floor((segundos % 3600) / 60);
   const s = segundos % 60;
+  // La auditoría acumula horas: "300m 0s" no se lee. Los segundos sobran a
+  // partir de una hora, y a partir de un minuto siguen siendo útiles porque
+  // un examen puede durar dos minutos y medio.
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 

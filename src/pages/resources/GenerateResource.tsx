@@ -83,6 +83,7 @@ export default function GenerateResource() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
+  const recursoParam = searchParams.get("recurso");
 
   const [resourceType, setResourceType] = useState(typeParam || "icfes");
 
@@ -159,11 +160,37 @@ export default function GenerateResource() {
 
   useEffect(() => {
     setResourceType(typeParam || "icfes");
+    if (recursoParam) return; // lo carga el efecto de abajo
     setGeneratedContent(null);
     setEditableContent(null);
     setIsEditing(false);
     setRecursoId(null);
-  }, [typeParam]);
+  }, [typeParam, recursoParam]);
+
+  // Llegar con ?recurso=<id> abre ese recurso listo para modificarlo. Es el
+  // camino desde el historial general: "si les quedo faltando algo, tienen
+  // dos opciones: volver a crearla o modificarla".
+  useEffect(() => {
+    if (!recursoParam || !user || recursoId === recursoParam) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from("generated_resources")
+        .select("*")
+        .eq("id", recursoParam)
+        .eq("user_id", user.id)
+        .single();
+      if (cancelado) return;
+      if (error || !data) {
+        toast.error("No se encontró ese recurso");
+        setSearchParams({ type: typeParam || "icfes" }, { replace: true });
+        return;
+      }
+      abrirDelHistorial(data as RecursoHistorial);
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recursoParam, user]);
 
   useEffect(() => {
     if (aiProvider === "ollama") {
@@ -423,6 +450,7 @@ export default function GenerateResource() {
 
   /** Vacia el visor para empezar un recurso nuevo sin recargar la pagina. */
   const empezarNuevo = () => {
+    if (recursoParam) setSearchParams({ type: resourceType }, { replace: true });
     setRecursoId(null);
     setGeneratedContent(null);
     setEditableContent(null);

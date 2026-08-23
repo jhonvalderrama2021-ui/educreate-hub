@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,13 +11,14 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
-  History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp,
+  History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation, Puzzle, BookText,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { rutaDelRecurso } from "@/lib/ruta-modulo";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -45,6 +47,7 @@ const RESOURCES_QK = (uid?: string) => ["generated_resources", uid] as const;
 
 export default function ResourceHistory() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
   const [filtroAsignatura, setFiltroAsignatura] = useState("all");
@@ -266,6 +269,12 @@ export default function ResourceHistory() {
                           </Button>
                         </>
                       )}
+                      <Button
+                        variant="outline" size="sm"
+                        onClick={() => navigate(rutaDelRecurso(r.resource_type, r.id))}
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                      </Button>
                       <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteResource(r.id)}>
                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
                       </Button>

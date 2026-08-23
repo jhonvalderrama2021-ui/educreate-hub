@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +58,8 @@ export default function Crossword() {
   const [generating, setGenerating] = useState(false);
   // Mientras exista, guardar actualiza ese registro en vez de duplicarlo.
   const [recursoId, setRecursoId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const recursoParam = searchParams.get("recurso");
   const [content, setContent] = useState<CrosswordContent | null>(null);
   const [showSolution, setShowSolution] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "docx" | null>(null);
@@ -152,6 +155,30 @@ export default function Crossword() {
     setRecursoId(id);
     toast.success(recursoId ? "Cambios guardados" : "Guardado en historial");
   };
+
+  // Llegar con ?recurso=<id> abre ese recurso para modificarlo, que es el
+  // camino desde el historial general.
+  useEffect(() => {
+    if (!recursoParam || !user || recursoId === recursoParam) return;
+    let cancelado = false;
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from("generated_resources")
+        .select("*")
+        .eq("id", recursoParam)
+        .eq("user_id", user.id)
+        .single();
+      if (cancelado) return;
+      if (error || !data) {
+        toast.error("No se encontró ese recurso");
+        setSearchParams({}, { replace: true });
+        return;
+      }
+      abrirDelHistorial(data as RecursoHistorial);
+    })();
+    return () => { cancelado = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recursoParam, user]);
 
   /** Carga en pantalla uno de los recursos de la franja lateral. */
   const abrirDelHistorial = (r: RecursoHistorial) => {
