@@ -17,10 +17,11 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
+import { revisarEntrega, notaColombiana, formatearDuracion, descargarCSV } from "@/lib/examen-respuestas";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -86,6 +87,60 @@ export default function CourseDetailTeacher() {
       return data as ResourceSubmission[];
     },
   });
+
+  // Los enunciados viven en el recurso generado, no en la entrega: hacen
+  // falta para que la exportacion incluya que se pregunto en cada punto.
+  const { data: contenidos = {} } = useQuery({
+    queryKey: ["contenidos_curso", courseId, resources.map((r) => r.resource_id).join(",")],
+    enabled: resources.length > 0,
+    queryFn: async () => {
+      const ids = [...new Set(resources.map((r) => r.resource_id))];
+      const { data } = await (supabase as any)
+        .from("generated_resources").select("id, content").in("id", ids);
+      return Object.fromEntries((data || []).map((r: any) => [r.id, r.content])) as Record<string, any>;
+    },
+  });
+
+  /**
+   * "O una opcion que le de para extraer todos" — pedido del asesor.
+   * Una fila por pregunta y estudiante: asi el docente puede ordenar en Excel
+   * y ver que punto fallo el grupo entero, que es lo que sirve para
+   * reorientar la clase.
+   */
+  const exportarTodo = () => {
+    if (submissions.length === 0) return toast.error("Aun no hay entregas que exportar");
+    const filas: (string | number)[][] = [
+      ["Estudiante", "Correo", "Actividad", "Tipo", "Aciertos", "Total", "Nota (1-5)",
+       "Tiempo", "Fecha", "N° pregunta", "Enunciado", "Respondio", "Correcta", "¿Acerto?"],
+    ];
+    for (const s of submissions) {
+      const enr = enrollments.find((e: any) => e.student_id === s.student_id);
+      const cr = resources.find((r) => r.id === s.course_resource_id);
+      const preguntas = revisarEntrega(cr ? contenidos[cr.resource_id] : null, s);
+      const cabecera = [
+        enr?.profile?.full_name || s.student_id.slice(0, 8),
+        enr?.profile?.email || "",
+        cr?.title || "",
+        s.resource_type,
+        s.score ?? "",
+        s.max_score ?? "",
+        notaColombiana(s.score, s.max_score),
+        formatearDuracion(s.time_spent_seconds),
+        new Date(s.submitted_at).toLocaleString("es-CO"),
+      ];
+      if (preguntas.length === 0) { filas.push([...cabecera, "", "", "", "", ""]); continue; }
+      for (const p of preguntas) {
+        filas.push([
+          ...cabecera, p.numero, p.enunciado,
+          p.opciones[p.marcada]?.text ?? "(sin responder)",
+          p.opciones[p.correcta]?.text ?? "",
+          p.acerto ? "Si" : "No",
+        ]);
+      }
+    }
+    descargarCSV(`resultados-${(course?.name || "curso").replace(/s+/g, "_")}.csv`, filas);
+    toast.success("Archivo descargado");
+  };
 
   const removeResource = async (id: string) => {
     if (!confirm("¿Quitar este recurso del curso?")) return;
@@ -219,6 +274,14 @@ export default function CourseDetailTeacher() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Pulsa sobre un estudiante para ver lo que respondio en cada pregunta.
+            </p>
+            <Button variant="outline" size="sm" onClick={exportarTodo} disabled={submissions.length === 0}>
+              <Download className="h-4 w-4 mr-2" /> Extraer todos
+            </Button>
+          </div>
           {submissions.length === 0 ? (
             <div className="glass-card rounded-xl p-8 text-center text-muted-foreground">
               Aún no hay entregas.
@@ -241,7 +304,15 @@ export default function CourseDetailTeacher() {
                   const res = resources.find((r) => r.id === s.course_resource_id);
                   return (
                     <TableRow key={s.id}>
-                      <TableCell>{enr?.profile?.full_name || s.student_id.slice(0, 8)}</TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/resources/courses/${courseId}/student-report/${s.student_id}`)}
+                          className="text-left hover:text-primary hover:underline transition-colors"
+                        >
+                          {enr?.profile?.full_name || s.student_id.slice(0, 8)}
+                        </button>
+                      </TableCell>
                       <TableCell className="line-clamp-1">{res?.title || "—"}</TableCell>
                       <TableCell><span className="text-xs">{s.resource_type}</span></TableCell>
                       <TableCell>{s.score !== null ? `${s.score} / ${s.max_score ?? "?"}` : "—"}</TableCell>

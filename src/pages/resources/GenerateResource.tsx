@@ -11,6 +11,7 @@ import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ import { SLIDE_PALETTES, getPaletteById, type StructuredSlide } from "@/lib/slid
 import {
   Sparkles, Upload, FileText, Loader2, Download, Save, Eye, EyeOff,
   ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
-  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette,
+  GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette, FilePlus,
 } from "lucide-react";
 
 const RESOURCE_TYPES = [
@@ -184,6 +185,10 @@ export default function GenerateResource() {
   const [saving, setSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [exportDialog, setExportDialog] = useState<null | "pdf" | "docx">(null);
+  // Id del recurso en la base de datos. Se llena solo al generar (guardado
+  // automatico) o al abrir uno del historial lateral. Mientras exista, guardar
+  // actualiza ese registro en vez de crear un duplicado.
+  const [recursoId, setRecursoId] = useState<string | null>(null);
 
   const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
@@ -207,6 +212,7 @@ export default function GenerateResource() {
     setGeneratedContent(null);
     setEditableContent(null);
     setIsEditing(false);
+    setRecursoId(null);
   }, [typeParam]);
 
   useEffect(() => {
@@ -370,7 +376,17 @@ export default function GenerateResource() {
       if (!title && result.title) setTitle(result.title);
       setGeneratedContent(result);
       setEditableContent(JSON.parse(JSON.stringify(result)));
-      toast.success("¡Recurso generado exitosamente!");
+      setRecursoId(null);
+
+      // Se guarda solo: hasta ahora, si el docente cerraba la pestana o se le
+      // caia la conexion perdia el recurso y el costo de la generacion.
+      const guardado = await persistirRecurso(result, null);
+      if (guardado) {
+        setRecursoId(guardado);
+        toast.success("Recurso generado y guardado en tu historial");
+      } else {
+        toast.success("Recurso generado. No se pudo guardar solo; usa el boton Guardar.");
+      }
     } catch (e: any) {
       toast.error(e.message || "Error al generar el recurso");
     } finally {
@@ -378,15 +394,17 @@ export default function GenerateResource() {
     }
   };
 
-  const handleSave = async () => {
-    if (!user || !generatedContent) return;
-    setSaving(true);
-
-    const contentToSave = isEditing ? editableContent : generatedContent;
-
+  /**
+   * Escribe el recurso en la base de datos y devuelve su id, o null si
+   * fallo. Si recibe un id actualiza ese registro; si no, crea uno nuevo.
+   * Separado de handleSave para poder reutilizarlo en el guardado
+   * automatico sin arrastrar los avisos ni el estado del boton.
+   */
+  const persistirRecurso = async (contenido: any, id: string | null): Promise<string | null> => {
+    if (!user || !contenido) return null;
     try {
       let sourcePdfUrl: string | null = null;
-      if (uploadedFile) {
+      if (uploadedFile && !id) {
         const filePath = `${user.id}/${Date.now()}_${uploadedFile.name}`;
         const { error: uploadError } = await supabase.storage
           .from("resource-pdfs")
@@ -394,29 +412,73 @@ export default function GenerateResource() {
         if (!uploadError) sourcePdfUrl = filePath;
       }
 
-      const { error } = await (supabase as any).from("generated_resources").insert({
-        user_id: user.id,
-        title: title || contentToSave.title || "Recurso sin título",
+      const datos: Record<string, any> = {
+        title: title || contenido.title || "Recurso sin título",
         resource_type: resourceType,
-        content: contentToSave,
-        source_pdf_url: sourcePdfUrl,
+        content: contenido,
         is_public: isPublic,
         // Se guardan como columnas, no solo dentro del contenido, para poder
         // filtrar y agrupar los recursos por asignatura y grado.
         subject: (subject === "Otras" ? customSubject : subject)?.trim() || null,
         grade: grade || null,
-      });
+      };
+      if (sourcePdfUrl) datos.source_pdf_url = sourcePdfUrl;
 
+      if (id) {
+        const { error } = await (supabase as any).from("generated_resources")
+          .update(datos).eq("id", id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
+        return id;
+      }
+
+      const { data, error } = await (supabase as any).from("generated_resources")
+        .insert({ user_id: user.id, ...datos }).select("id").single();
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
-      toast.success("Recurso guardado en tu historial");
+      return data?.id ?? null;
     } catch (e: any) {
-      toast.error("Error al guardar: " + e.message);
-    } finally {
-      setSaving(false);
+      console.error("No se pudo guardar el recurso:", e);
+      return null;
     }
   };
 
+  const handleSave = async () => {
+    if (!user || !generatedContent) return;
+    setSaving(true);
+    const contenido = isEditing ? editableContent : generatedContent;
+    const id = await persistirRecurso(contenido, recursoId);
+    if (id) {
+      setRecursoId(id);
+      toast.success(recursoId ? "Cambios guardados" : "Recurso guardado en tu historial");
+    } else {
+      toast.error("No se pudo guardar el recurso");
+    }
+    setSaving(false);
+  };
+
+  /** Carga en el visor un recurso de la franja lateral. */
+  const abrirDelHistorial = (r: RecursoHistorial) => {
+    setRecursoId(r.id);
+    setTitle(r.title);
+    setIsPublic(r.is_public);
+    setGeneratedContent(r.content);
+    setEditableContent(JSON.parse(JSON.stringify(r.content)));
+    setIsEditing(false);
+    if (r.subject) setSubject(SUBJECTS.includes(r.subject) ? r.subject : "Otras");
+    if (r.subject && !SUBJECTS.includes(r.subject)) setCustomSubject(r.subject);
+    if (r.grade) setGrade(r.grade);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** Vacia el visor para empezar un recurso nuevo sin recargar la pagina. */
+  const empezarNuevo = () => {
+    setRecursoId(null);
+    setGeneratedContent(null);
+    setEditableContent(null);
+    setIsEditing(false);
+    setTitle("");
+  };
   const savePreferences = async () => {
     if (!user) return;
     await (supabase as any).from("user_ai_preferences").upsert({
@@ -437,484 +499,502 @@ export default function GenerateResource() {
   const displayContent = isEditing ? editableContent : generatedContent;
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
-          <TypeIcon className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {currentType?.label || "Generar Recurso"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Completa el formulario y genera con IA
-          </p>
-        </div>
-      </div>
-
-      {/* Main Form */}
-      <div className="glass-card rounded-xl p-6 space-y-5">
-        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-          <BookMarked className="h-5 w-5 text-primary" />
-          Información del recurso
-        </h2>
-
-        {validationErrors.length > 0 && (
-          <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
-            {validationErrors.map((err, i) => (
-              <p key={i} className="text-sm text-destructive flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" /> {err}
-              </p>
-            ))}
+    // El formulario a la izquierda y la franja con lo ya creado a la derecha,
+    // como se acordo en la reunion: cada modulo muestra su propio historial en
+    // vez de mandar al docente al historial general.
+    <div className="max-w-7xl mx-auto animate-fade-in grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-6 min-w-0">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
+            <TypeIcon className="h-5 w-5 text-primary-foreground" />
           </div>
-        )}
-
-        {/* Row 1: Tema + Título */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Tema <span className="text-destructive">*</span></Label>
-            <Input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
-          </div>
-          <div className="space-y-2">
-            <Label>Título (opcional)</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Se generará automáticamente" />
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {currentType?.label || "Generar Recurso"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Completa el formulario y genera con IA
+            </p>
           </div>
         </div>
 
-        {/* Row 2: Asignatura + Nivel */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Asignatura <span className="text-destructive">*</span></Label>
-            <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
-              <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
-              <SelectContent className="max-h-72">
-                {SUBJECTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                <SelectItem value="Otras">Otras</SelectItem>
-              </SelectContent>
-            </Select>
-            {subject === "Otras" && (
-              <Input value={customSubject} onChange={(e) => setCustomSubject(e.target.value)} placeholder="Escribe la asignatura" className="mt-2" />
-            )}
+        {/* Main Form */}
+        <div className="glass-card rounded-xl p-6 space-y-5">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <BookMarked className="h-5 w-5 text-primary" />
+            Información del recurso
+          </h2>
+
+          {validationErrors.length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 space-y-1">
+              {validationErrors.map((err, i) => (
+                <p key={i} className="text-sm text-destructive flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" /> {err}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Row 1: Tema + Título */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Tema <span className="text-destructive">*</span></Label>
+              <Input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Título (opcional)</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Se generará automáticamente" />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label>Nivel educativo <span className="text-destructive">*</span></Label>
-            <div className="flex items-center gap-3">
-              <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
-              <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+
+          {/* Row 2: Asignatura + Nivel */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Asignatura <span className="text-destructive">*</span></Label>
+              <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
                 <SelectContent className="max-h-72">
-                  {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
-                    <SelectItem key={g} value={String(g)}>Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}</SelectItem>
+                  {SUBJECTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                  <SelectItem value="Otras">Otras</SelectItem>
+                </SelectContent>
+              </Select>
+              {subject === "Otras" && (
+                <Input value={customSubject} onChange={(e) => setCustomSubject(e.target.value)} placeholder="Escribe la asignatura" className="mt-2" />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Nivel educativo <span className="text-destructive">*</span></Label>
+              <div className="flex items-center gap-3">
+                <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
+                <Select value={grade} onValueChange={setGrade}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {Array.from({ length: 11 }, (_, i) => i + 1).map((g) => (
+                      <SelectItem key={g} value={String(g)}>Grado {g} — {g <= 5 ? "Primaria" : "Secundaria"}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Exam Type */}
+          {resourceType === "icfes" && (
+            <div className="space-y-2">
+              <Label>Tipo de examen <span className="text-destructive">*</span></Label>
+              <Select value={examType} onValueChange={setExamType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EXAM_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label} — {t.desc}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Exam Type */}
-        {resourceType === "icfes" && (
-          <div className="space-y-2">
-            <Label>Tipo de examen <span className="text-destructive">*</span></Label>
-            <Select value={examType} onValueChange={setExamType}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {EXAM_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label} — {t.desc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Nivel de complejidad: lo decide el docente según el momento del tema */}
-        {resourceType === "icfes" && (
-          <div className="space-y-2">
-            <Label>Nivel de complejidad <span className="text-destructive">*</span></Label>
-            <Select value={examComplexity} onValueChange={setExamComplexity}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {COMPLEXITY_LEVELS.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label} — {c.desc}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Puedes aplicar un examen básico al inicio del tema y uno avanzado al cierre,
-              para comparar el avance del grupo.
-            </p>
-          </div>
-        )}
-
-        {/* Rubric-specific fields */}
-        {resourceType === "rubric" && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tipo de rúbrica <span className="text-destructive">*</span></Label>
-                <Select value={rubricType} onValueChange={setRubricType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {RUBRIC_TYPES.map((r) => (
-                      <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {rubricType === "otro" && (
-                  <Input value={customRubricType} onChange={(e) => setCustomRubricType(e.target.value)} placeholder="Describe el tipo de rúbrica" className="mt-2" />
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label>Niveles de desempeño</Label>
-                <Select value={performanceLevels} onValueChange={setPerformanceLevels}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PERFORMANCE_LEVELS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Nivel de complejidad: lo decide el docente según el momento del tema */}
+          {resourceType === "icfes" && (
+            <div className="space-y-2">
+              <Label>Nivel de complejidad <span className="text-destructive">*</span></Label>
+              <Select value={examComplexity} onValueChange={setExamComplexity}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {COMPLEXITY_LEVELS.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label} — {c.desc}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Puedes aplicar un examen básico al inicio del tema y uno avanzado al cierre,
+                para comparar el avance del grupo.
+              </p>
             </div>
+          )}
 
-            {performanceLevels === "custom" && (
-              <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm">Cantidad de niveles:</Label>
-                  <Input
-                    type="number"
-                    min={2}
-                    max={10}
-                    value={customLevelCount}
-                    onChange={(e) => setCustomLevelCount(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
-                    className="w-20"
-                  />
+          {/* Rubric-specific fields */}
+          {resourceType === "rubric" && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tipo de rúbrica <span className="text-destructive">*</span></Label>
+                  <Select value={rubricType} onValueChange={setRubricType}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RUBRIC_TYPES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {rubricType === "otro" && (
+                    <Input value={customRubricType} onChange={(e) => setCustomRubricType(e.target.value)} placeholder="Describe el tipo de rúbrica" className="mt-2" />
+                  )}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {Array.from({ length: customLevelCount }, (_, i) => (
+                <div className="space-y-2">
+                  <Label>Niveles de desempeño</Label>
+                  <Select value={performanceLevels} onValueChange={setPerformanceLevels}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PERFORMANCE_LEVELS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {performanceLevels === "custom" && (
+                <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
+                  <div className="flex items-center gap-3">
+                    <Label className="text-sm">Cantidad de niveles:</Label>
                     <Input
-                      key={i}
-                      value={customLevelNames[i] || ""}
-                      onChange={(e) => {
-                        const updated = [...customLevelNames];
-                        updated[i] = e.target.value;
-                        setCustomLevelNames(updated);
-                      }}
-                      placeholder={`Nivel ${i + 1}`}
+                      type="number"
+                      min={2}
+                      max={10}
+                      value={customLevelCount}
+                      onChange={(e) => setCustomLevelCount(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
+                      className="w-20"
                     />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Array.from({ length: customLevelCount }, (_, i) => (
+                      <Input
+                        key={i}
+                        value={customLevelNames[i] || ""}
+                        onChange={(e) => {
+                          const updated = [...customLevelNames];
+                          updated[i] = e.target.value;
+                          setCustomLevelNames(updated);
+                        }}
+                        placeholder={`Nivel ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Objetivo o criterios específicos (opcional)</Label>
+                <Textarea value={rubricObjective} onChange={(e) => setRubricObjective(e.target.value)} placeholder="Describe el objetivo de aprendizaje o criterios particulares que debe considerar la rúbrica..." rows={2} />
+              </div>
+            </>
+          )}
+
+          {/* Slides: number + palette */}
+          {resourceType === "slides" && (
+            <>
+              <div className="space-y-2">
+                <Label>Número de diapositivas</Label>
+                <Input
+                  type="number"
+                  min={3}
+                  max={20}
+                  value={numSlides}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "") return setNumSlides("");
+                    const n = parseInt(v);
+                    if (!Number.isNaN(n)) setNumSlides(n);
+                  }}
+                  onBlur={() => {
+                    if (numSlides === "" || (typeof numSlides === "number" && numSlides < 3)) setNumSlides(8);
+                    else if (typeof numSlides === "number" && numSlides > 20) setNumSlides(20);
+                  }}
+                  placeholder="8"
+                  className="w-32"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Palette className="h-4 w-4 text-primary" /> Paleta de colores
+                </Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {SLIDE_PALETTES.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSlidePalette(p.id)}
+                      className={`text-left p-3 rounded-lg border-2 transition-all ${
+                        slidePalette === p.id
+                          ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                          : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <div className="flex gap-1 mb-2">
+                        {p.preview.map((c, i) => (
+                          <div key={i} className="h-6 w-6 rounded-md border border-border/50" style={{ background: c }} />
+                        ))}
+                      </div>
+                      <div className="text-sm font-medium text-foreground">{p.name}</div>
+                      <div className="text-xs text-muted-foreground line-clamp-2">{p.description}</div>
+                    </button>
                   ))}
                 </div>
               </div>
-            )}
+            </>
+          )}
 
+          {/* Methodology */}
+          {extraFields.includes("methodology") && (
             <div className="space-y-2">
-              <Label>Objetivo o criterios específicos (opcional)</Label>
-              <Textarea value={rubricObjective} onChange={(e) => setRubricObjective(e.target.value)} placeholder="Describe el objetivo de aprendizaje o criterios particulares que debe considerar la rúbrica..." rows={2} />
+              <Label>Metodología</Label>
+              <Select value={methodology} onValueChange={(v) => { setMethodology(v); if (v !== "Otras") setCustomMethodology(""); }}>
+                <SelectTrigger><SelectValue placeholder="Selecciona una metodología" /></SelectTrigger>
+                <SelectContent>
+                  {METHODOLOGIES.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
+                  <SelectItem value="Otras">Otras</SelectItem>
+                </SelectContent>
+              </Select>
+              {methodology === "Otras" && (
+                <Input value={customMethodology} onChange={(e) => setCustomMethodology(e.target.value)} placeholder="Escribe la metodología" className="mt-2" />
+              )}
             </div>
-          </>
-        )}
+          )}
 
-        {/* Slides: number + palette */}
-        {resourceType === "slides" && (
-          <>
+          {/* Duration */}
+          {extraFields.includes("duration") && (
             <div className="space-y-2">
-              <Label>Número de diapositivas</Label>
+              <Label>Duración</Label>
+              <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ej: 2 horas, 45 minutos" />
+            </div>
+          )}
+
+          {/* Number of items */}
+          {extraFields.includes("numItems") && (
+            <div className="space-y-2">
+              <Label>Número de preguntas</Label>
               <Input
                 type="number"
-                min={3}
-                max={20}
-                value={numSlides}
+                min={1}
+                max={50}
+                value={numItems}
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v === "") return setNumSlides("");
+                  if (v === "") return setNumItems("");
                   const n = parseInt(v);
-                  if (!Number.isNaN(n)) setNumSlides(n);
+                  if (!Number.isNaN(n)) setNumItems(n);
                 }}
                 onBlur={() => {
-                  if (numSlides === "" || (typeof numSlides === "number" && numSlides < 3)) setNumSlides(8);
-                  else if (typeof numSlides === "number" && numSlides > 20) setNumSlides(20);
+                  if (numItems === "" || (typeof numItems === "number" && numItems < 1)) setNumItems(10);
+                  else if (typeof numItems === "number" && numItems > 50) setNumItems(50);
                 }}
-                placeholder="8"
+                placeholder="10"
                 className="w-32"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Palette className="h-4 w-4 text-primary" /> Paleta de colores
-              </Label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {SLIDE_PALETTES.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => setSlidePalette(p.id)}
-                    className={`text-left p-3 rounded-lg border-2 transition-all ${
-                      slidePalette === p.id
-                        ? "border-primary ring-2 ring-primary/20 bg-primary/5"
-                        : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="flex gap-1 mb-2">
-                      {p.preview.map((c, i) => (
-                        <div key={i} className="h-6 w-6 rounded-md border border-border/50" style={{ background: c }} />
-                      ))}
-                    </div>
-                    <div className="text-sm font-medium text-foreground">{p.name}</div>
-                    <div className="text-xs text-muted-foreground line-clamp-2">{p.description}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Methodology */}
-        {extraFields.includes("methodology") && (
-          <div className="space-y-2">
-            <Label>Metodología</Label>
-            <Select value={methodology} onValueChange={(v) => { setMethodology(v); if (v !== "Otras") setCustomMethodology(""); }}>
-              <SelectTrigger><SelectValue placeholder="Selecciona una metodología" /></SelectTrigger>
-              <SelectContent>
-                {METHODOLOGIES.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}
-                <SelectItem value="Otras">Otras</SelectItem>
-              </SelectContent>
-            </Select>
-            {methodology === "Otras" && (
-              <Input value={customMethodology} onChange={(e) => setCustomMethodology(e.target.value)} placeholder="Escribe la metodología" className="mt-2" />
-            )}
-          </div>
-        )}
-
-        {/* Duration */}
-        {extraFields.includes("duration") && (
-          <div className="space-y-2">
-            <Label>Duración</Label>
-            <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ej: 2 horas, 45 minutos" />
-          </div>
-        )}
-
-        {/* Number of items */}
-        {extraFields.includes("numItems") && (
-          <div className="space-y-2">
-            <Label>Número de preguntas</Label>
-            <Input
-              type="number"
-              min={1}
-              max={50}
-              value={numItems}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "") return setNumItems("");
-                const n = parseInt(v);
-                if (!Number.isNaN(n)) setNumItems(n);
-              }}
-              onBlur={() => {
-                if (numItems === "" || (typeof numItems === "number" && numItems < 1)) setNumItems(10);
-                else if (typeof numItems === "number" && numItems > 50) setNumItems(50);
-              }}
-              placeholder="10"
-              className="w-32"
-            />
-          </div>
-        )}
-
-        {/* Additional instructions */}
-        <div className="space-y-2">
-          <Label>Instrucciones adicionales (opcional)</Label>
-          <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
-        </div>
-
-        {/* File Upload */}
-        <div className="space-y-2">
-          <Label>Archivo fuente (opcional) — PDF, Word o TXT</Label>
-          <div
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer border-border hover:border-primary/50"
-            onClick={() => document.getElementById("file-input")?.click()}
-          >
-            <input
-              id="file-input"
-              type="file"
-              accept=".pdf,.docx,.doc,.txt"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleFileUpload(file);
-              }}
-            />
-            {extractingFile ? (
-              <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Procesando archivo...</span>
-              </div>
-            ) : uploadedFile ? (
-              <div className="flex items-center justify-center gap-2 text-primary">
-                <FileText className="h-5 w-5" />
-                <span className="font-medium">{uploadedFile.name}</span>
-                <span className="text-xs text-muted-foreground">({fileText.length} caracteres)</span>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">Arrastra un archivo aquí o haz clic para seleccionar</p>
-                <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.docx), Texto (.txt)</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* AI Engine */}
-        <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
-          <Label className="text-sm font-semibold flex items-center gap-2">
-            <Beaker className="h-4 w-4 text-primary" />
-            Motor de IA
-          </Label>
-          <div className="flex gap-3">
-            <Button variant={aiProvider === "openai" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("openai")} className={aiProvider === "openai" ? "gradient-primary" : ""}>
-              <Cloud className="h-4 w-4 mr-1" /> OpenAI
-            </Button>
-            <Button variant={aiProvider === "ollama" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("ollama")} className={aiProvider === "ollama" ? "gradient-primary" : ""}>
-              <Server className="h-4 w-4 mr-1" /> Ollama (Local)
-            </Button>
-          </div>
-
-          {aiProvider === "ollama" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-              <div className="space-y-1">
-                <Label className="text-xs">URL de Ollama</Label>
-                <Input value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" className="text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Modelo</Label>
-                {ollamaModels.length > 0 ? (
-                  <Select value={ollamaModel} onValueChange={setOllamaModel}>
-                    <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
-                    <SelectContent>{ollamaModels.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}</SelectContent>
-                  </Select>
-                ) : (
-                  <Input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} placeholder="llama3" className="text-sm" />
-                )}
-              </div>
-            </div>
           )}
-        </div>
 
-        {/* Generate Button */}
-        <Button className="w-full gradient-primary text-lg py-6" onClick={handleGenerate} disabled={generating}>
-          {generating ? (
-            <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generando recurso...</>
-          ) : (
-            <><Sparkles className="h-5 w-5 mr-2" />Generar con IA</>
-          )}
-        </Button>
-      </div>
+          {/* Additional instructions */}
+          <div className="space-y-2">
+            <Label>Instrucciones adicionales (opcional)</Label>
+            <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
+          </div>
 
-      {/* Generated Content */}
-      {generatedContent && (
-        <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
-          <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
-            <h2 className="font-semibold text-foreground text-lg">
-              {displayContent?.title || title || "Recurso generado"}
-            </h2>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 mr-3">
-                {isPublic ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
-                <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
-                <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
-              </div>
-              <Button
-                variant={isEditing ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  if (!isEditing) {
-                    setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
-                  }
-                  setIsEditing(!isEditing);
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label>Archivo fuente (opcional) — PDF, Word o TXT</Label>
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              className="border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer border-border hover:border-primary/50"
+              onClick={() => document.getElementById("file-input")?.click()}
+            >
+              <input
+                id="file-input"
+                type="file"
+                accept=".pdf,.docx,.doc,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file);
                 }}
-              >
-                <Pencil className="h-4 w-4 mr-1" />
-                {isEditing ? "Viendo edición" : "Editar"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="h-4 w-4 mr-1" />{saving ? "Guardando..." : "Guardar"}
-              </Button>
-              {resourceType === "slides" ? (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => exportSlidesToPptx(displayContent)}>
-                    <Download className="h-4 w-4 mr-1" /> PPTX
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => exportSlidesToPdf(displayContent)}>
-                    <Download className="h-4 w-4 mr-1" /> PDF
-                  </Button>
-                </>
+              />
+              {extractingFile ? (
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Procesando archivo...</span>
+                </div>
+              ) : uploadedFile ? (
+                <div className="flex items-center justify-center gap-2 text-primary">
+                  <FileText className="h-5 w-5" />
+                  <span className="font-medium">{uploadedFile.name}</span>
+                  <span className="text-xs text-muted-foreground">({fileText.length} caracteres)</span>
+                </div>
               ) : (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => setExportDialog("docx")}>
-                    <Download className="h-4 w-4 mr-1" /> Word
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setExportDialog("pdf")}>
-                    <Download className="h-4 w-4 mr-1" /> PDF
-                  </Button>
-                </>
+                <div className="space-y-1">
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Arrastra un archivo aquí o haz clic para seleccionar</p>
+                  <p className="text-xs text-muted-foreground">Formatos: PDF, Word (.docx), Texto (.txt)</p>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="mb-4">
-              <AvisoContenidoIA meta={displayContent?._meta} />
+          {/* AI Engine */}
+          <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <Beaker className="h-4 w-4 text-primary" />
+              Motor de IA
+            </Label>
+            <div className="flex gap-3">
+              <Button variant={aiProvider === "openai" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("openai")} className={aiProvider === "openai" ? "gradient-primary" : ""}>
+                <Cloud className="h-4 w-4 mr-1" /> OpenAI
+              </Button>
+              <Button variant={aiProvider === "ollama" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("ollama")} className={aiProvider === "ollama" ? "gradient-primary" : ""}>
+                <Server className="h-4 w-4 mr-1" /> Ollama (Local)
+              </Button>
             </div>
-            {resourceType === "slides" ? (
-              <SlideViewer
-                slides={displayContent?.slides || []}
-                title={displayContent?.title}
-                theme={displayContent?.theme}
-                editable={isEditing}
-                onSlideChange={(idx, updated) => {
-                  setEditableContent((prev: any) => {
-                    const base = prev || JSON.parse(JSON.stringify(generatedContent));
-                    const nextSlides = [...(base.slides || [])];
-                    nextSlides[idx] = updated;
-                    return { ...base, slides: nextSlides };
-                  });
-                }}
-              />
-            ) : (
-              <ResourceContentViewer
-                type={resourceType}
-                content={displayContent}
-                editable={isEditing}
-                onContentChange={isEditing ? setEditableContent : undefined}
-              />
+
+            {aiProvider === "ollama" && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">URL de Ollama</Label>
+                  <Input value={ollamaUrl} onChange={(e) => setOllamaUrl(e.target.value)} placeholder="http://localhost:11434" className="text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Modelo</Label>
+                  {ollamaModels.length > 0 ? (
+                    <Select value={ollamaModel} onValueChange={setOllamaModel}>
+                      <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{ollamaModels.map((m) => (<SelectItem key={m} value={m}>{m}</SelectItem>))}</SelectContent>
+                    </Select>
+                  ) : (
+                    <Input value={ollamaModel} onChange={(e) => setOllamaModel(e.target.value)} placeholder="llama3" className="text-sm" />
+                  )}
+                </div>
+              </div>
             )}
           </div>
+
+          {/* Generate Button */}
+          <Button className="w-full gradient-primary text-lg py-6" onClick={handleGenerate} disabled={generating}>
+            {generating ? (
+              <><Loader2 className="h-5 w-5 mr-2 animate-spin" />Generando recurso...</>
+            ) : (
+              <><Sparkles className="h-5 w-5 mr-2" />Generar con IA</>
+            )}
+          </Button>
         </div>
-      )}
 
-      {exportDialog && resourceType !== "slides" && (
-        <ExportOptionsDialog
-          open={!!exportDialog}
-          onOpenChange={(o) => !o && setExportDialog(null)}
-          format={exportDialog}
-          onConfirm={async (opts) => {
-            const name = displayContent?.title || title || "Recurso";
-            if (exportDialog === "docx") await exportToDocx(name, resourceType, displayContent, opts);
-            else await exportToPdf(name, resourceType, displayContent, opts);
-          }}
-        />
-      )}
+        {/* Generated Content */}
+        {generatedContent && (
+          <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
+            <div className="p-4 border-b border-border flex items-center justify-between flex-wrap gap-3">
+              <h2 className="font-semibold text-foreground text-lg">
+                {displayContent?.title || title || "Recurso generado"}
+              </h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 mr-3">
+                  {isPublic ? <Eye className="h-4 w-4 text-primary" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                  <Label className="text-xs cursor-pointer" htmlFor="public-toggle">{isPublic ? "Público" : "Privado"}</Label>
+                  <Switch id="public-toggle" checked={isPublic} onCheckedChange={setIsPublic} />
+                </div>
+                <Button
+                  variant={isEditing ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    if (!isEditing) {
+                      setEditableContent(JSON.parse(JSON.stringify(generatedContent)));
+                    }
+                    setIsEditing(!isEditing);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-1" />
+                  {isEditing ? "Viendo edición" : "Editar"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
+                  <Save className="h-4 w-4 mr-1" />
+                  {saving ? "Guardando..." : recursoId ? "Guardar cambios" : "Guardar"}
+                </Button>
+                {recursoId && (
+                  <Button variant="outline" size="sm" onClick={empezarNuevo}>
+                    <FilePlus className="h-4 w-4 mr-1" /> Nuevo
+                  </Button>
+                )}
+                {resourceType === "slides" ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => exportSlidesToPptx(displayContent)}>
+                      <Download className="h-4 w-4 mr-1" /> PPTX
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => exportSlidesToPdf(displayContent)}>
+                      <Download className="h-4 w-4 mr-1" /> PDF
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" onClick={() => setExportDialog("docx")}>
+                      <Download className="h-4 w-4 mr-1" /> Word
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setExportDialog("pdf")}>
+                      <Download className="h-4 w-4 mr-1" /> PDF
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
 
-      {/* El módulo se identifica por el tipo de recurso, para poder analizar
-          después qué sección concentra más observaciones. */}
-      <div className="mt-6">
-        <CampoObservacion modulo={resourceType} />
+            <div className="p-6">
+              <div className="mb-4">
+                <AvisoContenidoIA meta={displayContent?._meta} />
+              </div>
+              {resourceType === "slides" ? (
+                <SlideViewer
+                  slides={displayContent?.slides || []}
+                  title={displayContent?.title}
+                  theme={displayContent?.theme}
+                  editable={isEditing}
+                  onSlideChange={(idx, updated) => {
+                    setEditableContent((prev: any) => {
+                      const base = prev || JSON.parse(JSON.stringify(generatedContent));
+                      const nextSlides = [...(base.slides || [])];
+                      nextSlides[idx] = updated;
+                      return { ...base, slides: nextSlides };
+                    });
+                  }}
+                />
+              ) : (
+                <ResourceContentViewer
+                  type={resourceType}
+                  content={displayContent}
+                  editable={isEditing}
+                  onContentChange={isEditing ? setEditableContent : undefined}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {exportDialog && resourceType !== "slides" && (
+          <ExportOptionsDialog
+            open={!!exportDialog}
+            onOpenChange={(o) => !o && setExportDialog(null)}
+            format={exportDialog}
+            onConfirm={async (opts) => {
+              const name = displayContent?.title || title || "Recurso";
+              if (exportDialog === "docx") await exportToDocx(name, resourceType, displayContent, opts);
+              else await exportToPdf(name, resourceType, displayContent, opts);
+            }}
+          />
+        )}
+
+        {/* El módulo se identifica por el tipo de recurso, para poder analizar
+            después qué sección concentra más observaciones. */}
+        <div className="mt-6">
+          <CampoObservacion modulo={resourceType} />
+        </div>
       </div>
+
+      <HistorialModulo
+        tipos={[resourceType]}
+        onAbrir={abrirDelHistorial}
+        activo={recursoId}
+        titulo={`${currentType?.label || "Recursos"} anteriores`}
+      />
     </div>
   );
 }

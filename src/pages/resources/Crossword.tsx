@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 
 export interface CrosswordClue {
   number: number;
@@ -54,6 +55,8 @@ export default function Crossword() {
   const [pdfText, setPdfText] = useState<string>("");
   const [pdfName, setPdfName] = useState<string>("");
   const [generating, setGenerating] = useState(false);
+  // Mientras exista, guardar actualiza ese registro en vez de duplicarlo.
+  const [recursoId, setRecursoId] = useState<string | null>(null);
   const [content, setContent] = useState<CrosswordContent | null>(null);
   const [showSolution, setShowSolution] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "docx" | null>(null);
@@ -104,7 +107,11 @@ export default function Crossword() {
       if ((data as any)?.error) throw new Error((data as any).error);
       setContent(data as CrosswordContent);
       setShowSolution(false);
-      toast.success("Crucigrama generado");
+      setRecursoId(null);
+      // Se guarda solo: antes, cerrar la pestana costaba el recurso y su generacion.
+      const guardado = await persistir(data as CrosswordContent, null);
+      setRecursoId(guardado);
+      toast.success(guardado ? "Crucigrama generado y guardado" : "Crucigrama generado");
     } catch (e: any) {
       toast.error(e.message || "Error al generar");
     } finally {
@@ -112,161 +119,197 @@ export default function Crossword() {
     }
   };
 
-  const handleSave = async () => {
-    if (!content || !user) return;
-    const { error } = await (supabase as any).from("generated_resources").insert({
-      user_id: user.id,
-      title: `Crucigrama: ${content.theme}`,
+  /** Guarda o actualiza y devuelve el id, o null si fallo. */
+  const persistir = async (c: any, id: string | null): Promise<string | null> => {
+    if (!c || !user) return null;
+    const datos = {
+      title: `Crucigrama: ${c.theme}`,
       resource_type: "crossword",
-      content,
-    });
-    if (error) toast.error("Error al guardar");
-    else {
+      content: c,
+    };
+    try {
+      if (id) {
+        const { error } = await (supabase as any).from("generated_resources")
+          .update(datos).eq("id", id);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
+        return id;
+      }
+      const { data, error } = await (supabase as any).from("generated_resources")
+        .insert({ user_id: user.id, ...datos }).select("id").single();
+      if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
-      toast.success("Guardado en historial");
+      return data?.id ?? null;
+    } catch (e) {
+      console.error("No se pudo guardar:", e);
+      return null;
     }
   };
 
+  const handleSave = async () => {
+    const id = await persistir(content, recursoId);
+    if (!id) return toast.error("Error al guardar");
+    setRecursoId(id);
+    toast.success(recursoId ? "Cambios guardados" : "Guardado en historial");
+  };
+
+  /** Carga en pantalla uno de los recursos de la franja lateral. */
+  const abrirDelHistorial = (r: RecursoHistorial) => {
+    setRecursoId(r.id);
+    setContent(r.content as CrosswordContent);
+    setShowSolution(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
-          <Puzzle className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Generador de Crucigramas</h1>
-          <p className="text-sm text-muted-foreground">Crea crucigramas educativos en español</p>
-        </div>
-      </div>
-
-      <div className="glass-card rounded-xl p-6 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Temática del crucigrama *</Label>
-            <Input
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              placeholder="Ej: Sistema solar, Independencia de Colombia, Animales..."
-            />
+    // Formulario a la izquierda, lo ya creado a la derecha.
+    <div className="max-w-7xl mx-auto animate-fade-in grid gap-6 items-start lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="space-y-6 min-w-0">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg gradient-primary flex items-center justify-center">
+            <Puzzle className="h-5 w-5 text-primary-foreground" />
           </div>
-          <div className="space-y-2">
-            <Label>Dificultad</Label>
-            <Select value={difficulty} onValueChange={setDifficulty}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="fácil">Fácil</SelectItem>
-                <SelectItem value="medio">Medio</SelectItem>
-                <SelectItem value="difícil">Difícil</SelectItem>
-              </SelectContent>
-            </Select>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Generador de Crucigramas</h1>
+            <p className="text-sm text-muted-foreground">Crea crucigramas educativos en español</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <Label>Total de palabras</Label>
-            <Input
-              type="number" min={4} max={20}
-              value={totalWords}
-              onChange={(e) => setTotalWords(Number(e.target.value) || 10)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Horizontales</Label>
-            <Input
-              type="number" min={1} max={totalWords - 1}
-              value={acrossCount}
-              onChange={(e) => {
-                const v = Number(e.target.value) || 1;
-                setAcrossCount(v);
-                setDownCount(Math.max(1, totalWords - v));
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Verticales</Label>
-            <Input
-              type="number" min={1} max={totalWords - 1}
-              value={downCount}
-              onChange={(e) => {
-                const v = Number(e.target.value) || 1;
-                setDownCount(v);
-                setAcrossCount(Math.max(1, totalWords - v));
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label>PDF de referencia (opcional)</Label>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-3.5 w-3.5 mr-1" /> Subir PDF
-            </Button>
-            {pdfName && <span className="text-xs text-muted-foreground truncate">{pdfName}</span>}
-            <input
-              ref={fileInputRef} type="file" accept=".pdf,.txt"
-              className="hidden" onChange={onPdfChange}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Si lo subes, las palabras se extraerán del contenido del PDF.
-          </p>
-        </div>
-
-        <Button onClick={handleGenerate} disabled={generating} className="w-full gradient-primary">
-          {generating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generando...</> : <><Sparkles className="h-4 w-4 mr-2" /> Generar crucigrama</>}
-        </Button>
-      </div>
-
-      {content && (
         <div className="glass-card rounded-xl p-6 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">{content.theme}</h2>
-              <p className="text-xs text-muted-foreground">
-                {content.across.length} horizontales · {content.down.length} verticales · {content.difficulty}
-              </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Temática del crucigrama *</Label>
+              <Input
+                value={theme}
+                onChange={(e) => setTheme(e.target.value)}
+                placeholder="Ej: Sistema solar, Independencia de Colombia, Animales..."
+              />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowSolution((s) => !s)}>
-                {showSolution ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
-                {showSolution ? "Ocultar solución" : "Ver solución"}
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleGenerate}>
-                <RefreshCcw className="h-3.5 w-3.5 mr-1" /> Regenerar
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSave}>
-                <Save className="h-3.5 w-3.5 mr-1" /> Guardar
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setExportFormat("docx")}>
-                <Download className="h-3.5 w-3.5 mr-1" /> Word
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setExportFormat("pdf")}>
-                <Download className="h-3.5 w-3.5 mr-1" /> PDF
-              </Button>
+            <div className="space-y-2">
+              <Label>Dificultad</Label>
+              <Select value={difficulty} onValueChange={setDifficulty}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fácil">Fácil</SelectItem>
+                  <SelectItem value="medio">Medio</SelectItem>
+                  <SelectItem value="difícil">Difícil</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <CrosswordGrid content={content} showSolution={showSolution} interactive />
-        </div>
-      )}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Total de palabras</Label>
+              <Input
+                type="number" min={4} max={20}
+                value={totalWords}
+                onChange={(e) => setTotalWords(Number(e.target.value) || 10)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Horizontales</Label>
+              <Input
+                type="number" min={1} max={totalWords - 1}
+                value={acrossCount}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 1;
+                  setAcrossCount(v);
+                  setDownCount(Math.max(1, totalWords - v));
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Verticales</Label>
+              <Input
+                type="number" min={1} max={totalWords - 1}
+                value={downCount}
+                onChange={(e) => {
+                  const v = Number(e.target.value) || 1;
+                  setDownCount(v);
+                  setAcrossCount(Math.max(1, totalWords - v));
+                }}
+              />
+            </div>
+          </div>
 
-      {exportFormat && content && (
-        <ExportOptionsDialog
-          open={!!exportFormat}
-          onOpenChange={(o) => !o && setExportFormat(null)}
-          format={exportFormat}
-          onConfirm={async (opts) => {
-            const title = `Crucigrama: ${content.theme}`;
-            if (exportFormat === "docx") await exportToDocx(title, "crossword", content, opts);
-            else await exportToPdf(title, "crossword", content, opts);
-          }}
-        />
-      )}
-      <div className="mt-6">
-        <CampoObservacion modulo="crucigrama" />
+          <div className="space-y-2">
+            <Label>PDF de referencia (opcional)</Label>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-3.5 w-3.5 mr-1" /> Subir PDF
+              </Button>
+              {pdfName && <span className="text-xs text-muted-foreground truncate">{pdfName}</span>}
+              <input
+                ref={fileInputRef} type="file" accept=".pdf,.txt"
+                className="hidden" onChange={onPdfChange}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Si lo subes, las palabras se extraerán del contenido del PDF.
+            </p>
+          </div>
+
+          <Button onClick={handleGenerate} disabled={generating} className="w-full gradient-primary">
+            {generating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generando...</> : <><Sparkles className="h-4 w-4 mr-2" /> Generar crucigrama</>}
+          </Button>
+        </div>
+
+        {content && (
+          <div className="glass-card rounded-xl p-6 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">{content.theme}</h2>
+                <p className="text-xs text-muted-foreground">
+                  {content.across.length} horizontales · {content.down.length} verticales · {content.difficulty}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowSolution((s) => !s)}>
+                  {showSolution ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
+                  {showSolution ? "Ocultar solución" : "Ver solución"}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleGenerate}>
+                  <RefreshCcw className="h-3.5 w-3.5 mr-1" /> Regenerar
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleSave}>
+                  <Save className="h-3.5 w-3.5 mr-1" /> Guardar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setExportFormat("docx")}>
+                  <Download className="h-3.5 w-3.5 mr-1" /> Word
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setExportFormat("pdf")}>
+                  <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                </Button>
+              </div>
+            </div>
+
+            <CrosswordGrid content={content} showSolution={showSolution} interactive />
+          </div>
+        )}
+
+        {exportFormat && content && (
+          <ExportOptionsDialog
+            open={!!exportFormat}
+            onOpenChange={(o) => !o && setExportFormat(null)}
+            format={exportFormat}
+            onConfirm={async (opts) => {
+              const title = `Crucigrama: ${content.theme}`;
+              if (exportFormat === "docx") await exportToDocx(title, "crossword", content, opts);
+              else await exportToPdf(title, "crossword", content, opts);
+            }}
+          />
+        )}
+        <div className="mt-6">
+          <CampoObservacion modulo="crucigrama" />
+        </div>
       </div>
+
+      <HistorialModulo
+        tipos={["crossword"]}
+        onAbrir={abrirDelHistorial}
+        activo={recursoId}
+        titulo="Crucigramas anteriores"
+      />
     </div>
   );
 }
