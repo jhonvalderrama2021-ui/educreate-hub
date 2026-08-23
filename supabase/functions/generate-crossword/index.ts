@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -302,6 +303,9 @@ serve(async (req) => {
     });
   }
 
+  let cobro: Cobro | null = null;
+  let idCobrado = "";
+
   try {
     // Require authenticated caller to prevent abuse of the paid AI gateway
     const authHeader = req.headers.get("Authorization");
@@ -377,6 +381,15 @@ serve(async (req) => {
     const apiKey = setting.value as string;
 
     const difficultyLabel = difficulty || "medio";
+    {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      idCobrado = idUsuario;
+      cobro = await cobrarTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idUsuario, "crossword", String(theme).slice(0, 200),
+      );
+    }
+
     // Del documento solo se toman los pasajes que hablan del tema del
     // crucigrama: con la cartilla entera las palabras salían de cualquier
     // capítulo, no del que el docente está trabajando.
@@ -513,6 +526,24 @@ serve(async (req) => {
     );
   } catch (e) {
     console.error("generate-crossword error:", e);
+
+    if (e instanceof SinTokensError) {
+      return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // La generacion fallo: se devuelve lo cobrado. El docente no debe pagar
+    // una generacion que no recibio.
+    if (cobro && idCobrado) {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      await devolverTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idCobrado, cobro, "crossword",
+        e instanceof Error ? e.message : "Error desconocido",
+      );
+    }
+
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
       status: e instanceof ErrorDePeticion ? e.estado : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

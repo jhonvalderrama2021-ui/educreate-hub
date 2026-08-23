@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -75,6 +76,9 @@ async function leerJson(req: Request): Promise<Record<string, unknown>> {
 
 
 serve(async (req) => {
+  let cobro: Cobro | null = null;
+  let idCobrado = "";
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
@@ -157,6 +161,16 @@ serve(async (req) => {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const apiKey = setting.value as string;
+
+    // Un cuento ilustrado es de lo mas caro de generar: lleva imagenes.
+    {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      idCobrado = idUsuario;
+      cobro = await cobrarTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idUsuario, "story", String(title).slice(0, 200),
+      );
+    }
 
     const lengthLabel = length === "corto" ? "corto (3-4 párrafos por capítulo)" : length === "largo" ? "extenso (6-8 párrafos por capítulo)" : "medio (4-6 párrafos por capítulo)";
     const ageLabel = ageGroup || "niños de 6-10 años";
@@ -296,6 +310,24 @@ ILUSTRACIONES
     );
   } catch (e) {
     console.error("generate-story error:", e);
+
+    if (e instanceof SinTokensError) {
+      return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // La generacion fallo: se devuelve lo cobrado. El docente no debe pagar
+    // una generacion que no recibio.
+    if (cobro && idCobrado) {
+      const { createClient: crearCliente } = await import("https://esm.sh/@supabase/supabase-js@2");
+      await devolverTokens(
+        crearCliente(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!),
+        idCobrado, cobro, "story",
+        e instanceof Error ? e.message : "Error desconocido",
+      );
+    }
+
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
       status: e instanceof ErrorDePeticion ? e.estado : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

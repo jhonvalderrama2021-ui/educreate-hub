@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GestorUsuarios } from "@/components/GestorUsuarios";
 import { GestorCatalogos } from "@/components/GestorCatalogos";
 import { PanelAuditoria } from "@/components/PanelAuditoria";
+import { GestorTokens } from "@/components/GestorTokens";
 import {
   Select,
   SelectContent,
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import {
   FileText, Shield, ArrowLeft, Key, Eye, EyeOff, Save, CheckCircle,
-  Users, Settings, BarChart3, UserX, MessageSquare, ImagePlus, ListChecks, Clock
+  Users, Settings, BarChart3, UserX, MessageSquare, ImagePlus, ListChecks, Clock, Coins
 } from "lucide-react";
 import { toast } from "sonner";
 import { PanelObservaciones } from "@/components/PanelObservaciones";
@@ -184,6 +185,10 @@ export default function AdminPanel() {
               <Users className="h-4 w-4" />
               Usuarios
             </TabsTrigger>
+            <TabsTrigger value="tokens" className="gap-1.5">
+              <Coins className="h-4 w-4" />
+              <span className="hidden sm:inline">Tokens</span>
+            </TabsTrigger>
             <TabsTrigger value="auditoria" className="gap-1.5">
               <Clock className="h-4 w-4" />
               <span className="hidden sm:inline">Auditoría</span>
@@ -209,6 +214,10 @@ export default function AdminPanel() {
           {/* Users Tab */}
           <TabsContent value="users" className="mt-4">
             <GestorUsuarios />
+          </TabsContent>
+
+          <TabsContent value="tokens" className="mt-4">
+            <GestorTokens />
           </TabsContent>
 
           <TabsContent value="auditoria" className="mt-4">

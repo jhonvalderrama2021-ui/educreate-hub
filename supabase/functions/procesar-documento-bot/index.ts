@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { partirEnFragmentos } from "../_compartido/fragmentar.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 /**
  * Vectoriza un documento para que un bot pueda responder a partir de el.
@@ -73,6 +74,9 @@ async function leerJson(req: Request): Promise<Record<string, unknown>> {
 
 
 serve(async (req) => {
+  let cobro: Cobro | null = null;
+  let idCobrado = "";
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
@@ -142,6 +146,11 @@ serve(async (req) => {
     }
     const apiKey = ajuste.value as string;
 
+    // Vectorizar cuesta: son embeddings de todo el documento.
+    idCobrado = user.id;
+    cobro = await cobrarTokens(admin, user.id, "bot_documento",
+      String(nombre || "documento").slice(0, 200));
+
     const recortado = texto.length > MAX_CARACTERES;
     const fragmentos = partirEnFragmentos(texto.slice(0, MAX_CARACTERES));
     if (fragmentos.length === 0) {
@@ -200,6 +209,20 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("procesar-documento-bot:", e);
+
+    if (e instanceof SinTokensError) {
+      return responder({ error: e.message, sinTokens: true }, 429);
+    }
+
+    if (cobro && idCobrado) {
+      const cliente = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      await devolverTokens(cliente, idCobrado, cobro, "bot_documento",
+        e instanceof Error ? e.message : "Error desconocido");
+    }
+
     return responder(
       { error: e instanceof Error ? e.message : "Error desconocido" },
       e instanceof ErrorDePeticion ? e.estado : 500,

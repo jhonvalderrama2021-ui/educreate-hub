@@ -704,6 +704,87 @@ export type Database = {
           },
         ]
       }
+      token_costos: {
+        Row: {
+          descripcion: string | null
+          recurso: string
+          tokens: number
+          updated_at: string
+        }
+        Insert: {
+          descripcion?: string | null
+          recurso: string
+          tokens: number
+          updated_at?: string
+        }
+        Update: {
+          descripcion?: string | null
+          recurso?: string
+          tokens?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      token_movimientos: {
+        Row: {
+          created_at: string
+          detalle: string | null
+          id: string
+          otorgado_por: string | null
+          recurso: string | null
+          tipo: string
+          tokens: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detalle?: string | null
+          id?: string
+          otorgado_por?: string | null
+          recurso?: string | null
+          tipo: string
+          tokens: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detalle?: string | null
+          id?: string
+          otorgado_por?: string | null
+          recurso?: string | null
+          tipo?: string
+          tokens?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      token_saldos: {
+        Row: {
+          dia: string
+          extra_hoy: number
+          limite_diario: number
+          updated_at: string
+          usados_hoy: number
+          user_id: string
+        }
+        Insert: {
+          dia?: string
+          extra_hoy?: number
+          limite_diario?: number
+          updated_at?: string
+          usados_hoy?: number
+          user_id: string
+        }
+        Update: {
+          dia?: string
+          extra_hoy?: number
+          limite_diario?: number
+          updated_at?: string
+          usados_hoy?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_ai_preferences: {
         Row: {
           id: string
@@ -772,6 +853,10 @@ export type Database = {
         Args: { p_activo: boolean; p_id: string }
         Returns: undefined
       }
+      admin_cambiar_limite_tokens: {
+        Args: { p_limite: number; p_user: string }
+        Returns: undefined
+      }
       admin_has_openai_key: { Args: never; Returns: boolean }
       admin_listar_usuarios: {
         Args: never
@@ -785,6 +870,25 @@ export type Database = {
           rol: string
           ultimo_acceso: string
           username: string
+        }[]
+      }
+      admin_regalar_tokens: {
+        Args: { p_motivo?: string; p_tokens: number; p_user: string }
+        Returns: number
+      }
+      admin_saldos_tokens: {
+        Args: never
+        Returns: {
+          disponibles: number
+          email: string
+          extra_hoy: number
+          generaciones_semana: number
+          limite_diario: number
+          nombre: string
+          rol: string
+          usados_hoy: number
+          usados_semana: number
+          user_id: string
         }[]
       }
       buscar_en_documentos_bot: {
@@ -806,6 +910,22 @@ export type Database = {
           segundos: number
           student_id: string
         }[]
+      }
+      consumir_tokens: {
+        Args: { p_detalle?: string; p_recurso: string; p_user: string }
+        Returns: {
+          cobrado: number
+          disponibles: number
+        }[]
+      }
+      devolver_tokens: {
+        Args: {
+          p_detalle?: string
+          p_recurso?: string
+          p_tokens: number
+          p_user: string
+        }
+        Returns: undefined
       }
       duplicar_curso_para_grupo: {
         Args: { p_clave: string; p_curso_id: string; p_grupo: string }
@@ -853,6 +973,15 @@ export type Database = {
           sesiones: number
           ultima_vez: string
           user_id: string
+        }[]
+      }
+      tokens_disponibles: {
+        Args: { p_user?: string }
+        Returns: {
+          disponibles: number
+          extra_hoy: number
+          limite_diario: number
+          usados_hoy: number
         }[]
       }
     }

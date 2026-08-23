@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
+import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,6 +65,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
     });
   }
+
+  // Fuera del try para poder devolverlo en el catch
+  let cobro: Cobro | null = null;
+  let idUsuario = "";
+  let tipoCobrado = "";
 
   try {
     // ─── AUTH CHECK ─────────────────────────────────────────────
@@ -154,6 +160,14 @@ serve(async (req) => {
     }
 
     const apiKey = setting.value as string;
+
+    // ── Tokens ─────────────────────────────────────────────────────────
+    // Se cobra antes de llamar a OpenAI. Si algo falla despues, se devuelve
+    // en el catch: el docente no debe pagar una generacion que no recibio.
+    idUsuario = userData.user.id;
+    tipoCobrado = resourceType;
+    cobro = await cobrarTokens(supabaseAdmin, userData.user.id, resourceType,
+      typeof instructions === "string" ? instructions.slice(0, 200) : null);
 
     // ── Del documento del docente, solo lo que viene al caso ────────────
     // Antes se mandaba el PDF entero: si el docente cargaba la cartilla
@@ -296,6 +310,21 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-resource error:", e);
+
+    if (e instanceof SinTokensError) {
+      return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // La generacion fallo: se devuelve lo cobrado
+    const cliente = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    await devolverTokens(cliente, idUsuario, cobro, tipoCobrado,
+      e instanceof Error ? e.message : "Error desconocido");
+
     // Un error de la petición lleva su propio mensaje, que dice qué corregir.
     // El genérico se reserva para los fallos del servidor, donde el detalle
     // no le sirve al docente y podría exponer cómo está montado por dentro.
