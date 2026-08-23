@@ -188,4 +188,57 @@ describe("Franja de historial por módulo", () => {
     expect(screen.getByText("Falso y verdadero")).toBeInTheDocument();
     expect(screen.queryByText("Cuento")).not.toBeInTheDocument();
   });
+
+  it("muestra los filtros aunque solo haya un recurso", async () => {
+    // Con "más de un valor distinto" los filtros desaparecían mientras el
+    // docente tuviera un solo recurso, y parecía que la función no existía.
+    RECURSOS.push({ ...recurso("1", "icfes", "Examen único"), subject: "Biología", grade: "9" });
+    montar();
+    await screen.findByText("Examen único");
+
+    expect(screen.getByRole("button", { name: /Filtrar por asignatura/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Filtrar por grado/ })).toBeInTheDocument();
+  });
+
+  it("filtra por asignatura y por grado a la vez", async () => {
+    const user = userEvent.setup();
+    RECURSOS.push(
+      { ...recurso("1", "icfes", "Bio grado 9"), subject: "Biología", grade: "9" },
+      { ...recurso("2", "icfes", "Bio grado 10"), subject: "Biología", grade: "10" },
+      { ...recurso("3", "icfes", "Química grado 9"), subject: "Química", grade: "9" },
+    );
+    montar();
+    await screen.findByText("Bio grado 9");
+
+    await user.click(screen.getByRole("button", { name: /Filtrar por asignatura/ }));
+    await user.click(await screen.findByLabelText(/Biología/));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByText("Química grado 9")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /Filtrar por grado/ }));
+    await user.click(await screen.findByLabelText(/Grado 10/));
+
+    // Los dos filtros se aplican juntos, no uno u otro
+    await waitFor(() => expect(screen.queryByText("Bio grado 9")).not.toBeInTheDocument());
+    expect(screen.getByText("Bio grado 10")).toBeInTheDocument();
+  });
+
+  it("avisa cuando los filtros no dejan nada", async () => {
+    const user = userEvent.setup();
+    RECURSOS.push(
+      { ...recurso("1", "icfes", "Bio grado 9"), subject: "Biología", grade: "9" },
+      { ...recurso("2", "icfes", "Química grado 10"), subject: "Química", grade: "10" },
+    );
+    montar();
+    await screen.findByText("Bio grado 9");
+
+    await user.click(screen.getByRole("button", { name: /Filtrar por asignatura/ }));
+    await user.click(await screen.findByLabelText(/Biología/));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: /Filtrar por grado/ }));
+    await user.click(await screen.findByLabelText(/Grado 10/));
+
+    expect(await screen.findByText(/Ningún recurso coincide con los filtros/)).toBeInTheDocument();
+  });
 });

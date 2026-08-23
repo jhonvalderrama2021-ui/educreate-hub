@@ -15,9 +15,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, BarChart3, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAccessCode } from "@/lib/courses-types";
@@ -164,7 +163,6 @@ export default function CourseDetailTeacher() {
         <TabsList>
           <TabsTrigger value="resources"><FileText className="h-4 w-4 mr-2" />Recursos</TabsTrigger>
           <TabsTrigger value="students"><Users className="h-4 w-4 mr-2" />Estudiantes ({enrollments.length})</TabsTrigger>
-          <TabsTrigger value="reports"><BarChart3 className="h-4 w-4 mr-2" />Resultados</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resources" className="space-y-4 mt-4">
@@ -211,50 +209,24 @@ export default function CourseDetailTeacher() {
 
         <TabsContent value="students" className="space-y-4 mt-4">
           <ManualEnrollButton courseId={courseId!} onAdded={() => qc.invalidateQueries({ queryKey: ["enrollments", courseId] })} />
+
           {enrollments.length === 0 ? (
             <div className="glass-card rounded-xl p-8 text-center text-muted-foreground">
               Sin estudiantes inscritos. Comparte la clave <span className="font-mono">{course.access_code}</span>.
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Estudiante</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Inscrito</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {enrollments.map((e: any) => (
-                  <TableRow key={e.id}>
-                    <TableCell>{e.profile?.full_name || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{e.profile?.email || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{new Date(e.enrolled_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => navigate(`/resources/courses/${courseId}/student-report/${e.student_id}`)}>
-                        Ver detalle
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            /* En cuadrícula y no en tabla: con treinta estudiantes y cinco
+               actividades, una fila por entrega son ciento cincuenta filas
+               donde no se distingue quién va al día y quién no ha entrado. */
+            <PanelEstudiantesCurso
+              courseId={courseId!}
+              nombreCurso={course.name}
+              inscripciones={enrollments}
+              recursos={resources}
+              entregas={submissions}
+              contenidos={contenidos}
+            />
           )}
-        </TabsContent>
-
-        <TabsContent value="reports" className="space-y-4 mt-4">
-          {/* En cuadrícula y no en tabla: con treinta estudiantes y cinco
-              actividades, una fila por entrega son ciento cincuenta filas
-              donde no se distingue quién va al día y quién no ha entrado. */}
-          <PanelEstudiantesCurso
-            courseId={courseId!}
-            nombreCurso={course.name}
-            inscripciones={enrollments}
-            recursos={resources}
-            entregas={submissions}
-            contenidos={contenidos}
-          />
         </TabsContent>
       </Tabs>
     </div>

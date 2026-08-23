@@ -435,16 +435,23 @@ export default function GenerateResource() {
   };
 
   /** Carga en el visor un recurso de la franja lateral. */
+  /**
+   * Abre un recurso de la franja lateral directamente en el panel de edición.
+   *
+   * Pulsar un recurso del historial es, casi siempre, querer retocarlo: para
+   * verlo tal cual ya está el visor de la página, que es lo que queda debajo
+   * al cerrar el panel.
+   */
   const abrirDelHistorial = (r: RecursoHistorial) => {
     setRecursoId(r.id);
     setTitle(r.title);
     setIsPublic(r.is_public);
     setGeneratedContent(r.content);
-    setIsEditing(false);
     if (r.subject) setSubject(SUBJECTS.includes(r.subject) ? r.subject : "Otras");
     if (r.subject && !SUBJECTS.includes(r.subject)) setCustomSubject(r.subject);
     if (r.grade) setGrade(r.grade);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setIsEditing(true);
   };
 
   /** Vacia el visor para empezar un recurso nuevo sin recargar la pagina. */
@@ -930,6 +937,10 @@ export default function GenerateResource() {
           y el docente tenía que desplazarse para encontrar los campos. */}
       {isEditing && generatedContent && (
         <DialogoEditarRecurso
+          // La copia de trabajo se crea al montar. Sin la clave, abrir otro
+          // recurso del historial reutilizaría el componente y seguiría
+          // mostrando el contenido del anterior.
+          key={recursoId ?? "nuevo"}
           abierto
           onCerrar={() => setIsEditing(false)}
           tipo={resourceType}

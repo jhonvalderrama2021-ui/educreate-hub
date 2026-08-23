@@ -129,9 +129,9 @@ export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados ante
         )}
       </div>
 
-      {(opcionesAsignatura.length > 1 || opcionesGrado.length > 1) && (
+      {(opcionesAsignatura.length > 0 || opcionesGrado.length > 0) && (
         <div className="flex flex-col gap-1.5">
-          {opcionesAsignatura.length > 1 && (
+          {opcionesAsignatura.length > 0 && (
             <FiltroMultiple
               etiqueta="Asignatura"
               opciones={opcionesAsignatura}
@@ -140,7 +140,7 @@ export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados ante
               className="w-full"
             />
           )}
-          {opcionesGrado.length > 1 && (
+          {opcionesGrado.length > 0 && (
             <FiltroMultiple
               etiqueta="Grado"
               opciones={opcionesGrado}
