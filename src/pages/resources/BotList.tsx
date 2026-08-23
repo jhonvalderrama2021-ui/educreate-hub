@@ -5,14 +5,17 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Bot, Plus, Trash2, MessageCircle, Sparkles } from "lucide-react";
+import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 
 interface BotItem {
   id: string;
   name: string;
   specialty: string;
+  detalle: string | null;
+  nivel_educativo: string | null;
   created_at: string;
 }
 
@@ -25,6 +28,9 @@ export default function BotList() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
+  const [detalle, setDetalle] = useState("");
+  const [nivel, setNivel] = useState("");
+  const [editando, setEditando] = useState<BotItem | null>(null);
 
   useEffect(() => {
     if (user) loadBots();
@@ -42,29 +48,49 @@ export default function BotList() {
     setLoading(false);
   };
 
+  /** Limpia el formulario y cierra el modo edición. */
+  const limpiarFormulario = () => {
+    setName(""); setSpecialty(""); setDetalle(""); setNivel("");
+    setEditando(null); setShowForm(false);
+  };
+
+  /** Abre el formulario cargado con los datos del bot a corregir. */
+  const empezarEdicion = (bot: BotItem) => {
+    setEditando(bot);
+    setName(bot.name);
+    setSpecialty(bot.specialty);
+    setDetalle(bot.detalle || "");
+    setNivel(bot.nivel_educativo || "");
+    setShowForm(true);
+  };
+
   const handleCreate = async () => {
     if (!name.trim() || !specialty.trim()) {
       toast.error("Nombre y especialidad son obligatorios");
       return;
     }
     setCreating(true);
-    const { error } = await (supabase as any).from("bots").insert({
-      user_id: user!.id,
+
+    const datos = {
       name: name.trim(),
       specialty: specialty.trim(),
-    });
+      detalle: detalle.trim() || null,
+      nivel_educativo: nivel.trim() || null,
+    };
+
+    const { error } = editando
+      ? await (supabase as any).from("bots").update({ ...datos, updated_at: new Date().toISOString() }).eq("id", editando.id)
+      : await (supabase as any).from("bots").insert({ user_id: user!.id, ...datos });
+
     if (error) {
-      toast.error("Error al crear el bot");
+      toast.error(editando ? "Error al guardar los cambios" : "Error al crear el bot");
     } else {
-      toast.success("Bot creado exitosamente");
-      setName("");
-      setSpecialty("");
-      setShowForm(false);
+      toast.success(editando ? "Bot actualizado" : "Bot creado exitosamente");
+      limpiarFormulario();
       loadBots();
     }
     setCreating(false);
   };
-
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este bot y todas sus conversaciones?")) return;
     const { error } = await (supabase as any).from("bots").delete().eq("id", id);
@@ -87,42 +113,73 @@ export default function BotList() {
             <p className="text-sm text-muted-foreground">Crea y gestiona tus bots educativos con IA</p>
           </div>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gradient-primary">
-          <Plus className="h-4 w-4 mr-1" /> Crear Bot
+        <Button
+          onClick={() => (showForm ? limpiarFormulario() : setShowForm(true))}
+          className="gradient-primary"
+        >
+          {showForm ? "Cerrar" : <><Plus className="h-4 w-4 mr-1" /> Nuevo Bot</>}
         </Button>
       </div>
 
       {showForm && (
         <div className="glass-card rounded-xl p-6 space-y-4 animate-fade-in">
           <h2 className="font-semibold text-foreground flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> Nuevo Bot
+            <Sparkles className="h-5 w-5 text-primary" /> {editando ? "Editar bot" : "Nuevo Bot"}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Nombre del bot <span className="text-destructive">*</span></Label>
+              <Label htmlFor="bot-nombre">Nombre del bot <span className="text-destructive">*</span></Label>
               <Input
+                id="bot-nombre"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ej: MateBot, HistorIA..."
               />
             </div>
             <div className="space-y-2">
-              <Label>Especialidad <span className="text-destructive">*</span></Label>
+              <Label htmlFor="bot-especialidad">Especialidad <span className="text-destructive">*</span></Label>
               <Input
+                id="bot-especialidad"
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value)}
                 placeholder="Ej: Matemáticas, Historia de Colombia..."
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            El bot solo responderá preguntas relacionadas con su especialidad.
-          </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="bot-nivel">Nivel educativo</Label>
+            <Input
+              id="bot-nivel"
+              value={nivel}
+              onChange={(e) => setNivel(e.target.value)}
+              placeholder="Ej: Grado 8, primaria, media vocacional..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Ajusta el lenguaje del bot a la edad de tus estudiantes.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bot-detalle">Personalización</Label>
+            <Textarea
+              id="bot-detalle"
+              value={detalle}
+              onChange={(e) => setDetalle(e.target.value)}
+              rows={4}
+              maxLength={2000}
+              placeholder="Indica qué temas debe cubrir, con qué enfoque explicar, qué ejemplos usar o qué evitar. Por ejemplo: enfócate en álgebra básica, usa ejemplos de situaciones cotidianas y no resuelvas los ejercicios completos."
+            />
+            <p className="text-xs text-muted-foreground">
+              Con solo el nombre y la especialidad el bot responde de forma genérica.
+              Aquí precisas cómo quieres que se comporte. {detalle.length}/2000
+            </p>
+          </div>
           <div className="flex gap-2">
             <Button onClick={handleCreate} disabled={creating} className="gradient-primary">
-              {creating ? "Creando..." : "Crear Bot"}
+              {creating ? "Guardando..." : editando ? "Guardar cambios" : "Crear Bot"}
             </Button>
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={limpiarFormulario}>Cancelar</Button>
           </div>
         </div>
       )}
@@ -151,16 +208,34 @@ export default function BotList() {
                     <p className="text-xs text-muted-foreground">{bot.specialty}</p>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive hover:text-destructive h-8 w-8"
-                  onClick={() => handleDelete(bot.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => empezarEdicion(bot)}
+                    aria-label={`Editar ${bot.name}`}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive h-8 w-8"
+                    onClick={() => handleDelete(bot.id)}
+                    aria-label={`Eliminar ${bot.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
+              {bot.detalle && (
+                <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/40 rounded-md p-2">
+                  {bot.detalle}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
+                {bot.nivel_educativo && `${bot.nivel_educativo} · `}
                 Creado: {new Date(bot.created_at).toLocaleDateString("es-CO")}
               </p>
               <Button

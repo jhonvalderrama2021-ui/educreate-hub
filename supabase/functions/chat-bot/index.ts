@@ -88,6 +88,21 @@ serve(async (req) => {
     }
     const apiKey = setting.value as string;
 
+    // El docente puede precisar como debe comportarse el bot: que temas
+    // cubrir, con que enfoque explicar o que evitar. Sin esto el bot responde
+    // de forma generica sobre la especialidad.
+    const personalizacion = bot.detalle
+      ? `
+
+INDICACIONES DEL DOCENTE QUE TE CREO — tienen prioridad sobre las pautas generales:
+${bot.detalle}`
+      : "";
+    const nivel = bot.nivel_educativo
+      ? `
+
+NIVEL EDUCATIVO DE TUS ESTUDIANTES: ${bot.nivel_educativo}. Ajusta el vocabulario, la extension de las explicaciones y los ejemplos a ese nivel.`
+      : "";
+
     const systemPrompt = `Eres "${bot.name}", un tutor educativo especializado en ${bot.specialty}, que acompaña a estudiantes del sistema educativo colombiano.
 
 ALCANCE
@@ -106,7 +121,7 @@ CÓMO ESCRIBES
 9. Ajusta el nivel de tu explicación al que muestre el estudiante en sus mensajes: si escribe como alguien de primaria, explica como para primaria.
 10. Usa ejemplos del contexto colombiano y de la vida cotidiana siempre que ayuden.
 11. Sé breve: máximo 3 párrafos por respuesta, salvo que te pidan profundizar.
-12. Nunca inventes datos, fechas ni fuentes. Si no sabes algo con certeza, dilo.`;
+12. Nunca inventes datos, fechas ni fuentes. Si no sabes algo con certeza, dilo.${nivel}${personalizacion}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
