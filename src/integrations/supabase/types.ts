@@ -12,8 +12,190 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.4"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      accesos: {
+        Row: {
+          created_at: string
+          id: string
+          inicio: string
+          ultima_actividad: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inicio?: string
+          ultima_actividad?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inicio?: string
+          ultima_actividad?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ayuda_imagenes: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          id: string
+          orden: number
+          ruta: string
+          seccion: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          orden?: number
+          ruta: string
+          seccion: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          orden?: number
+          ruta?: string
+          seccion?: string
+        }
+        Relationships: []
+      }
+      bot_documentos: {
+        Row: {
+          bot_id: string
+          caracteres: number
+          created_at: string
+          detalle_error: string | null
+          estado: string
+          fragmentos: number
+          id: string
+          nombre: string
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          caracteres?: number
+          created_at?: string
+          detalle_error?: string | null
+          estado?: string
+          fragmentos?: number
+          id?: string
+          nombre: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          caracteres?: number
+          created_at?: string
+          detalle_error?: string | null
+          estado?: string
+          fragmentos?: number
+          id?: string
+          nombre?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_documentos_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_documentos_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots_con_documentos"
+            referencedColumns: ["bot_id"]
+          },
+        ]
+      }
+      bot_fragmentos: {
+        Row: {
+          bot_id: string
+          created_at: string
+          documento_id: string
+          embedding: string | null
+          id: string
+          orden: number
+          texto: string
+          user_id: string
+        }
+        Insert: {
+          bot_id: string
+          created_at?: string
+          documento_id: string
+          embedding?: string | null
+          id?: string
+          orden: number
+          texto: string
+          user_id: string
+        }
+        Update: {
+          bot_id?: string
+          created_at?: string
+          documento_id?: string
+          embedding?: string | null
+          id?: string
+          orden?: number
+          texto?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_fragmentos_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bot_fragmentos_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots_con_documentos"
+            referencedColumns: ["bot_id"]
+          },
+          {
+            foreignKeyName: "bot_fragmentos_documento_id_fkey"
+            columns: ["documento_id"]
+            isOneToOne: false
+            referencedRelation: "bot_documentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bot_messages: {
         Row: {
           bot_id: string
@@ -47,28 +229,44 @@ export type Database = {
             referencedRelation: "bots"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bot_messages_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots_con_documentos"
+            referencedColumns: ["bot_id"]
+          },
         ]
       }
       bots: {
         Row: {
           created_at: string
+          detalle: string | null
           id: string
           name: string
+          nivel_educativo: string | null
           specialty: string
+          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          detalle?: string | null
           id?: string
           name: string
+          nivel_educativo?: string | null
           specialty: string
+          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          detalle?: string | null
           id?: string
           name?: string
+          nivel_educativo?: string | null
           specialty?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -103,6 +301,39 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      catalogos: {
+        Row: {
+          activo: boolean
+          creado_por: string | null
+          created_at: string
+          id: string
+          orden: number
+          tipo: string
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          activo?: boolean
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          orden?: number
+          tipo: string
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          activo?: boolean
+          creado_por?: string | null
+          created_at?: string
+          id?: string
+          orden?: number
+          tipo?: string
+          updated_at?: string
+          valor?: string
         }
         Relationships: []
       }
@@ -211,10 +442,12 @@ export type Database = {
         Row: {
           content: Json
           created_at: string | null
+          grade: string | null
           id: string
           is_public: boolean | null
           resource_type: string
           source_pdf_url: string | null
+          subject: string | null
           title: string
           updated_at: string | null
           user_id: string
@@ -222,10 +455,12 @@ export type Database = {
         Insert: {
           content?: Json
           created_at?: string | null
+          grade?: string | null
           id?: string
           is_public?: boolean | null
           resource_type: string
           source_pdf_url?: string | null
+          subject?: string | null
           title: string
           updated_at?: string | null
           user_id: string
@@ -233,10 +468,12 @@ export type Database = {
         Update: {
           content?: Json
           created_at?: string | null
+          grade?: string | null
           id?: string
           is_public?: boolean | null
           resource_type?: string
           source_pdf_url?: string | null
+          subject?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
@@ -248,6 +485,8 @@ export type Database = {
           access_code: string
           created_at: string
           description: string | null
+          grado: string | null
+          grupo: string | null
           id: string
           is_active: boolean
           name: string
@@ -258,6 +497,8 @@ export type Database = {
           access_code: string
           created_at?: string
           description?: string | null
+          grado?: string | null
+          grupo?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -268,6 +509,8 @@ export type Database = {
           access_code?: string
           created_at?: string
           description?: string | null
+          grado?: string | null
+          grupo?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -275,6 +518,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      observaciones_piloto: {
+        Row: {
+          atendida: boolean
+          created_at: string
+          id: string
+          modulo: string
+          observacion: string
+          recurso_id: string | null
+          user_id: string
+        }
+        Insert: {
+          atendida?: boolean
+          created_at?: string
+          id?: string
+          modulo: string
+          observacion: string
+          recurso_id?: string | null
+          user_id: string
+        }
+        Update: {
+          atendida?: boolean
+          created_at?: string
+          id?: string
+          modulo?: string
+          observacion?: string
+          recurso_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observaciones_piloto_recurso_id_fkey"
+            columns: ["recurso_id"]
+            isOneToOne: false
+            referencedRelation: "generated_resources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_settings: {
         Row: {
@@ -299,7 +580,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          activo: boolean
           created_at: string
+          desactivado_en: string | null
+          desactivado_por: string | null
           email: string | null
           full_name: string | null
           id: string
@@ -307,7 +591,10 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          activo?: boolean
           created_at?: string
+          desactivado_en?: string | null
+          desactivado_por?: string | null
           email?: string | null
           full_name?: string | null
           id: string
@@ -315,7 +602,10 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          activo?: boolean
           created_at?: string
+          desactivado_en?: string | null
+          desactivado_por?: string | null
           email?: string | null
           full_name?: string | null
           id?: string
@@ -437,10 +727,57 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      bots_con_documentos: {
+        Row: {
+          bot_id: string | null
+          documentos_listos: number | null
+          documentos_procesando: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_actualizar_usuario: {
+        Args: { p_id: string; p_nombre: string; p_usuario: string }
+        Returns: undefined
+      }
+      admin_cambiar_estado_usuario: {
+        Args: { p_activo: boolean; p_id: string }
+        Returns: undefined
+      }
       admin_has_openai_key: { Args: never; Returns: boolean }
+      admin_listar_usuarios: {
+        Args: never
+        Returns: {
+          activo: boolean
+          correo_confirmado: boolean
+          creado_en: string
+          email: string
+          full_name: string
+          id: string
+          rol: string
+          ultimo_acceso: string
+          username: string
+        }[]
+      }
+      buscar_en_documentos_bot: {
+        Args: { p_bot_id: string; p_embedding: string; p_limite?: number }
+        Returns: {
+          documento: string
+          similitud: number
+          texto: string
+        }[]
+      }
+      buscar_usuario_por_correo: { Args: { _correo: string }; Returns: string }
+      duplicar_curso_para_grupo: {
+        Args: { p_clave: string; p_curso_id: string; p_grupo: string }
+        Returns: string
+      }
+      es_estudiante_de_mis_cursos: {
+        Args: { _docente: string; _estudiante: string }
+        Returns: boolean
+      }
+      es_usuario_activo: { Args: { p_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -457,6 +794,20 @@ export type Database = {
         Returns: boolean
       }
       join_course_by_code: { Args: { _code: string }; Returns: string }
+      registrar_acceso: { Args: never; Returns: string }
+      resumen_accesos: {
+        Args: { p_dias?: number }
+        Returns: {
+          email: string
+          nombre: string
+          primera_vez: string
+          rol: string
+          segundos_totales: number
+          sesiones: number
+          ultima_vez: string
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "docente" | "estudiante"
@@ -585,6 +936,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "docente", "estudiante"],

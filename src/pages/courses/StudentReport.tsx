@@ -31,7 +31,7 @@ export default function StudentReport() {
     queryKey: ["profile", studentId],
     enabled: !!studentId,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("profiles").select("*").eq("id", studentId).single();
+      const { data } = await supabase.from("profiles").select("*").eq("id", studentId!).single();
       return data;
     },
   });
@@ -40,7 +40,7 @@ export default function StudentReport() {
     queryKey: ["mini_course", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data } = await (supabase as any).from("mini_courses").select("name").eq("id", courseId).single();
+      const { data } = await supabase.from("mini_courses").select("name").eq("id", courseId!).single();
       return data;
     },
   });
@@ -49,9 +49,9 @@ export default function StudentReport() {
     queryKey: ["report_subs", courseId, studentId],
     enabled: !!courseId && !!studentId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("resource_submissions").select("*")
-        .eq("course_id", courseId).eq("student_id", studentId)
+        .eq("course_id", courseId!).eq("student_id", studentId!)
         .order("submitted_at", { ascending: false });
       if (error) throw error;
       return data as ResourceSubmission[];
@@ -62,8 +62,8 @@ export default function StudentReport() {
     queryKey: ["report_resources", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data } = await (supabase as any)
-        .from("course_resources").select("*").eq("course_id", courseId);
+      const { data } = await supabase
+        .from("course_resources").select("*").eq("course_id", courseId!);
       return (data || []) as CourseResource[];
     },
   });
@@ -75,7 +75,7 @@ export default function StudentReport() {
     enabled: resources.length > 0,
     queryFn: async () => {
       const ids = [...new Set(resources.map((r) => r.resource_id))];
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from("generated_resources").select("id, content").in("id", ids);
       return Object.fromEntries((data || []).map((r: any) => [r.id, r.content])) as Record<string, any>;
     },

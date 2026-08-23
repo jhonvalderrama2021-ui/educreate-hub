@@ -38,7 +38,7 @@ export function GestorImagenesAyuda() {
 
   const cargar = async () => {
     setCargando(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("ayuda_imagenes").select("*").order("seccion").order("orden");
     if (error) toast.error("No se pudieron cargar las imágenes");
     setImagenes(data || []);
@@ -71,7 +71,7 @@ export function GestorImagenesAyuda() {
     }
 
     const siguienteOrden = imagenes.filter((i) => i.seccion === seccion).length;
-    const { error } = await (supabase as any).from("ayuda_imagenes").insert({
+    const { error } = await supabase.from("ayuda_imagenes").insert({
       seccion, ruta, descripcion: descripcion.trim() || null, orden: siguienteOrden,
     });
 
@@ -91,7 +91,7 @@ export function GestorImagenesAyuda() {
   const eliminar = async (imagen: ImagenAyuda) => {
     if (!confirm("¿Eliminar esta imagen de la ayuda?")) return;
     await supabase.storage.from(BUCKET).remove([imagen.ruta]);
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("ayuda_imagenes").delete().eq("id", imagen.id);
     if (error) { toast.error("No se pudo eliminar"); return; }
     toast.success("Imagen eliminada");

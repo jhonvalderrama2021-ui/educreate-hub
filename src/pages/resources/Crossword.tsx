@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
+import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 
@@ -132,13 +132,13 @@ export default function Crossword() {
     };
     try {
       if (id) {
-        const { error } = await (supabase as any).from("generated_resources")
+        const { error } = await supabase.from("generated_resources")
           .update(datos).eq("id", id);
         if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
         return id;
       }
-      const { data, error } = await (supabase as any).from("generated_resources")
+      const { data, error } = await supabase.from("generated_resources")
         .insert({ user_id: user.id, ...datos }).select("id").single();
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
@@ -162,7 +162,7 @@ export default function Crossword() {
     if (!recursoParam || !user || recursoId === recursoParam) return;
     let cancelado = false;
     (async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources")
         .select("*")
         .eq("id", recursoParam)

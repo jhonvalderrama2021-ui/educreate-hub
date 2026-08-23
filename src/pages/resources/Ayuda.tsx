@@ -463,7 +463,7 @@ export default function Ayuda() {
   const [imagenes, setImagenes] = useState<ImagenAyuda[]>([]);
 
   useEffect(() => {
-    (supabase as any)
+    supabase
       .from("ayuda_imagenes")
       .select("id, seccion, ruta, descripcion")
       .order("orden")

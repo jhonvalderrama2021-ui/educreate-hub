@@ -41,7 +41,10 @@ export interface UsuarioAdmin {
   creado_en: string;
 }
 
-const ROLES = [
+/** Los tres roles de la base. `user_roles.role` es un enumerado, no texto libre. */
+export type RolUsuario = "admin" | "docente" | "estudiante";
+
+const ROLES: { valor: RolUsuario; etiqueta: string }[] = [
   { valor: "admin", etiqueta: "Admin" },
   { valor: "docente", etiqueta: "Docente" },
   { valor: "estudiante", etiqueta: "Estudiante" },
@@ -67,7 +70,7 @@ export function GestorUsuarios() {
 
   const cargar = async () => {
     setCargando(true);
-    const { data, error } = await (supabase as any).rpc("admin_listar_usuarios");
+    const { data, error } = await supabase.rpc("admin_listar_usuarios");
     if (error) toast.error("Error al cargar los usuarios");
     setUsuarios((data || []) as UsuarioAdmin[]);
     setCargando(false);
@@ -75,10 +78,10 @@ export function GestorUsuarios() {
 
   useEffect(() => { cargar(); }, []);
 
-  const cambiarRol = async (id: string, rol: string) => {
+  const cambiarRol = async (id: string, rol: RolUsuario) => {
     // El rol vive en una tabla aparte, con una fila por usuario: se reemplaza.
-    await (supabase as any).from("user_roles").delete().eq("user_id", id);
-    const { error } = await (supabase as any).from("user_roles").insert([{ user_id: id, role: rol }]);
+    await supabase.from("user_roles").delete().eq("user_id", id);
+    const { error } = await supabase.from("user_roles").insert([{ user_id: id, role: rol }]);
     if (error) return toast.error("Error al cambiar el rol");
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol } : u)));
     toast.success("Rol actualizado");
@@ -92,7 +95,7 @@ export function GestorUsuarios() {
       "entregas de sus estudiantes. Puedes reactivarlo cuando quieras."
     )) return;
 
-    const { error } = await (supabase as any).rpc("admin_cambiar_estado_usuario", {
+    const { error } = await supabase.rpc("admin_cambiar_estado_usuario", {
       p_id: u.id, p_activo: !u.activo,
     });
     if (error) return toast.error(error.message || "No se pudo cambiar el estado");
@@ -103,10 +106,13 @@ export function GestorUsuarios() {
 
   const guardarEdicion = async (nombre: string, usuario: string) => {
     if (!editando) return;
-    const { error } = await (supabase as any).rpc("admin_actualizar_usuario", {
+    const { error } = await supabase.rpc("admin_actualizar_usuario", {
       p_id: editando.id, p_nombre: nombre, p_usuario: usuario,
     });
-    if (error) return toast.error(error.message || "No se pudo guardar");
+    if (error) {
+      toast.error(error.message || "No se pudo guardar");
+      return;
+    }
 
     setUsuarios((prev) => prev.map((u) =>
       u.id === editando.id
@@ -250,7 +256,7 @@ export function GestorUsuarios() {
 
                 <Select
                   value={u.rol}
-                  onValueChange={(v) => cambiarRol(u.id, v)}
+                  onValueChange={(v) => cambiarRol(u.id, v as RolUsuario)}
                   disabled={u.id === user?.id}
                 >
                   <SelectTrigger className="w-[130px] h-8 text-xs" aria-label={`Rol de ${u.full_name || u.email}`}>

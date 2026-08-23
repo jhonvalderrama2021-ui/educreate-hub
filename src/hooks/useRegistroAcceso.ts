@@ -28,9 +28,17 @@ export function useRegistroAcceso(activo: boolean) {
       // alternar entre ventanas generaria una consulta por cada cambio.
       if (Date.now() - ultimoEnvio.current < 60_000) return;
       ultimoEnvio.current = Date.now();
+      // try/catch y no .catch(): el constructor de consultas de Supabase solo
+      // implementa `then`, así que encadenar .catch lanza un TypeError y la
+      // auditoría se quedaría siempre vacía sin que nadie lo note.
+      //
       // Un fallo aquí no debe romper nada: la auditoría es secundaria frente
       // a que el docente pueda trabajar.
-      await (supabase as any).rpc("registrar_acceso").catch(() => {});
+      try {
+        await supabase.rpc("registrar_acceso");
+      } catch (e) {
+        console.error("No se pudo registrar el acceso:", e);
+      }
     };
 
     latir();

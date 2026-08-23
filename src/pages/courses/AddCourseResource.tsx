@@ -46,7 +46,7 @@ export default function AddCourseResource() {
     queryKey: ["my_resources_for_course", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources").select("*")
         .eq("user_id", user!.id)
         .order("created_at", { ascending: false });
@@ -59,8 +59,8 @@ export default function AddCourseResource() {
     queryKey: ["course_resources_ids", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("course_resources").select("resource_id").eq("course_id", courseId);
+      const { data, error } = await supabase
+        .from("course_resources").select("resource_id").eq("course_id", courseId!);
       if (error) throw error;
       return (data || []).map((d: any) => d.resource_id) as string[];
     },
@@ -92,8 +92,8 @@ export default function AddCourseResource() {
   const addToCourse = async (r: any) => {
     setAdding(r.id);
     try {
-      const { error } = await (supabase as any).from("course_resources").insert({
-        course_id: courseId,
+      const { error } = await supabase.from("course_resources").insert({
+        course_id: courseId!,
         resource_id: r.id,
         resource_type: r.resource_type,
         title: r.title,

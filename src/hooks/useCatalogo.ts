@@ -16,7 +16,7 @@ export function useCatalogo(tipo: TipoCatalogo): string[] {
     // Cambian muy de vez en cuando: no vale la pena reconsultarlos a cada rato.
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("catalogos")
         .select("valor")
         .eq("tipo", tipo)
@@ -24,7 +24,7 @@ export function useCatalogo(tipo: TipoCatalogo): string[] {
         .order("orden", { ascending: true })
         .order("valor", { ascending: true });
       if (error) throw error;
-      return (data || []).map((f: any) => f.valor as string);
+      return (data || []).map((f) => f.valor);
     },
   });
 

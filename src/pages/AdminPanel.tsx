@@ -74,7 +74,7 @@ export default function AdminPanel() {
     setLoadingUsers(true);
     // Misma consulta que usa GestorUsuarios: las tarjetas de resumen y la
     // lista deben contar lo mismo.
-    const { data, error } = await (supabase as any).rpc("admin_listar_usuarios");
+    const { data, error } = await supabase.rpc("admin_listar_usuarios");
     if (error) toast.error("Error al cargar usuarios");
     setUsers((data || []) as UsuarioResumen[]);
     setLoadingUsers(false);
@@ -82,7 +82,7 @@ export default function AdminPanel() {
 
   const loadAISettings = async () => {
     // Never fetch the raw key into the browser. Use a server-side check that returns only a boolean.
-    const { data, error } = await (supabase as any).rpc("admin_has_openai_key");
+    const { data, error } = await supabase.rpc("admin_has_openai_key");
     if (!error && data === true) setKeyConfigured(true);
   };
 

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert } from "@/integrations/supabase/types";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
 import { generateWithOpenAI, generateWithOllama, fetchOllamaModels } from "@/lib/ai-service";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
@@ -145,13 +146,15 @@ export default function GenerateResource() {
 
   useEffect(() => {
     if (!user) return;
-    (supabase as any).from("user_ai_preferences")
+    supabase.from("user_ai_preferences")
       .select("*")
       .eq("user_id", user.id)
       .single()
-      .then(({ data }: any) => {
+      .then(({ data }) => {
         if (data) {
-          setAiProvider(data.provider || "openai");
+          // La columna es texto libre; solo se aceptan los dos valores que
+          // el generador sabe usar.
+          setAiProvider(data.provider === "ollama" ? "ollama" : "openai");
           setOllamaUrl(data.ollama_url || "http://localhost:11434");
           setOllamaModel(data.ollama_model || "llama3");
         }
@@ -173,7 +176,7 @@ export default function GenerateResource() {
     if (!recursoParam || !user || recursoId === recursoParam) return;
     let cancelado = false;
     (async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources")
         .select("*")
         .eq("id", recursoParam)
@@ -390,7 +393,8 @@ export default function GenerateResource() {
         if (!uploadError) sourcePdfUrl = filePath;
       }
 
-      const datos: Record<string, any> = {
+      const datos: TablesInsert<"generated_resources"> = {
+        user_id: user.id,
         title: tituloExplicito?.trim() || title || contenido.title || "Recurso sin título",
         resource_type: resourceType,
         content: contenido,
@@ -403,15 +407,15 @@ export default function GenerateResource() {
       if (sourcePdfUrl) datos.source_pdf_url = sourcePdfUrl;
 
       if (id) {
-        const { error } = await (supabase as any).from("generated_resources")
+        const { error } = await supabase.from("generated_resources")
           .update(datos).eq("id", id);
         if (error) throw error;
         queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
         return id;
       }
 
-      const { data, error } = await (supabase as any).from("generated_resources")
-        .insert({ user_id: user.id, ...datos }).select("id").single();
+      const { data, error } = await supabase.from("generated_resources")
+        .insert(datos).select("id").single();
       if (error) throw error;
       queryClient.invalidateQueries({ queryKey: ["generated_resources", user.id] });
       return data?.id ?? null;
@@ -464,7 +468,7 @@ export default function GenerateResource() {
   };
   const savePreferences = async () => {
     if (!user) return;
-    await (supabase as any).from("user_ai_preferences").upsert({
+    await supabase.from("user_ai_preferences").upsert({
       user_id: user.id,
       provider: aiProvider,
       ollama_url: ollamaUrl,

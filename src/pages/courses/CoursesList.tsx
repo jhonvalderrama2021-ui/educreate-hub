@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { GraduationCap, Plus, KeyRound, Users, BookOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
+import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
 import { CampoObservacion } from "@/components/CampoObservacion";
 
 export default function CoursesList() {
@@ -36,7 +36,7 @@ export default function CoursesList() {
     queryKey: ["mini_courses_own", user?.id],
     enabled: !!user && isDocente,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("mini_courses")
         .select("*")
         .eq("teacher_id", user!.id)
@@ -50,12 +50,12 @@ export default function CoursesList() {
     queryKey: ["mini_courses_enrolled", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("course_enrollments")
         .select("course_id, mini_courses(*)")
         .eq("student_id", user!.id);
       if (error) throw error;
-      return (data || []).map((r: any) => r.mini_courses).filter(Boolean) as MiniCourse[];
+      return (data || []).map((r) => r.mini_courses).filter(Boolean) as MiniCourse[];
     },
   });
 
@@ -86,7 +86,7 @@ export default function CoursesList() {
     if (!name.trim()) return toast.error("Coloca un nombre al curso");
     setSaving(true);
     try {
-      const { data, error } = await (supabase as any).from("mini_courses").insert({
+      const { data, error } = await supabase.from("mini_courses").insert({
         teacher_id: user!.id,
         name: name.trim(),
         description: description.trim() || null,
@@ -111,7 +111,7 @@ export default function CoursesList() {
     if (!joinCode.trim()) return toast.error("Ingresa la clave del curso");
     setSaving(true);
     try {
-      const { data, error } = await (supabase as any).rpc("join_course_by_code", {
+      const { data, error } = await supabase.rpc("join_course_by_code", {
         _code: joinCode.trim().toUpperCase(),
       });
       if (error) throw error;

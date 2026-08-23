@@ -59,7 +59,7 @@ export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados ante
     enabled: !!user,
     staleTime: 10_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources")
         .select("id, title, resource_type, content, is_public, subject, grade, created_at")
         .eq("user_id", user!.id)

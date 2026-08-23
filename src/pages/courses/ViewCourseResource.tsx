@@ -12,8 +12,8 @@ export default function ViewCourseResource() {
     queryKey: ["view_cr", courseResourceId],
     enabled: !!courseResourceId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("course_resources").select("*").eq("id", courseResourceId).single();
+      const { data, error } = await supabase
+        .from("course_resources").select("*").eq("id", courseResourceId!).single();
       if (error) throw error;
       return data as any;
     },
@@ -23,7 +23,7 @@ export default function ViewCourseResource() {
     queryKey: ["view_res", cr?.resource_id],
     enabled: !!cr,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources").select("*").eq("id", cr.resource_id).single();
       if (error) throw error;
       return data;

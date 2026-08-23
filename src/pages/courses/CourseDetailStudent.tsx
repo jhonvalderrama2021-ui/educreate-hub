@@ -24,8 +24,8 @@ export default function CourseDetailStudent() {
     queryKey: ["mini_course", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("mini_courses").select("*").eq("id", courseId).single();
+      const { data, error } = await supabase
+        .from("mini_courses").select("*").eq("id", courseId!).single();
       if (error) throw error;
       return data as MiniCourse;
     },
@@ -35,8 +35,8 @@ export default function CourseDetailStudent() {
     queryKey: ["course_resources_student", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("course_resources").select("*").eq("course_id", courseId)
+      const { data, error } = await supabase
+        .from("course_resources").select("*").eq("course_id", courseId!)
         .order("position", { ascending: true }).order("created_at", { ascending: true });
       if (error) throw error;
       return data as CourseResource[];
@@ -47,9 +47,9 @@ export default function CourseDetailStudent() {
     queryKey: ["my_submissions", courseId, user?.id],
     enabled: !!courseId && !!user,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("resource_submissions").select("*")
-        .eq("course_id", courseId).eq("student_id", user!.id);
+        .eq("course_id", courseId!).eq("student_id", user!.id);
       if (error) throw error;
       return data as ResourceSubmission[];
     },

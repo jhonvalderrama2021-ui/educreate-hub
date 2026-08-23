@@ -36,7 +36,7 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
   const [procesando, setProcesando] = useState<string | null>(null);
 
   const cargar = async () => {
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("bot_documentos")
       .select("*")
       .eq("bot_id", botId)
@@ -46,7 +46,12 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
     setCargando(false);
   };
 
-  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [botId]);
+  useEffect(() => {
+    cargar();
+    // `cargar` se redefine en cada render: incluirla en las dependencias
+    // dispararía la consulta en bucle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botId]);
 
   const subir = async (archivo: File) => {
     setProcesando("Leyendo el archivo...");
@@ -88,7 +93,7 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
       `¿Quitar "${d.nombre}" de este bot?\n\n` +
       "El bot dejará de responder a partir de ese documento."
     )) return;
-    const { error } = await (supabase as any).from("bot_documentos").delete().eq("id", d.id);
+    const { error } = await supabase.from("bot_documentos").delete().eq("id", d.id);
     if (error) return toast.error("No se pudo eliminar");
     setDocumentos((prev) => prev.filter((x) => x.id !== d.id));
     toast.success("Documento eliminado");

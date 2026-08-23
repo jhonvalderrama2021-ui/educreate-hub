@@ -51,19 +51,22 @@ export default function MisDatos() {
       }
 
       // Qué información está registrada a nombre del titular (derecho a conocer)
-      const contar = async (tabla: string) => {
-        const { count } = await (supabase as any)
-          .from(tabla)
-          .select("*", { count: "exact", head: true })
-          .eq("user_id", user.id);
-        return count || 0;
-      };
+      // Cada tabla se consulta por su nombre real. Un ayudante genérico
+      // suponía `user_id` en todas, y `mini_courses` guarda al docente en
+      // `teacher_id`: la página informaba cero cursos sin dar ningún error.
+      const soloContar = { count: "exact" as const, head: true };
+      const [recursos, bots, cursos, notas] = await Promise.all([
+        supabase.from("generated_resources").select("*", soloContar).eq("user_id", user.id),
+        supabase.from("bots").select("*", soloContar).eq("user_id", user.id),
+        supabase.from("mini_courses").select("*", soloContar).eq("teacher_id", user.id),
+        supabase.from("calendar_notes").select("*", soloContar).eq("user_id", user.id),
+      ]);
 
       setConteos({
-        recursos: await contar("generated_resources"),
-        bots: await contar("bots"),
-        cursos: await contar("mini_courses"),
-        notas: await contar("calendar_notes"),
+        recursos: recursos.count || 0,
+        bots: bots.count || 0,
+        cursos: cursos.count || 0,
+        notas: notas.count || 0,
       });
       setCargando(false);
     })();
@@ -140,19 +143,15 @@ export default function MisDatos() {
     if (!user) return;
     toast.info("Preparando tu información...");
 
-    const traer = async (tabla: string) => {
-      const { data } = await (supabase as any).from(tabla).select("*").eq("user_id", user.id);
-      return data || [];
-    };
-
     const paquete = {
       exportadoEl: new Date().toISOString(),
       cuenta: { id: user.id, email: user.email, rol: role },
       perfil: { nombre, usuario },
-      recursosGenerados: await traer("generated_resources"),
-      bots: await traer("bots"),
-      cursos: await traer("mini_courses"),
-      notasDeCalendario: await traer("calendar_notes"),
+      recursosGenerados: (await supabase.from("generated_resources").select("*").eq("user_id", user.id)).data || [],
+      bots: (await supabase.from("bots").select("*").eq("user_id", user.id)).data || [],
+      // teacher_id, no user_id: es la columna con la que esta tabla guarda al docente
+      cursos: (await supabase.from("mini_courses").select("*").eq("teacher_id", user.id)).data || [],
+      notasDeCalendario: (await supabase.from("calendar_notes").select("*").eq("user_id", user.id)).data || [],
     };
 
     const blob = new Blob([JSON.stringify(paquete, null, 2)], { type: "application/json" });

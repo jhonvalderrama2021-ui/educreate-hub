@@ -51,7 +51,7 @@ export function PanelAuditoria() {
   const { data: filas = [], isLoading } = useQuery({
     queryKey: ["resumen_accesos", dias],
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("resumen_accesos", {
+      const { data, error } = await supabase.rpc("resumen_accesos", {
         p_dias: Number(dias),
       });
       if (error) throw error;

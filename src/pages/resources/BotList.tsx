@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil, FileText } from "lucide-react";
+import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil, FileText } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { GestorDocumentosBot } from "@/components/GestorDocumentosBot";
 
@@ -40,7 +40,7 @@ export default function BotList() {
 
   const loadBots = async () => {
     setLoading(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("bots")
       .select("*")
       .eq("user_id", user!.id)
@@ -49,7 +49,7 @@ export default function BotList() {
     setBots(data || []);
 
     // Cuantos documentos tiene cada bot, para el distintivo de la tarjeta
-    const { data: conteos } = await (supabase as any)
+    const { data: conteos } = await supabase
       .from("bots_con_documentos").select("bot_id, documentos_listos");
     setDocumentosPorBot(Object.fromEntries(
       (conteos || []).map((c: any) => [c.bot_id, Number(c.documentos_listos) || 0]),
@@ -89,8 +89,8 @@ export default function BotList() {
     };
 
     const { error } = editando
-      ? await (supabase as any).from("bots").update({ ...datos, updated_at: new Date().toISOString() }).eq("id", editando.id)
-      : await (supabase as any).from("bots").insert({ user_id: user!.id, ...datos });
+      ? await supabase.from("bots").update({ ...datos, updated_at: new Date().toISOString() }).eq("id", editando.id)
+      : await supabase.from("bots").insert({ user_id: user!.id, ...datos });
 
     if (error) {
       toast.error(editando ? "Error al guardar los cambios" : "Error al crear el bot");
@@ -103,7 +103,7 @@ export default function BotList() {
   };
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este bot y todas sus conversaciones?")) return;
-    const { error } = await (supabase as any).from("bots").delete().eq("id", id);
+    const { error } = await supabase.from("bots").delete().eq("id", id);
     if (error) toast.error("Error al eliminar");
     else {
       setBots((prev) => prev.filter((b) => b.id !== id));

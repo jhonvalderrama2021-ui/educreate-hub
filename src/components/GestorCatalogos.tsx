@@ -70,7 +70,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
   const { data: entradas = [], isLoading } = useQuery({
     queryKey: clave,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("catalogos")
         .select("*")
         .eq("tipo", tipo)
@@ -94,7 +94,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
       return toast.error("Esa opción ya existe");
     }
     setAgregando(true);
-    const { error } = await (supabase as any).from("catalogos").insert({
+    const { error } = await supabase.from("catalogos").insert({
       tipo,
       valor,
       // Al final de la lista: no reordena lo que el docente ya tiene aprendido.
@@ -111,7 +111,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
   const renombrar = async (id: string) => {
     const valor = textoEdicion.trim();
     if (!valor) return;
-    const { error } = await (supabase as any).from("catalogos").update({ valor }).eq("id", id);
+    const { error } = await supabase.from("catalogos").update({ valor }).eq("id", id);
     if (error) return toast.error("No se pudo guardar");
     setEditandoId(null);
     refrescar();
@@ -119,7 +119,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
   };
 
   const alternarActivo = async (e: EntradaCatalogo) => {
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("catalogos").update({ activo: !e.activo }).eq("id", e.id);
     if (error) return toast.error("No se pudo cambiar");
     refrescar();
@@ -132,7 +132,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
       "Si ya la usaron en algún recurso, es preferible ocultarla: así el " +
       "recurso conserva su sentido y puedes volver a mostrarla cuando quieras."
     )) return;
-    const { error } = await (supabase as any).from("catalogos").delete().eq("id", e.id);
+    const { error } = await supabase.from("catalogos").delete().eq("id", e.id);
     if (error) return toast.error("No se pudo eliminar");
     refrescar();
     toast.success("Eliminada");

@@ -38,7 +38,7 @@ export function CampoObservacion({
       return;
     }
     setEnviando(true);
-    const { error } = await (supabase as any).from("observaciones_piloto").insert({
+    const { error } = await supabase.from("observaciones_piloto").insert({
       user_id: user.id,
       modulo,
       recurso_id: recursoId ?? null,

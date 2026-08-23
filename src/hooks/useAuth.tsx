@@ -45,7 +45,7 @@ export function useAuth() {
  * políticas de la base de datos, que es donde está el gasto y los datos.
  */
 async function verificarActivo(idUsuario: string) {
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("profiles")
     .select("activo")
     .eq("id", idUsuario)

@@ -40,8 +40,8 @@ export default function CourseDetailTeacher() {
     queryKey: ["mini_course", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("mini_courses").select("*").eq("id", courseId).single();
+      const { data, error } = await supabase
+        .from("mini_courses").select("*").eq("id", courseId!).single();
       if (error) throw error;
       return data as MiniCourse;
     },
@@ -51,8 +51,8 @@ export default function CourseDetailTeacher() {
     queryKey: ["course_resources", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("course_resources").select("*").eq("course_id", courseId)
+      const { data, error } = await supabase
+        .from("course_resources").select("*").eq("course_id", courseId!)
         .order("position", { ascending: true }).order("created_at", { ascending: true });
       if (error) throw error;
       return data as CourseResource[];
@@ -63,16 +63,16 @@ export default function CourseDetailTeacher() {
     queryKey: ["enrollments", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("course_enrollments").select("id, student_id, enrolled_at")
-        .eq("course_id", courseId);
+        .eq("course_id", courseId!);
       if (error) throw error;
-      const ids = (data || []).map((d: any) => d.student_id);
+      const ids = (data || []).map((d) => d.student_id);
       if (ids.length === 0) return [] as any[];
-      const { data: profiles } = await (supabase as any)
+      const { data: profiles } = await supabase
         .from("profiles").select("id, full_name, email").in("id", ids);
-      const map = new Map((profiles || []).map((p: any) => [p.id, p]));
-      return (data || []).map((d: any) => ({ ...d, profile: map.get(d.student_id) }));
+      const map = new Map((profiles || []).map((p) => [p.id, p]));
+      return (data || []).map((d) => ({ ...d, profile: map.get(d.student_id) }));
     },
   });
 
@@ -80,8 +80,8 @@ export default function CourseDetailTeacher() {
     queryKey: ["submissions_course", courseId],
     enabled: !!courseId,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("resource_submissions").select("*").eq("course_id", courseId)
+      const { data, error } = await supabase
+        .from("resource_submissions").select("*").eq("course_id", courseId!)
         .order("submitted_at", { ascending: false });
       if (error) throw error;
       return data as ResourceSubmission[];
@@ -95,22 +95,22 @@ export default function CourseDetailTeacher() {
     enabled: resources.length > 0,
     queryFn: async () => {
       const ids = [...new Set(resources.map((r) => r.resource_id))];
-      const { data } = await (supabase as any)
+      const { data } = await supabase
         .from("generated_resources").select("id, content").in("id", ids);
-      return Object.fromEntries((data || []).map((r: any) => [r.id, r.content])) as Record<string, any>;
+      return Object.fromEntries((data || []).map((r) => [r.id, r.content])) as Record<string, unknown>;
     },
   });
 
   const removeResource = async (id: string) => {
     if (!confirm("¿Quitar este recurso del curso?")) return;
-    const { error } = await (supabase as any).from("course_resources").delete().eq("id", id);
+    const { error } = await supabase.from("course_resources").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Recurso eliminado");
     qc.invalidateQueries({ queryKey: ["course_resources", courseId] });
   };
 
   const updateCourse = async (patch: Partial<MiniCourse>) => {
-    const { error } = await (supabase as any).from("mini_courses").update(patch).eq("id", courseId);
+    const { error } = await supabase.from("mini_courses").update(patch).eq("id", courseId!);
     if (error) { toast.error(error.message); return; }
     toast.success("Curso actualizado");
     qc.invalidateQueries({ queryKey: ["mini_course", courseId] });
@@ -118,7 +118,7 @@ export default function CourseDetailTeacher() {
 
   const deleteCourse = async () => {
     if (!confirm("Esto eliminará el curso y todas sus inscripciones, recursos y entregas. ¿Continuar?")) return;
-    const { error } = await (supabase as any).from("mini_courses").delete().eq("id", courseId);
+    const { error } = await supabase.from("mini_courses").delete().eq("id", courseId!);
     if (error) { toast.error(error.message); return; }
     toast.success("Curso eliminado");
     navigate("/resources/courses");
@@ -286,7 +286,7 @@ function ResourceConfigButton({ resource, onSaved }: { resource: CourseResource;
   const isExam = EVALUABLE.includes(resource.resource_type);
 
   const save = async () => {
-    const { error } = await (supabase as any).from("course_resources").update({
+    const { error } = await supabase.from("course_resources").update({
       show_grade: r.show_grade, show_feedback: r.show_feedback,
       max_attempts: r.max_attempts, time_limit_minutes: r.time_limit_minutes,
       opens_at: r.opens_at, closes_at: r.closes_at, shuffle_questions: r.shuffle_questions,
@@ -359,7 +359,7 @@ function ManualEnrollButton({ courseId, onAdded }: { courseId: string; onAdded: 
       // Se resuelve el correo mediante una función del servidor: consultar
       // `profiles` directamente devolvía cero filas al docente, porque solo
       // puede ver su propio perfil.
-      const { data: estudianteId, error: pErr } = await (supabase as any)
+      const { data: estudianteId, error: pErr } = await supabase
         .rpc("buscar_usuario_por_correo", { _correo: email.trim() });
       if (pErr) throw pErr;
 
@@ -371,7 +371,7 @@ function ManualEnrollButton({ courseId, onAdded }: { courseId: string; onAdded: 
         return;
       }
 
-      const { error } = await (supabase as any).from("course_enrollments").insert({
+      const { error } = await supabase.from("course_enrollments").insert({
         course_id: courseId, student_id: estudianteId,
       });
       if (error) {
@@ -426,7 +426,7 @@ function BotonDuplicarGrupo({ curso, recursos }: { curso: MiniCourse; recursos: 
   const duplicar = async () => {
     if (!grupo.trim()) return toast.error("Indica el grupo del curso nuevo");
     setDuplicando(true);
-    const { data, error } = await (supabase as any).rpc("duplicar_curso_para_grupo", {
+    const { data, error } = await supabase.rpc("duplicar_curso_para_grupo", {
       p_curso_id: curso.id,
       p_grupo: grupo.trim().toUpperCase(),
       p_clave: clave.trim().toUpperCase(),

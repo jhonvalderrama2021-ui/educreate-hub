@@ -45,7 +45,7 @@ export function PanelObservaciones() {
 
   const cargar = async () => {
     setCargando(true);
-    const { data, error } = await (supabase as any)
+    const { data, error } = await supabase
       .from("observaciones_piloto")
       .select("*")
       .order("created_at", { ascending: false });
@@ -60,7 +60,7 @@ export function PanelObservaciones() {
     const ids = [...new Set((data || []).map((o: any) => o.user_id))];
     let autores = new Map<string, any>();
     if (ids.length) {
-      const { data: perfiles } = await (supabase as any)
+      const { data: perfiles } = await supabase
         .from("profiles").select("id, full_name, email").in("id", ids);
       autores = new Map((perfiles || []).map((p: any) => [p.id, p]));
     }
@@ -73,7 +73,7 @@ export function PanelObservaciones() {
 
   const marcarAtendida = async (id: string, atendida: boolean) => {
     setObservaciones((prev) => prev.map((o) => (o.id === id ? { ...o, atendida } : o)));
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("observaciones_piloto").update({ atendida }).eq("id", id);
     if (error) {
       toast.error("No se pudo actualizar");

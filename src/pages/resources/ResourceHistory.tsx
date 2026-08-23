@@ -65,7 +65,7 @@ export default function ResourceHistory() {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("generated_resources")
         .select("*")
         .eq("user_id", user!.id)
@@ -112,7 +112,7 @@ export default function ResourceHistory() {
     queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (prev) =>
       (prev || []).map((r) => (r.id === id ? { ...r, is_public: !isPublic } : r)),
     );
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("generated_resources")
       .update({ is_public: !isPublic })
       .eq("id", id);
@@ -128,7 +128,7 @@ export default function ResourceHistory() {
     queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (cur) =>
       (cur || []).filter((r) => r.id !== id),
     );
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from("generated_resources")
       .delete()
       .eq("id", id);
