@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil } from "lucide-react";
+import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil, FileText } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { GestorDocumentosBot } from "@/components/GestorDocumentosBot";
 
 interface BotItem {
   id: string;
@@ -31,6 +32,7 @@ export default function BotList() {
   const [detalle, setDetalle] = useState("");
   const [nivel, setNivel] = useState("");
   const [editando, setEditando] = useState<BotItem | null>(null);
+  const [documentosPorBot, setDocumentosPorBot] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (user) loadBots();
@@ -45,6 +47,14 @@ export default function BotList() {
       .order("created_at", { ascending: false });
     if (error) toast.error("Error al cargar bots");
     setBots(data || []);
+
+    // Cuantos documentos tiene cada bot, para el distintivo de la tarjeta
+    const { data: conteos } = await (supabase as any)
+      .from("bots_con_documentos").select("bot_id, documentos_listos");
+    setDocumentosPorBot(Object.fromEntries(
+      (conteos || []).map((c: any) => [c.bot_id, Number(c.documentos_listos) || 0]),
+    ));
+
     setLoading(false);
   };
 
@@ -175,6 +185,15 @@ export default function BotList() {
               Aquí precisas cómo quieres que se comporte. {detalle.length}/2000
             </p>
           </div>
+          {editando ? (
+            <GestorDocumentosBot botId={editando.id} />
+          ) : (
+            <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border p-3">
+              ¿Quieres que el bot responda a partir de un documento tuyo? Crea el
+              bot primero y luego ábrelo con el lápiz para anexarlo.
+            </p>
+          )}
+
           <div className="flex gap-2">
             <Button onClick={handleCreate} disabled={creating} className="gradient-primary">
               {creating ? "Guardando..." : editando ? "Guardar cambios" : "Crear Bot"}
@@ -229,6 +248,12 @@ export default function BotList() {
                   </Button>
                 </div>
               </div>
+              {documentosPorBot[bot.id] > 0 && (
+                <p className="text-xs text-primary flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {documentosPorBot[bot.id]} documento{documentosPorBot[bot.id] === 1 ? "" : "s"} como fuente
+                </p>
+              )}
               {bot.detalle && (
                 <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/40 rounded-md p-2">
                   {bot.detalle}

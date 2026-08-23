@@ -1,6 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const MODELO_EMBEDDING = "text-embedding-3-small";
+// Por debajo de este parecido el fragmento habla de otra cosa. Meterlo en el
+// prompt solo confunde al modelo y le hace citar algo que no viene al caso.
+const SIMILITUD_MINIMA = 0.25;
+const FRAGMENTOS_POR_PREGUNTA = 5;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -105,6 +111,74 @@ serve(async (req) => {
     }
     const apiKey = setting.value as string;
 
+    // ── Documentos anexados ────────────────────────────────────────────
+    // "El bot puede partir de un documento que yo pueda anexar". La pregunta
+    // se convierte en vector y se recuperan los fragmentos mas parecidos.
+    // Solo se mandan esos, no el documento entero: una cartilla completa
+    // costaria mucho en cada pregunta y el modelo se perderia entre tanto
+    // texto.
+    let contextoDocumentos = "";
+    try {
+      const { count } = await supabaseAdmin
+        .from("bot_documentos")
+        .select("id", { count: "exact", head: true })
+        .eq("bot_id", botId)
+        .eq("estado", "listo");
+
+      if ((count ?? 0) > 0) {
+        const respuestaEmbedding = await fetch("https://api.openai.com/v1/embeddings", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: MODELO_EMBEDDING, input: message }),
+        });
+
+        if (respuestaEmbedding.ok) {
+          const datos = await respuestaEmbedding.json();
+          const vector = datos.data?.[0]?.embedding;
+
+          const { data: encontrados } = await supabase.rpc("buscar_en_documentos_bot", {
+            p_bot_id: botId,
+            p_embedding: JSON.stringify(vector),
+            p_limite: FRAGMENTOS_POR_PREGUNTA,
+          });
+
+          const utiles = (encontrados || []).filter(
+            (f: any) => Number(f.similitud) >= SIMILITUD_MINIMA,
+          );
+
+          if (utiles.length > 0) {
+            contextoDocumentos = [
+              "",
+              "MATERIAL DEL DOCENTE — es tu fuente principal:",
+              ...utiles.map((f: any, i: number) =>
+                `[${i + 1}] (de "${f.documento}") ${f.texto}`),
+              "",
+              "Usa este material antes que tu conocimiento general. Si la " +
+              "pregunta no se responde con el, dilo con claridad y responde " +
+              "desde tu especialidad, avisando que no viene del material.",
+            ].join("\n\n");
+          } else {
+            // Sin esto el bot no se entera de que existe un documento y
+            // rechaza la pregunta por "no ser de mi especialidad", cuando lo
+            // util es decir que ese dato no esta en el material del docente.
+            contextoDocumentos = [
+              "",
+              "MATERIAL DEL DOCENTE:",
+              "El docente anexo material a este bot, pero ningun fragmento " +
+              "responde a esta pregunta en concreto. Si la pregunta parece " +
+              "referirse a ese material, dilo asi: que ese dato no aparece en " +
+              "el material anexado. No respondas que la pregunta es ajena a tu " +
+              "especialidad, y no inventes el dato.",
+            ].join("\n\n");
+          }
+        }
+      }
+    } catch (e) {
+      // Si la busqueda falla, el bot responde igual desde su especialidad.
+      // Quedarse sin bot por un fallo de recuperacion seria peor.
+      console.error("No se pudo consultar los documentos del bot:", e);
+    }
+
     // El docente puede precisar como debe comportarse el bot: que temas
     // cubrir, con que enfoque explicar o que evitar. Sin esto el bot responde
     // de forma generica sobre la especialidad.
@@ -123,8 +197,11 @@ NIVEL EDUCATIVO DE TUS ESTUDIANTES: ${bot.nivel_educativo}. Ajusta el vocabulari
     const systemPrompt = `Eres "${bot.name}", un tutor educativo especializado en ${bot.specialty}, que acompaña a estudiantes del sistema educativo colombiano.
 
 ALCANCE
-1. Responde ÚNICAMENTE sobre ${bot.specialty}.
-2. Si te preguntan algo ajeno a tu especialidad, responde: "Mi especialidad es ${bot.specialty}, por lo que no puedo ayudarte con esa pregunta. ¿Tienes alguna duda sobre ${bot.specialty}?"
+${contextoDocumentos ? `1. Tienes DOS temas permitidos: ${bot.specialty} y el MATERIAL DEL DOCENTE que aparece al final de estas instrucciones. Cualquier pregunta sobre alguno de los dos entra en tu alcance.
+2. Antes de rechazar una pregunta, comprueba si trata sobre el material del docente o sobre la institución, el curso o el plan que ese material describe. Si es así, RESPÓNDELA. El docente anexó ese material justamente para que lo consultes.
+2b. Si trata del material pero el dato concreto no aparece en él, di que ese dato no está en el material anexado. Eso es una respuesta útil; contestar "no es mi especialidad" no lo es.
+2c. Solo si la pregunta no tiene nada que ver ni con ${bot.specialty} ni con ese material, responde: "Mi especialidad es ${bot.specialty}, por lo que no puedo ayudarte con esa pregunta. ¿Tienes alguna duda sobre ${bot.specialty}?"` : `1. Responde ÚNICAMENTE sobre ${bot.specialty}.
+2. Si te preguntan algo ajeno a tu especialidad, responde: "Mi especialidad es ${bot.specialty}, por lo que no puedo ayudarte con esa pregunta. ¿Tienes alguna duda sobre ${bot.specialty}?"`}
 
 CÓMO ENSEÑAS — ESTO ES LO MÁS IMPORTANTE
 3. Tu objetivo es que el estudiante APRENDA, no que entregue una tarea resuelta.
@@ -138,7 +215,7 @@ CÓMO ESCRIBES
 9. Ajusta el nivel de tu explicación al que muestre el estudiante en sus mensajes: si escribe como alguien de primaria, explica como para primaria.
 10. Usa ejemplos del contexto colombiano y de la vida cotidiana siempre que ayuden.
 11. Sé breve: máximo 3 párrafos por respuesta, salvo que te pidan profundizar.
-12. Nunca inventes datos, fechas ni fuentes. Si no sabes algo con certeza, dilo.${nivel}${personalizacion}`;
+12. Nunca inventes datos, fechas ni fuentes. Si no sabes algo con certeza, dilo.${nivel}${personalizacion}${contextoDocumentos}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
