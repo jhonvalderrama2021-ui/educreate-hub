@@ -167,7 +167,7 @@ export default function Crossword() {
         .select("*")
         .eq("id", recursoParam)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
       if (cancelado) return;
       if (error || !data) {
         toast.error("No se encontró ese recurso");

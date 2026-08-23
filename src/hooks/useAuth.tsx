@@ -49,7 +49,9 @@ async function verificarActivo(idUsuario: string) {
     .from("profiles")
     .select("activo")
     .eq("id", idUsuario)
-    .single();
+    // maybeSingle: el perfil se crea con un disparador y puede no existir
+    // todavia en el primer instante tras el registro.
+    .maybeSingle();
 
   // Un error de red no debe expulsar a nadie de la plataforma.
   if (error || data?.activo !== false) return;

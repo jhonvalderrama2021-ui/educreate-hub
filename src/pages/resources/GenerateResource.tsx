@@ -149,7 +149,9 @@ export default function GenerateResource() {
     supabase.from("user_ai_preferences")
       .select("*")
       .eq("user_id", user.id)
-      .single()
+      // maybeSingle: quien nunca ha tocado los ajustes no tiene fila, y eso
+      // es normal, no un error que deba salir en la consola.
+      .maybeSingle()
       .then(({ data }) => {
         if (data) {
           // La columna es texto libre; solo se aceptan los dos valores que
@@ -181,7 +183,7 @@ export default function GenerateResource() {
         .select("*")
         .eq("id", recursoParam)
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
       if (cancelado) return;
       if (error || !data) {
         toast.error("No se encontró ese recurso");
@@ -528,19 +530,19 @@ export default function GenerateResource() {
           {/* Row 1: Tema + Título */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Tema <span className="text-destructive">*</span></Label>
-              <Input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
+              <Label htmlFor="campo-tema">Tema <span className="text-destructive">*</span></Label>
+              <Input id="campo-tema" value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
             </div>
             <div className="space-y-2">
-              <Label>Título (opcional)</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Se generará automáticamente" />
+              <Label htmlFor="campo-titulo">Título (opcional)</Label>
+              <Input id="campo-titulo" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Se generará automáticamente" />
             </div>
           </div>
 
           {/* Row 2: Asignatura + Nivel */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Asignatura <span className="text-destructive">*</span></Label>
+              <Label htmlFor="campo-asignatura">Asignatura <span className="text-destructive">*</span></Label>
               <Select value={subject} onValueChange={(v) => { setSubject(v); if (v !== "Otras") setCustomSubject(""); }}>
                 <SelectTrigger><SelectValue placeholder="Selecciona una asignatura" /></SelectTrigger>
                 <SelectContent className="max-h-72">
@@ -553,7 +555,7 @@ export default function GenerateResource() {
               )}
             </div>
             <div className="space-y-2">
-              <Label>Nivel educativo <span className="text-destructive">*</span></Label>
+              <Label htmlFor="campo-grado">Nivel educativo <span className="text-destructive">*</span></Label>
               <div className="flex items-center gap-3">
                 <GraduationCap className="h-5 w-5 text-muted-foreground shrink-0" />
                 <Select value={grade} onValueChange={setGrade}>
@@ -731,7 +733,7 @@ export default function GenerateResource() {
           {/* Methodology */}
           {extraFields.includes("methodology") && (
             <div className="space-y-2">
-              <Label>Metodología</Label>
+              <Label htmlFor="campo-metodologia">Metodología</Label>
               <Select value={methodology} onValueChange={(v) => { setMethodology(v); if (v !== "Otras") setCustomMethodology(""); }}>
                 <SelectTrigger><SelectValue placeholder="Selecciona una metodología" /></SelectTrigger>
                 <SelectContent>
@@ -748,15 +750,15 @@ export default function GenerateResource() {
           {/* Duration */}
           {extraFields.includes("duration") && (
             <div className="space-y-2">
-              <Label>Duración</Label>
-              <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ej: 2 horas, 45 minutos" />
+              <Label htmlFor="campo-duracion">Duración</Label>
+              <Input id="campo-duracion" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Ej: 2 horas, 45 minutos" />
             </div>
           )}
 
           {/* Number of items */}
           {extraFields.includes("numItems") && (
             <div className="space-y-2">
-              <Label>Número de preguntas</Label>
+              <Label htmlFor="campo-num-preguntas">Número de preguntas</Label>
               <Input
                 type="number"
                 min={1}
@@ -780,8 +782,8 @@ export default function GenerateResource() {
 
           {/* Additional instructions */}
           <div className="space-y-2">
-            <Label>Instrucciones adicionales (opcional)</Label>
-            <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
+            <Label htmlFor="campo-instrucciones">Instrucciones adicionales (opcional)</Label>
+            <Textarea id="campo-instrucciones" value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
           </div>
 
           {/* File Upload */}

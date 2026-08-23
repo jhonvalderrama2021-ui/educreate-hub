@@ -49,7 +49,7 @@ export default function BotChat() {
       .select("id, name, specialty")
       .eq("id", botId!)
       .eq("user_id", user!.id)
-      .single();
+      .maybeSingle();
     if (error || !data) {
       toast.error("Bot no encontrado");
       navigate("/resources/bots");
