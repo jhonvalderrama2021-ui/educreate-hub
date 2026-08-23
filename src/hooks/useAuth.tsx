@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { User, Session } from "@supabase/supabase-js";
 
 export function useAuth() {
@@ -13,6 +14,7 @@ export function useAuth() {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        if (session?.user) verificarActivo(session.user.id);
       }
     );
 
@@ -20,6 +22,7 @@ export function useAuth() {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (session?.user) verificarActivo(session.user.id);
     });
 
     return () => subscription.unsubscribe();
@@ -30,4 +33,27 @@ export function useAuth() {
   };
 
   return { user, session, loading, signOut };
+}
+
+/**
+ * El administrador puede desactivar una cuenta sin borrarla. Aquí se cierra
+ * la sesión para que la persona vea el aviso en vez de una pantalla que
+ * falla sin explicación.
+ *
+ * Esto es cortesía, no seguridad: quien abra la consola del navegador puede
+ * saltárselo. El bloqueo de verdad está en las Edge Functions y en las
+ * políticas de la base de datos, que es donde está el gasto y los datos.
+ */
+async function verificarActivo(idUsuario: string) {
+  const { data, error } = await (supabase as any)
+    .from("profiles")
+    .select("activo")
+    .eq("id", idUsuario)
+    .single();
+
+  // Un error de red no debe expulsar a nadie de la plataforma.
+  if (error || data?.activo !== false) return;
+
+  toast.error("Tu cuenta fue desactivada. Comunícate con el administrador.", { duration: 10000 });
+  await supabase.auth.signOut();
 }

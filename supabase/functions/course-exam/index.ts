@@ -96,6 +96,23 @@ serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
+
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba aqui, no solo en la interfaz.
+    {
+      const { createClient: crearClienteAdmin } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const revisor = crearClienteAdmin(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: userId });
+      if (activo === false) {
+        return new Response(JSON.stringify({ error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

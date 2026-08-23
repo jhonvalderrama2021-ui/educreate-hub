@@ -31,6 +31,23 @@ serve(async (req) => {
       });
     }
 
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba en el servidor, no solo en la
+    // interfaz: si no, bastaria abrir la consola para seguir gastando la
+    // clave de OpenAI de la institucion.
+    {
+      const revisor = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: user.id });
+      if (activo === false) {
+        return new Response(JSON.stringify({
+          error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma.",
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const { botId, message } = await req.json();
     if (!botId || !message) {
       return new Response(JSON.stringify({ error: "botId y message son requeridos" }), {

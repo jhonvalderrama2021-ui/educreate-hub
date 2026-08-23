@@ -59,6 +59,7 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    let idUsuario = "";
     {
       const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const sb = createClient(
@@ -71,6 +72,24 @@ serve(async (req) => {
       if (error || !data?.claims?.sub) {
         return new Response(JSON.stringify({ error: "Unauthorized" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      idUsuario = data.claims.sub as string;
+    }
+
+
+    // El administrador puede desactivar una cuenta sin borrarla (tarea 10 de
+    // la reunion de asesoria). Se comprueba aqui, no solo en la interfaz.
+    {
+      const { createClient: crearClienteAdmin } = await import("https://esm.sh/@supabase/supabase-js@2");
+      const revisor = crearClienteAdmin(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: activo } = await revisor.rpc("es_usuario_activo", { p_id: idUsuario });
+      if (activo === false) {
+        return new Response(JSON.stringify({ error: "Tu cuenta esta desactivada. Comunicate con el administrador de la plataforma." }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
     }

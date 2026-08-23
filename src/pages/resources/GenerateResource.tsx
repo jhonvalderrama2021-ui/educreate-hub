@@ -11,6 +11,7 @@ import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { SlideViewer } from "@/components/SlideViewer";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { useCatalogo } from "@/hooks/useCatalogo";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { Button } from "@/components/ui/button";
@@ -33,62 +34,6 @@ const RESOURCE_TYPES = [
   { value: "slides", label: "Diapositivas", icon: Presentation },
   { value: "lesson_plan", label: "Plan de clase", icon: ClipboardList },
   { value: "rubric", label: "Rúbrica", icon: Table2 },
-];
-
-const SUBJECTS = [
-  "Matemáticas",
-  "Español y Literatura",
-  "Lengua Castellana",
-  "Inglés",
-  "Francés",
-  "Ciencias Naturales",
-  "Biología",
-  "Química",
-  "Física",
-  "Ciencias Sociales",
-  "Historia",
-  "Geografía",
-  "Filosofía",
-  "Economía",
-  "Política y Constitución",
-  "Cátedra de la Paz",
-  "Educación Ética y Valores Humanos",
-  "Educación Religiosa",
-  "Educación Artística",
-  "Música",
-  "Danza",
-  "Teatro",
-  "Artes Plásticas",
-  "Educación Física, Recreación y Deportes",
-  "Tecnología e Informática",
-  "Programación y Computación",
-  "Robótica",
-  "Emprendimiento",
-  "Educación Ambiental",
-  "Lectura Crítica",
-  "Competencias Ciudadanas",
-  "Orientación Vocacional",
-];
-
-const METHODOLOGIES = [
-  "Aprendizaje Basado en Proyectos (ABP)",
-  "Aprendizaje Basado en Problemas",
-  "Aula Invertida (Flipped Classroom)",
-  "Aprendizaje Cooperativo",
-  "Gamificación",
-  "Design Thinking aplicado a la educación",
-  "Método Socrático",
-  "Aprendizaje Experiencial (Kolb)",
-  "Aprendizaje Basado en Competencias",
-  "Método Montessori (adaptado)",
-  "Aprendizaje Servicio",
-  "Enseñanza Explícita",
-  "Pensamiento Visible (Visible Thinking)",
-  "Aprendizaje Multimodal",
-  "STEM / STEAM",
-  "Aprendizaje Personalizado",
-  "Aprendizaje colaborativo",
-  "Clase magistral",
 ];
 
 /**
@@ -189,6 +134,11 @@ export default function GenerateResource() {
   // automatico) o al abrir uno del historial lateral. Mientras exista, guardar
   // actualiza ese registro en vez de crear un duplicado.
   const [recursoId, setRecursoId] = useState<string | null>(null);
+
+  // Los mantiene el administrador desde el panel: el asesor pidio que
+  // agregar una metodologia nueva no exigiera tocar el codigo.
+  const SUBJECTS = useCatalogo("asignatura");
+  const METHODOLOGIES = useCatalogo("metodologia");
 
   const extraFields = useMemo(() => RESOURCE_FIELDS[resourceType] || [], [resourceType]);
 
