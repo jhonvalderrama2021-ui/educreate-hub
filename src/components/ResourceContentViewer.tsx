@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SlideViewer } from "@/components/SlideViewer";
@@ -21,6 +22,27 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
     onContentChange(copy);
   };
 
+  /**
+   * Elimina una pregunta del examen y renumera las restantes.
+   *
+   * Responde a una práctica habitual del docente: pedir muchas preguntas,
+   * revisarlas y descartar las que no sirven, en lugar de reescribirlas.
+   */
+  const eliminarPregunta = (idx: number) => {
+    if (!onContentChange) return;
+    const q = content.questions?.[idx];
+    const resumen = (q?.question || "").slice(0, 70);
+    if (!confirm(`¿Eliminar esta pregunta?\n\n${resumen}${resumen.length >= 70 ? "…" : ""}`)) return;
+
+    const copy = JSON.parse(JSON.stringify(content));
+    copy.questions.splice(idx, 1);
+    // La numeración debe quedar corrida: si se quita la 3, la 4 pasa a ser 3.
+    copy.questions.forEach((pregunta: any, i: number) => {
+      if (pregunta.number !== undefined) pregunta.number = i + 1;
+    });
+    onContentChange(copy);
+  };
+
   const EditableText = ({ value, path, multiline = false, className = "" }: { value: string; path: string[]; multiline?: boolean; className?: string }) => {
     if (!editable) return <span className={className}>{value}</span>;
     if (multiline) return <Textarea value={value || ""} onChange={(e) => update(path, e.target.value)} className={`text-sm ${className}`} rows={2} />;
@@ -34,6 +56,14 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
     case "mixed":
       return (
         <div className="space-y-6">
+          {editable && content.questions?.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {content.questions.length}{" "}
+              {content.questions.length === 1 ? "pregunta" : "preguntas"}. Puedes eliminar
+              las que no quieras usar con el botón de cada una.
+            </p>
+          )}
+
           {/* Questions WITHOUT correct answer highlighted */}
           {content.questions?.map((q: any, idx: number) => (
             <div key={q.number || idx} className="p-4 border border-border rounded-lg bg-muted/20">
@@ -42,6 +72,15 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
                   <div className="flex gap-2 items-start">
                     <span className="mt-2">{q.number || idx + 1}.</span>
                     <EditableText value={q.question} path={["questions", String(idx), "question"]} multiline className="flex-1" />
+                    <button
+                      type="button"
+                      onClick={() => eliminarPregunta(idx)}
+                      title="Eliminar esta pregunta"
+                      aria-label={`Eliminar la pregunta ${q.number || idx + 1}`}
+                      className="mt-1.5 shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ) : (
                   <p>{q.number || idx + 1}. {q.question}</p>
