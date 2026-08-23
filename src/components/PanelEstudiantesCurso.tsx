@@ -47,6 +47,7 @@ export function PanelEstudiantesCurso({
   const navigate = useNavigate();
   const [busqueda, setBusqueda] = useState("");
   const [recursosSel, setRecursosSel] = useState<string[]>([]);
+  const [mostrarSinEntrega, setMostrarSinEntrega] = useState(false);
 
   const opcionesRecurso = useMemo(
     () => opcionesDe(recursos, (r) => r.id, (id) => recursos.find((r) => r.id === id)?.title || id),
@@ -90,7 +91,28 @@ export function PanelEstudiantesCurso({
           b.inscripcion.profile?.full_name || "", "es"));
   }, [inscripciones, entregasActivas, recursosActivos, busqueda]);
 
+  const hayFiltroActividad = recursosSel.length > 0;
+
+  /**
+   * Al filtrar por una actividad, la cuadrícula muestra solo a quienes la
+   * entregaron. Antes seguía mostrando a todo el curso con la nota en blanco,
+   * y el filtro parecía no hacer nada.
+   *
+   * Quién NO entregó sigue siendo un dato valioso, así que no desaparece: se
+   * cuenta debajo y se puede volver a mostrar con un clic.
+   */
+  const ocultos = hayFiltroActividad && !mostrarSinEntrega
+    ? filas.filter((f) => f.entregas.length === 0)
+    : [];
+  const visibles = filas.filter((f) => !ocultos.includes(f));
+
   const sinEmpezar = filas.filter((f) => f.entregas.length === 0).length;
+
+  const resumenVisibles = `${visibles.length} estudiante${visibles.length === 1 ? "" : "s"}`;
+  const resumenActividades =
+    `viendo ${recursosActivos.length} de ${recursos.length} actividades`;
+  // Concuerda con el número de ACTIVIDADES, no con el de estudiantes
+  const palabraActividad = recursosActivos.length === 1 ? "esta actividad" : "estas actividades";
 
   /**
    * Resumen de todo el grupo. Una fila por estudiante y actividad, con la
@@ -188,7 +210,13 @@ export function PanelEstudiantesCurso({
           etiqueta="Actividad"
           opciones={opcionesRecurso}
           seleccion={recursosSel}
-          onCambio={setRecursosSel}
+          onCambio={(sel) => {
+            setRecursosSel(sel);
+            // Al cambiar de actividad se vuelve a ocultar a quienes no
+            // entregaron: si no, el "ver" de la actividad anterior se
+            // arrastra y el filtro nuevo parece no hacer nada.
+            setMostrarSinEntrega(false);
+          }}
           className="w-[230px]"
         />
 
@@ -200,16 +228,47 @@ export function PanelEstudiantesCurso({
         </Button>
       </div>
 
+      {hayFiltroActividad && (
+        <p className="text-xs text-muted-foreground">
+          Las descargas incluyen al curso completo, también a quienes no
+          entregaron: es lo que hace falta para el consolidado de notas.
+        </p>
+      )}
+
       <p className="text-xs text-muted-foreground">
-        {filas.length} estudiante{filas.length === 1 ? "" : "s"}
-        {recursosSel.length > 0 && (
-          <> · viendo {recursosActivos.length} de {recursos.length} actividades</>
+        <span>{resumenVisibles}</span>
+        {hayFiltroActividad && <span>{" · " + resumenActividades}</span>}
+        {!hayFiltroActividad && sinEmpezar > 0 && (
+          <span>{` · ${sinEmpezar} sin entregar nada`}</span>
         )}
-        {sinEmpezar > 0 && <> · {sinEmpezar} sin entregar nada</>}
+        {ocultos.length > 0 && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              onClick={() => setMostrarSinEntrega(true)}
+              className="underline hover:text-foreground"
+            >
+              {`${ocultos.length} sin entregar ${palabraActividad} (ver)`}
+            </button>
+          </>
+        )}
+        {hayFiltroActividad && mostrarSinEntrega && sinEmpezar > 0 && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              onClick={() => setMostrarSinEntrega(false)}
+              className="underline hover:text-foreground"
+            >
+              ocultar a quienes no entregaron
+            </button>
+          </>
+        )}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filas.map(({ inscripcion, entregas: suyas, promedio, tiempo, pendientes }) => {
+        {visibles.map(({ inscripcion, entregas: suyas, promedio, tiempo, pendientes }) => {
           const nombre = inscripcion.profile?.full_name || "Sin nombre";
           const completo = pendientes <= 0 && recursosActivos.length > 0;
 
@@ -290,7 +349,7 @@ export function PanelEstudiantesCurso({
         })}
       </div>
 
-      {filas.length === 0 && (
+      {visibles.length === 0 && (
         <div className="glass-card rounded-xl p-8 text-center text-muted-foreground">
           <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
           Ningún estudiante coincide con la búsqueda.

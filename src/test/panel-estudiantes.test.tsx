@@ -100,18 +100,60 @@ describe("Cuadrícula de estudiantes del curso", () => {
     expect(screen.getByText("0 de 2 entregadas")).toBeInTheDocument();
   });
 
-  it("al filtrar por una actividad, el avance y el promedio son de esa actividad", async () => {
+  it("al filtrar por una actividad muestra SOLO a quienes la entregaron", async () => {
     const user = userEvent.setup();
     montar();
 
     await user.click(screen.getByRole("button", { name: /Filtrar por actividad/ }));
     await user.click(await screen.findByLabelText(/Examen de genética/));
 
-    // Solo Ana la presentó: 5/10 → 2,5
+    // Solo Ana la presentó. Antes seguían saliendo los tres con la nota en
+    // blanco, y el filtro parecía no hacer nada.
+    await waitFor(() => expect(screen.queryByText("Luis Gómez")).not.toBeInTheDocument());
+    expect(screen.queryByText("Pedro Sin Entregas")).not.toBeInTheDocument();
+    expect(screen.getByText("Ana Ruiz")).toBeInTheDocument();
+    expect(screen.getByText("1 estudiante")).toBeInTheDocument();
+  });
+
+  it("el avance y el promedio se refieren solo a la actividad filtrada", async () => {
+    const user = userEvent.setup();
+    montar();
+
+    await user.click(screen.getByRole("button", { name: /Filtrar por actividad/ }));
+    await user.click(await screen.findByLabelText(/Examen de genética/));
+
+    // Ana sacó 5/10 en esa: 2,5. Su promedio del curso entero era 3,8.
     await waitFor(() => expect(screen.getByText("2.5")).toBeInTheDocument());
-    expect(screen.getAllByText("1 de 1 entregada")).toHaveLength(1);
-    expect(screen.getAllByText("0 de 1 entregada")).toHaveLength(2);
+    expect(screen.queryByText("3.8")).not.toBeInTheDocument();
+    expect(screen.getByText("1 de 1 entregada")).toBeInTheDocument();
     expect(screen.getByText(/viendo 1 de 2 actividades/)).toBeInTheDocument();
+  });
+
+  it("quien no entregó no desaparece: se cuenta y se puede volver a ver", async () => {
+    const user = userEvent.setup();
+    montar();
+
+    await user.click(screen.getByRole("button", { name: /Filtrar por actividad/ }));
+    await user.click(await screen.findByLabelText(/Examen de genética/));
+    await waitFor(() => expect(screen.queryByText("Luis Gómez")).not.toBeInTheDocument());
+
+    // Saber quién NO entregó es justo lo que el docente persigue, así que el
+    // dato sigue a la vista aunque las tarjetas estén ocultas.
+    const verOcultos = screen.getByRole("button", { name: /2 sin entregar esta actividad/ });
+    await user.click(verOcultos);
+
+    expect(screen.getByText("Luis Gómez")).toBeInTheDocument();
+    expect(screen.getByText("Pedro Sin Entregas")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /ocultar a quienes no entregaron/ }));
+    await waitFor(() => expect(screen.queryByText("Luis Gómez")).not.toBeInTheDocument());
+  });
+
+  it("sin filtro de actividad siguen saliendo todos", async () => {
+    montar();
+    expect(screen.getByText("Ana Ruiz")).toBeInTheDocument();
+    expect(screen.getByText("Luis Gómez")).toBeInTheDocument();
+    expect(screen.getByText("Pedro Sin Entregas")).toBeInTheDocument();
   });
 
   it("busca por nombre o correo", async () => {
