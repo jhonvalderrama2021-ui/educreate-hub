@@ -374,10 +374,13 @@ export type Database = {
           closes_at: string | null
           course_id: string
           created_at: string
+          entrega_hasta: string | null
           id: string
+          instrucciones_entrega: string | null
           max_attempts: number
           opens_at: string | null
           position: number
+          requiere_entrega: boolean
           resource_id: string
           resource_type: string
           show_feedback: boolean
@@ -391,10 +394,13 @@ export type Database = {
           closes_at?: string | null
           course_id: string
           created_at?: string
+          entrega_hasta?: string | null
           id?: string
+          instrucciones_entrega?: string | null
           max_attempts?: number
           opens_at?: string | null
           position?: number
+          requiere_entrega?: boolean
           resource_id: string
           resource_type: string
           show_feedback?: boolean
@@ -408,10 +414,13 @@ export type Database = {
           closes_at?: string | null
           course_id?: string
           created_at?: string
+          entrega_hasta?: string | null
           id?: string
+          instrucciones_entrega?: string | null
           max_attempts?: number
           opens_at?: string | null
           position?: number
+          requiere_entrega?: boolean
           resource_id?: string
           resource_type?: string
           show_feedback?: boolean
@@ -617,7 +626,13 @@ export type Database = {
       resource_submissions: {
         Row: {
           answers: Json
+          archivo_nombre: string | null
+          archivo_ruta: string | null
+          archivo_tamano: number | null
           attempt_number: number
+          calificado_en: string | null
+          comentario_docente: string | null
+          comentario_estudiante: string | null
           course_id: string
           course_resource_id: string
           feedback: Json | null
@@ -632,7 +647,13 @@ export type Database = {
         }
         Insert: {
           answers?: Json
+          archivo_nombre?: string | null
+          archivo_ruta?: string | null
+          archivo_tamano?: number | null
           attempt_number?: number
+          calificado_en?: string | null
+          comentario_docente?: string | null
+          comentario_estudiante?: string | null
           course_id: string
           course_resource_id: string
           feedback?: Json | null
@@ -647,7 +668,13 @@ export type Database = {
         }
         Update: {
           answers?: Json
+          archivo_nombre?: string | null
+          archivo_ruta?: string | null
+          archivo_tamano?: number | null
           attempt_number?: number
+          calificado_en?: string | null
+          comentario_docente?: string | null
+          comentario_estudiante?: string | null
           course_id?: string
           course_resource_id?: string
           feedback?: Json | null

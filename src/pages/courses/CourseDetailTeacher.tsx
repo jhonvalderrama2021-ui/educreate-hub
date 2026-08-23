@@ -16,12 +16,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus, Inbox,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAccessCode } from "@/lib/courses-types";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
 import { PanelEstudiantesCurso } from "@/components/PanelEstudiantesCurso";
+import { RevisarEntregas } from "@/components/RevisarEntregas";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -163,6 +164,9 @@ export default function CourseDetailTeacher() {
         <TabsList>
           <TabsTrigger value="resources"><FileText className="h-4 w-4 mr-2" />Recursos</TabsTrigger>
           <TabsTrigger value="students"><Users className="h-4 w-4 mr-2" />Estudiantes ({enrollments.length})</TabsTrigger>
+          {resources.some((r) => r.requiere_entrega) && (
+            <TabsTrigger value="entregas"><Inbox className="h-4 w-4 mr-2" />Trabajos recibidos</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="resources" className="space-y-4 mt-4">
@@ -186,6 +190,7 @@ export default function CourseDetailTeacher() {
                       <div className="font-medium text-foreground line-clamp-1">{r.title}</div>
                       <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                         <span>{r.resource_type}</span>
+                        {r.requiere_entrega && <span className="text-primary">Pide entrega</span>}
                         {EVALUABLE.includes(r.resource_type) && (
                           <>
                             <span>Intentos: {r.max_attempts}</span>
@@ -205,6 +210,19 @@ export default function CourseDetailTeacher() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="entregas" className="space-y-4 mt-4">
+          {/* Un taller no se califica solo: aqui el docente abre el archivo y
+              escribe la nota a mano. */}
+          <RevisarEntregas
+            courseId={courseId!}
+            titulosPorRecurso={Object.fromEntries(resources.map((r) => [r.id, r.title]))}
+            nombresPorEstudiante={Object.fromEntries(
+              enrollments.map((e: any) => [e.student_id, e.profile?.full_name || "Sin nombre"]),
+            )}
+            limitesPorRecurso={Object.fromEntries(resources.map((r) => [r.id, r.entrega_hasta]))}
+          />
         </TabsContent>
 
         <TabsContent value="students" className="space-y-4 mt-4">
@@ -290,6 +308,9 @@ function ResourceConfigButton({ resource, onSaved }: { resource: CourseResource;
       show_grade: r.show_grade, show_feedback: r.show_feedback,
       max_attempts: r.max_attempts, time_limit_minutes: r.time_limit_minutes,
       opens_at: r.opens_at, closes_at: r.closes_at, shuffle_questions: r.shuffle_questions,
+      requiere_entrega: r.requiere_entrega,
+      instrucciones_entrega: r.instrucciones_entrega?.trim() || null,
+      entrega_hasta: r.entrega_hasta,
     }).eq("id", resource.id);
     if (error) return toast.error(error.message);
     toast.success("Configuración guardada");
@@ -337,7 +358,57 @@ function ResourceConfigButton({ resource, onSaved }: { resource: CourseResource;
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Este tipo de recurso no requiere configuración de evaluación.</p>
+          /* Un taller o una guia no se califican solos: lo unico que se
+             configura es si el estudiante debe entregar su trabajo. */
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Label htmlFor="pide-entrega">Pedir entrega de archivo</Label>
+                <p className="text-xs text-muted-foreground">
+                  El estudiante sube su trabajo en PDF, Word o como foto. Sin
+                  esto solo puede leer el recurso, y no tendrías cómo comprobar
+                  que lo hizo.
+                </p>
+              </div>
+              <Switch
+                id="pide-entrega"
+                checked={r.requiere_entrega}
+                onCheckedChange={(v) => setR({ ...r, requiere_entrega: v })}
+              />
+            </div>
+
+            {r.requiere_entrega && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="instrucciones-entrega">Instrucciones (opcional)</Label>
+                  <Textarea
+                    id="instrucciones-entrega"
+                    rows={3}
+                    maxLength={2000}
+                    value={r.instrucciones_entrega ?? ""}
+                    onChange={(e) => setR({ ...r, instrucciones_entrega: e.target.value })}
+                    placeholder="Ej: Resuelve los cinco puntos a mano, toma una foto legible y súbela en un solo PDF."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="entrega-hasta">Fecha límite (opcional)</Label>
+                  <Input
+                    id="entrega-hasta"
+                    type="datetime-local"
+                    value={r.entrega_hasta ? r.entrega_hasta.slice(0, 16) : ""}
+                    onChange={(e) => setR({
+                      ...r,
+                      entrega_hasta: e.target.value ? new Date(e.target.value).toISOString() : null,
+                    })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Pasada la fecha se sigue admitiendo la entrega, marcada como
+                    tardía. Rechazarla te dejaría sin el trabajo del estudiante.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         )}
         <DialogFooter>
           <Button onClick={save} className="gradient-primary">Guardar</Button>

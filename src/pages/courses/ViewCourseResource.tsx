@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
+import { EntregaDeTarea } from "@/components/EntregaDeTarea";
 
 export default function ViewCourseResource() {
   const { courseId, courseResourceId } = useParams<{ courseId: string; courseResourceId: string }>();
@@ -41,6 +42,19 @@ export default function ViewCourseResource() {
         <h1 className="text-2xl font-bold text-foreground mb-4">{cr.title}</h1>
         <ResourceContentViewer type={resource.resource_type} content={resource.content} />
       </div>
+
+      {/* Los recursos que no se califican solos —un taller, una guía— no
+          tenían forma de entregarse: el estudiante los abría y ahí terminaba
+          todo, y el docente no podía comprobar que los hubiera hecho. */}
+      {cr.requiere_entrega && (
+        <EntregaDeTarea
+          courseId={courseId!}
+          courseResourceId={courseResourceId!}
+          tituloRecurso={cr.title}
+          instrucciones={cr.instrucciones_entrega}
+          entregaHasta={cr.entrega_hasta}
+        />
+      )}
     </div>
   );
 }
