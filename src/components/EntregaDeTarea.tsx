@@ -77,7 +77,20 @@ export function EntregaDeTarea({
     },
   });
 
-  const fueraDePlazo = !!entregaHasta && new Date(entregaHasta) < new Date();
+  const { data: estado } = useQuery({
+    queryKey: ["estado_entrega", courseResourceId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .rpc("estado_de_entrega", { p_course_resource_id: courseResourceId })
+        .maybeSingle();
+      return data;
+    },
+    // El plazo puede vencer con la pantalla abierta: se recomprueba.
+    refetchInterval: 60_000,
+  });
+
+  const abierto = estado?.abierto !== false;
+  const cierre = estado?.cierra_en ?? entregaHasta ?? null;
 
   const subir = async (archivo: File) => {
     if (!user) return;
@@ -132,11 +145,7 @@ export function EntregaDeTarea({
 
       qc.invalidateQueries({ queryKey: clave });
       qc.invalidateQueries({ queryKey: ["my_submissions", courseId] });
-      toast.success(
-        fueraDePlazo
-          ? "Trabajo entregado. Quedó marcado como fuera de plazo."
-          : "Trabajo entregado",
-      );
+      toast.success("Trabajo entregado");
     } catch (e: any) {
       toast.error(e?.message || "No se pudo subir el archivo");
     } finally {
@@ -187,14 +196,22 @@ export function EntregaDeTarea({
         </p>
       )}
 
-      {entregaHasta && (
-        <p className={`text-xs flex items-center gap-1.5 ${
-          fueraDePlazo ? "text-amber-700 dark:text-amber-500" : "text-muted-foreground"
-        }`}>
-          {fueraDePlazo ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-          {fueraDePlazo ? "El plazo terminó el " : "Puedes entregar hasta el "}
-          {new Date(entregaHasta).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}
-          {fueraDePlazo && ". Aún puedes entregar; quedará marcado como tardío."}
+      {!abierto && (
+        <p className="text-sm flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-amber-800 dark:text-amber-400">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            {estado?.motivo === "Todavía no está abierta"
+              ? `Esta actividad abre el ${new Date(estado.abre_en!).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}.`
+              : `El plazo terminó el ${cierre ? new Date(cierre).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" }) : ""}. Ya no se admiten entregas ni cambios.`}
+          </span>
+        </p>
+      )}
+
+      {abierto && cierre && (
+        <p className="text-xs flex items-center gap-1.5 text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" />
+          Puedes entregar hasta el{" "}
+          {new Date(cierre).toLocaleString("es-CO", { dateStyle: "long", timeStyle: "short" })}
         </p>
       )}
 
@@ -219,7 +236,7 @@ export function EntregaDeTarea({
               aria-label="Ver mi archivo">
               <Download className="h-4 w-4" />
             </Button>
-            {!yaCalificada && (
+            {!yaCalificada && abierto && (
               <Button variant="ghost" size="icon"
                 className="h-8 w-8 text-destructive hover:text-destructive"
                 onClick={quitar} aria-label="Quitar mi entrega">
@@ -243,7 +260,7 @@ export function EntregaDeTarea({
         </div>
       ) : null}
 
-      {!yaCalificada && (
+      {!yaCalificada && abierto && (
         <>
           <div className="space-y-2">
             <Label htmlFor="comentario-entrega" className="text-xs">
@@ -299,6 +316,13 @@ export function EntregaDeTarea({
         <p className="text-xs text-muted-foreground">
           Tu trabajo ya fue calificado, así que no se puede reemplazar. Si
           necesitas volver a entregarlo, habla con tu docente.
+        </p>
+      )}
+
+      {!abierto && !entrega?.archivo_ruta && (
+        <p className="text-xs text-muted-foreground">
+          No alcanzaste a entregar. Habla con tu docente: solo él puede
+          registrar una entrega fuera de plazo.
         </p>
       )}
     </div>

@@ -16,13 +16,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus, Inbox,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus, Inbox, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAccessCode } from "@/lib/courses-types";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
 import { PanelEstudiantesCurso } from "@/components/PanelEstudiantesCurso";
 import { RevisarEntregas } from "@/components/RevisarEntregas";
+import { ConexionesDelCurso } from "@/components/ConexionesDelCurso";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -167,6 +168,7 @@ export default function CourseDetailTeacher() {
           {resources.some((r) => r.requiere_entrega) && (
             <TabsTrigger value="entregas"><Inbox className="h-4 w-4 mr-2" />Trabajos recibidos</TabsTrigger>
           )}
+          <TabsTrigger value="conexiones"><Clock className="h-4 w-4 mr-2" />Conexiones</TabsTrigger>
         </TabsList>
 
         <TabsContent value="resources" className="space-y-4 mt-4">
@@ -210,6 +212,12 @@ export default function CourseDetailTeacher() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="conexiones" className="space-y-4 mt-4">
+          {/* Cuándo entró cada estudiante y cuánto estuvo, sin tener que
+              abrirlos uno por uno. */}
+          <ConexionesDelCurso courseId={courseId!} nombreCurso={course.name} />
         </TabsContent>
 
         <TabsContent value="entregas" className="space-y-4 mt-4">

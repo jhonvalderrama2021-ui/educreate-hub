@@ -203,6 +203,43 @@ serve(async (req) => {
 
     const questions = normalizeQuestions(resource.content);
 
+    // ── Ventana e intentos, comprobados AQUI ───────────────────────────
+    // Hasta ahora solo se miraban en el navegador, asi que bastaba llamar a
+    // esta funcion directamente para presentar fuera de plazo o repetir el
+    // examen tantas veces como se quisiera. En una evaluacion, eso no es un
+    // detalle: es la diferencia entre una nota que vale y una que no.
+    if (isStudent) {
+      const ahora = new Date();
+
+      if (cr.opens_at && new Date(cr.opens_at) > ahora) {
+        return new Response(JSON.stringify({
+          error: `Esta actividad abre el ${new Date(cr.opens_at).toLocaleString("es-CO")}.`,
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (cr.closes_at && new Date(cr.closes_at) < ahora) {
+        return new Response(JSON.stringify({
+          error: `El plazo termino el ${new Date(cr.closes_at).toLocaleString("es-CO")}. Ya no se admiten respuestas.`,
+        }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (action === "submit") {
+        const { count } = await admin
+          .from("resource_submissions")
+          .select("id", { count: "exact", head: true })
+          .eq("course_resource_id", cr.id)
+          .eq("student_id", userId);
+
+        const intentos = count ?? 0;
+        const permitidos = Math.max(1, cr.max_attempts ?? 1);
+        if (intentos >= permitidos) {
+          return new Response(JSON.stringify({
+            error: `Ya usaste tus ${permitidos} intento${permitidos === 1 ? "" : "s"} en esta actividad.`,
+          }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      }
+    }
+
     if (action === "get") {
       // Strip correct answers and explanations before returning to student
       const safeQuestions = questions.map((q: any) => {
@@ -257,12 +294,19 @@ serve(async (req) => {
         };
       });
 
+      const { count: intentosPrevios } = await admin
+        .from("resource_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("course_resource_id", cr.id)
+        .eq("student_id", userId);
+      const numeroDeIntento = (intentosPrevios ?? 0) + 1;
+
       const { error: insErr } = await admin.from("resource_submissions").insert({
         course_resource_id: cr.id,
         course_id: cr.course_id,
         student_id: userId,
         resource_type: cr.resource_type,
-        attempt_number: 1,
+        attempt_number: numeroDeIntento,
         answers,
         score,
         max_score: max,

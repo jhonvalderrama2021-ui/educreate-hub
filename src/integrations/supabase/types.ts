@@ -796,6 +796,17 @@ export type Database = {
         }[]
       }
       buscar_usuario_por_correo: { Args: { _correo: string }; Returns: string }
+      conexiones_del_curso: {
+        Args: { p_course_id: string; p_dias?: number }
+        Returns: {
+          email: string
+          fin: string
+          inicio: string
+          nombre: string
+          segundos: number
+          student_id: string
+        }[]
+      }
       duplicar_curso_para_grupo: {
         Args: { p_clave: string; p_curso_id: string; p_grupo: string }
         Returns: string
@@ -805,6 +816,15 @@ export type Database = {
         Returns: boolean
       }
       es_usuario_activo: { Args: { p_id: string }; Returns: boolean }
+      estado_de_entrega: {
+        Args: { p_course_resource_id: string }
+        Returns: {
+          abierto: boolean
+          abre_en: string
+          cierra_en: string
+          motivo: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
