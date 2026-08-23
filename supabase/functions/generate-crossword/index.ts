@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -340,8 +341,18 @@ serve(async (req) => {
     const apiKey = setting.value as string;
 
     const difficultyLabel = difficulty || "medio";
-    const sourceContext = pdfContent
-      ? `\n\nBasado en el siguiente material:\n${String(pdfContent).slice(0, 6000)}`
+    // Del documento solo se toman los pasajes que hablan del tema del
+    // crucigrama: con la cartilla entera las palabras salían de cualquier
+    // capítulo, no del que el docente está trabajando.
+    const seleccion = await seleccionarPasajes({
+      texto: typeof pdfContent === "string" ? pdfContent : "",
+      consulta: `Tema del crucigrama: ${theme}`,
+      apiKey,
+      presupuesto: 8000,
+    });
+
+    const sourceContext = seleccion.texto
+      ? `\n\nBasado en el siguiente material:\n${seleccion.texto}`
       : "";
 
     // Ask the AI for MANY more words than needed so the backtracking algorithm

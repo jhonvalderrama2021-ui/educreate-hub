@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { partirEnFragmentos } from "./fragmentar.ts";
+import { partirEnFragmentos } from "../_compartido/fragmentar.ts";
 
 /**
  * Vectoriza un documento para que un bot pueda responder a partir de el.

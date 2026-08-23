@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,17 +119,29 @@ serve(async (req) => {
 
     const apiKey = setting.value as string;
 
+    // ── Del documento del docente, solo lo que viene al caso ────────────
+    // Antes se mandaba el PDF entero: si el docente cargaba la cartilla
+    // completa del area y pedia un taller de fracciones, el modelo tenia que
+    // encontrar esas tres paginas entre cien. Ahora se eligen los pasajes
+    // relacionados con lo que pidio.
+    const seleccion = await seleccionarPasajes({
+      texto: typeof pdfContent === "string" ? pdfContent : "",
+      consulta: typeof instructions === "string" ? instructions : "",
+      apiKey,
+    });
+    const documentoFuente = seleccion.texto;
+
     // ============================================================
     // SLIDES: 2-PHASE GENERATION (outline → slides in parallel)
     // ============================================================
     if (resourceType === "slides") {
       const total = Math.max(3, Math.min(20, numItems || 8));
-      const hasSourcePdf = !!(pdfContent && pdfContent.trim().length > 100);
+      const hasSourcePdf = documentoFuente.trim().length > 100;
 
       // Phase 1 — Outline (titles + layout assignment + image hints)
       const outline = await generateOutline(apiKey, {
         instructions: instructions || "",
-        pdfContent: hasSourcePdf ? pdfContent : "",
+        pdfContent: hasSourcePdf ? documentoFuente : "",
         total,
       });
 
@@ -141,7 +154,7 @@ serve(async (req) => {
           totalSlides: total,
           item,
           hasSourcePdf,
-          pdfExcerpt: hasSourcePdf ? pdfContent.slice(0, 4000) : "",
+          pdfExcerpt: hasSourcePdf ? documentoFuente.slice(0, 4000) : "",
         }).catch((e) => {
           console.warn(`Slide ${idx} fallback:`, e);
           return buildFallbackSlide(item, idx, total);
@@ -173,18 +186,18 @@ serve(async (req) => {
     // Cuando hay documento fuente, el recurso debe salir de él. Sin esta
     // instrucción explícita el modelo tendía a producir contenido genérico
     // sobre el tema y a ignorar el material que el docente había cargado.
-    if (pdfContent) {
+    if (documentoFuente) {
       userParts.push(
         `\n=== DOCUMENTO FUENTE ===\n` +
         `El siguiente material fue cargado por el docente y es la BASE OBLIGATORIA del recurso.\n` +
         `Genera el contenido a partir de la información, los conceptos, los datos y los ejemplos que aparecen aquí.\n` +
         `No produzcas contenido genérico sobre el tema: usa ESTE documento.\n` +
         `Si el documento no alcanza para cubrir todo lo solicitado, apóyate en él en lo que sí cubre y complementa el resto de forma coherente con su enfoque.\n\n` +
-        `${pdfContent}\n` +
+        `${documentoFuente}\n` +
         `=== FIN DEL DOCUMENTO FUENTE ===`,
       );
     }
-    if (!pdfContent && !instructions)
+    if (!documentoFuente && !instructions)
       userParts.push("Genera contenido educativo de ejemplo sobre un tema general apropiado.");
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -225,6 +238,21 @@ serve(async (req) => {
       proveedor: "OpenAI",
       fecha: new Date().toISOString(),
       requiereValidacionDocente: true,
+      // Cuando el documento del docente es largo no entra entero: entran los
+      // pasajes relacionados con lo que pidió. Se deja constancia para que
+      // sepa sobre qué parte de su material se generó el recurso, en vez de
+      // recortarlo en silencio.
+      ...(seleccion.metodo !== "completo" && seleccion.caracteresOriginales > 0
+        ? {
+            documentoFuente: {
+              metodo: seleccion.metodo,
+              caracteresOriginales: seleccion.caracteresOriginales,
+              caracteresUsados: seleccion.caracteresUsados,
+              fragmentosTotales: seleccion.fragmentosTotales,
+              fragmentosUsados: seleccion.fragmentosUsados,
+            },
+          }
+        : {}),
     };
 
     return new Response(JSON.stringify(content), {

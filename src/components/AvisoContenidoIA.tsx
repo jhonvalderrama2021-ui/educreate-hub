@@ -1,4 +1,4 @@
-import { Sparkles, AlertTriangle } from "lucide-react";
+import { Sparkles, AlertTriangle, FileSearch } from "lucide-react";
 
 interface MetaIA {
   generadoPorIA?: boolean;
@@ -6,7 +6,16 @@ interface MetaIA {
   proveedor?: string;
   fecha?: string;
   requiereValidacionDocente?: boolean;
+  documentoFuente?: {
+    metodo?: "seleccion" | "recorte" | "completo";
+    caracteresOriginales?: number;
+    caracteresUsados?: number;
+    fragmentosTotales?: number;
+    fragmentosUsados?: number;
+  };
 }
+
+const numero = (n?: number) => (n ?? 0).toLocaleString("es-CO");
 
 /**
  * Aviso de transparencia algorítmica.
@@ -40,6 +49,31 @@ export function AvisoContenidoIA({ meta }: { meta?: MetaIA }) {
             {meta.proveedor && <> de {meta.proveedor}</>}
             {fecha && <> el {fecha}</>}.
           </p>
+          {/* Un documento largo no entra entero en la petición. Decirlo evita
+              que el docente crea que se usó su material completo. */}
+          {meta.documentoFuente && (
+            <p className="flex gap-1.5 text-xs text-muted-foreground">
+              <FileSearch className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                {meta.documentoFuente.metodo === "seleccion" ? (
+                  <>
+                    Tu documento tiene {numero(meta.documentoFuente.caracteresOriginales)} caracteres.
+                    Se usaron los {meta.documentoFuente.fragmentosUsados} fragmentos
+                    más relacionados con lo que pediste
+                    ({numero(meta.documentoFuente.caracteresUsados)} caracteres
+                    de {meta.documentoFuente.fragmentosTotales} fragmentos en total).
+                  </>
+                ) : (
+                  <>
+                    Tu documento tiene {numero(meta.documentoFuente.caracteresOriginales)} caracteres
+                    y no se pudo analizar por partes, así que se usaron los
+                    primeros {numero(meta.documentoFuente.caracteresUsados)}.
+                  </>
+                )}
+              </span>
+            </p>
+          )}
+
           {meta.requiereValidacionDocente && (
             <p className="flex gap-1.5 text-xs text-amber-700 dark:text-amber-500">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />

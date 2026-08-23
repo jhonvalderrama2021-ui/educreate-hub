@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   partirEnFragmentos, TAMANO_FRAGMENTO, SOLAPE,
-} from "../../supabase/functions/procesar-documento-bot/fragmentar";
+} from "../../supabase/functions/_compartido/fragmentar";
 
 /**
  * Partición de documentos para los bots (último punto de la tarea 8).
