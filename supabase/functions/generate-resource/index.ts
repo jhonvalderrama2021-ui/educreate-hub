@@ -25,9 +25,45 @@ function pickModel(resourceType: string): string {
   return TIPOS_ALTA_EXIGENCIA.has(resourceType) ? MODEL_ALTA_EXIGENCIA : MODEL_ECONOMICO;
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS")
     return new Response(null, { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
 
   try {
     // ─── AUTH CHECK ─────────────────────────────────────────────
@@ -67,7 +103,7 @@ serve(async (req) => {
 
     // ────────────────────────────────────────────────────────────
 
-    const { resourceType, pdfContent, instructions, numItems, theme } = await req.json();
+    const { resourceType, pdfContent, instructions, numItems, theme } = await leerJson(req);
 
     // ─── INPUT VALIDATION ───────────────────────────────────────
     const ALLOWED_TYPES = new Set([
@@ -260,8 +296,16 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("generate-resource error:", e);
-    return new Response(JSON.stringify({ error: "Error al generar el recurso. Intenta nuevamente." }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Un error de la petición lleva su propio mensaje, que dice qué corregir.
+    // El genérico se reserva para los fallos del servidor, donde el detalle
+    // no le sirve al docente y podría exponer cómo está montado por dentro.
+    return new Response(JSON.stringify({
+      error: e instanceof ErrorDePeticion
+        ? e.message
+        : "Error al generar el recurso. Intenta nuevamente.",
+    }), {
+      status: e instanceof ErrorDePeticion ? e.estado : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

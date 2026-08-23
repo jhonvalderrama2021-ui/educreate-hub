@@ -48,8 +48,44 @@ async function generateImage(apiKey: string, prompt: string): Promise<string | n
   }
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
 
   try {
     // Require authenticated caller to prevent abuse of the paid AI gateway
@@ -94,7 +130,7 @@ serve(async (req) => {
       }
     }
 
-    const { title, character, characterType, ageGroup, theme, length } = await req.json();
+    const { title, character, characterType, ageGroup, theme, length } = await leerJson(req);
 
 
     if (typeof title !== "string" || title.trim().length < 2) {
@@ -261,7 +297,7 @@ ILUSTRACIONES
   } catch (e) {
     console.error("generate-story error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Error desconocido" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: e instanceof ErrorDePeticion ? e.estado : 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

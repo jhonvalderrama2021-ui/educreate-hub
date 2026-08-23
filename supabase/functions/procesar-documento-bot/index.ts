@@ -46,8 +46,44 @@ async function pedirEmbeddings(textos: string[], apiKey: string): Promise<number
     .map((d: any) => d.embedding as number[]);
 }
 
+/** Error con el estado que corresponde, para distinguirlo de un fallo del servidor. */
+class ErrorDePeticion extends Error {
+  constructor(public estado: number, mensaje: string) { super(mensaje); }
+}
+
+/**
+ * Lee el cuerpo como JSON. Un cuerpo vacio o mal formado es culpa de quien
+ * llama: se responde 400, no 500, para no confundirlo con un fallo real del
+ * servidor al revisar los registros.
+ */
+async function leerJson(req: Request): Promise<Record<string, unknown>> {
+  const texto = await req.text();
+  if (!texto.trim()) throw new ErrorDePeticion(400, "El cuerpo de la petición está vacío");
+  try {
+    const datos = JSON.parse(texto);
+    if (!datos || typeof datos !== "object" || Array.isArray(datos)) {
+      throw new ErrorDePeticion(400, "El cuerpo debe ser un objeto JSON");
+    }
+    return datos as Record<string, unknown>;
+  } catch (e) {
+    if (e instanceof ErrorDePeticion) throw e;
+    throw new ErrorDePeticion(400, "El cuerpo no es JSON válido");
+  }
+}
+
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Todas estas funciones son POST. Un GET devolvia 500 al intentar leer un
+  // cuerpo que no existe, y eso ensucia los registros con errores que no son
+  // del servidor.
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json", Allow: "POST, OPTIONS" },
+    });
+  }
 
   const responder = (cuerpo: unknown, status = 200) =>
     new Response(JSON.stringify(cuerpo), {
@@ -80,7 +116,7 @@ serve(async (req) => {
       }, 403);
     }
 
-    const { botId, nombre, texto } = await req.json();
+    const { botId, nombre, texto } = await leerJson(req);
     if (!botId || typeof texto !== "string") {
       return responder({ error: "botId y texto son requeridos" }, 400);
     }
@@ -164,6 +200,9 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("procesar-documento-bot:", e);
-    return responder({ error: e instanceof Error ? e.message : "Error desconocido" }, 500);
+    return responder(
+      { error: e instanceof Error ? e.message : "Error desconocido" },
+      e instanceof ErrorDePeticion ? e.estado : 500,
+    );
   }
 });
