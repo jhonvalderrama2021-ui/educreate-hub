@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { descargarExcel } from "@/lib/export-excel";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,26 +82,31 @@ export function PanelObservaciones() {
     }
   };
 
-  const exportar = () => {
-    const filas = [
-      "Fecha;Docente;Correo;Modulo;Observacion;Atendida",
-      ...observaciones.map((o) =>
-        [
-          new Date(o.created_at).toLocaleString("es-CO"),
-          o.autor?.full_name || "—",
-          o.autor?.email || "—",
-          nombreModulo(o.modulo),
-          `"${o.observacion.replace(/"/g, "'")}"`,
-          o.atendida ? "Si" : "No",
-        ].join(";")),
-    ];
-    const blob = new Blob(["﻿" + filas.join("\r\n")], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `observaciones-piloto-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const exportar = async () => {
+    await descargarExcel("Observaciones prueba piloto", [{
+      nombre: "Observaciones",
+      titulo: "Observaciones de la prueba piloto",
+      subtitulo: `${observaciones.length} observaciones · ` +
+        `${observaciones.filter((o) => !o.atendida).length} pendientes · Generado el ` +
+        new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }),
+      columnas: [
+        { titulo: "Fecha", ancho: 20 },
+        { titulo: "Docente", ancho: 28 },
+        { titulo: "Correo", ancho: 30 },
+        { titulo: "Módulo", ancho: 20 },
+        // La observación es lo que se analiza: se le da el ancho que merece
+        { titulo: "Observación", ancho: 45 },
+        { titulo: "Atendida", ancho: 11, alineacion: "center" },
+      ],
+      filas: observaciones.map((o) => [
+        new Date(o.created_at).toLocaleString("es-CO"),
+        o.autor?.full_name || "—",
+        o.autor?.email || "—",
+        nombreModulo(o.modulo),
+        o.observacion,
+        o.atendida ? "Sí" : "No",
+      ]),
+    }]);
     toast.success("Archivo descargado");
   };
 
@@ -144,7 +150,7 @@ export function PanelObservaciones() {
               </SelectContent>
             </Select>
           </div>
-          <Button variant="outline" size="sm" onClick={exportar} disabled={!observaciones.length}>
+          <Button variant="outline" size="sm" onClick={() => { void exportar(); }} disabled={!observaciones.length}>
             <Download className="h-4 w-4 mr-2" />
             Exportar
           </Button>

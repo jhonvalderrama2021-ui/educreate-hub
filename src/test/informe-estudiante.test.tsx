@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -58,16 +58,15 @@ const ENTREGAS = [{
   ],
 }];
 
-const descargas: { nombre: string; filas: any[][] }[] = [];
+const descargas: { base: string; hojas: any[] }[] = [];
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-vi.mock("@/lib/examen-respuestas", async (original) => {
-  const real = await original<typeof import("@/lib/examen-respuestas")>();
-  // Se intercepta solo la descarga: jsdom no puede escribir archivos, pero el
-  // contenido del CSV sí interesa comprobarlo.
-  return { ...real, descargarCSV: (nombre: string, filas: any[][]) => { descargas.push({ nombre, filas }); } };
-});
+// Se intercepta la descarga, no la construcción del .xlsx: que el archivo
+// salga bien formado se comprueba aparte, en descargas.test.ts.
+vi.mock("@/lib/export-excel", () => ({
+  descargarExcel: async (base: string, hojas: any[]) => { descargas.push({ base, hojas }); },
+}));
 
 vi.mock("@/integrations/supabase/client", () => {
   const DATOS: Record<string, any> = {
@@ -149,31 +148,35 @@ describe("Informe de un estudiante", () => {
     expect(screen.getByText("La mitocondria produce ATP.")).toBeInTheDocument();
   });
 
-  it("exporta una fila por pregunta, no solo la nota", async () => {
+  it("exporta un libro con resumen y detalle pregunta por pregunta", async () => {
     const user = userEvent.setup();
     montar();
-    await user.click(await screen.findByRole("button", { name: /Descargar resultados/ }));
+    await user.click(await screen.findByRole("button", { name: /Descargar en Excel/ }));
 
-    expect(descargas).toHaveLength(1);
-    const { nombre, filas } = descargas[0];
-    expect(nombre).toBe("resultados-María_Fernanda_Ruiz.csv");
+    await waitFor(() => expect(descargas).toHaveLength(1));
+    const { base, hojas } = descargas[0];
+    expect(base).toContain("María Fernanda Ruiz");
 
-    // Cabecera + una fila por cada una de las 2 preguntas
-    expect(filas).toHaveLength(3);
-    expect(filas[0]).toContain("Enunciado");
+    // Dos hojas: el resumen que se lleva a la reunión de evaluación y el
+    // detalle para hablar con el estudiante. En una sola tabla, el resumen se
+    // perdía entre las preguntas.
+    expect(hojas).toHaveLength(2);
+    expect(hojas[0].nombre).toBe("Resumen");
+    expect(hojas[1].nombre).toBe("Detalle por pregunta");
 
-    const primera = filas[1];
-    expect(primera).toContain("María Fernanda Ruiz");
-    expect(primera).toContain("Examen de la célula");
-    expect(primera).toContain("2.5");
-    expect(primera).toContain("¿Qué organelo produce la energía de la célula?");
-    expect(primera).toContain("Mitocondria");
-    expect(primera[primera.length - 1]).toBe("Sí");
+    // Resumen: una actividad, con la nota como número (1 de 2 aciertos → 2,5)
+    expect(hojas[0].filas).toHaveLength(1);
+    expect(hojas[0].filas[0]).toContain("Examen de la célula");
+    expect(hojas[0].filas[0][4]).toBe(2.5);
 
-    // La fallada debe salir con la respuesta del estudiante Y la correcta
-    const segunda = filas[2];
-    expect(segunda).toContain("Citoplasma");
-    expect(segunda).toContain("Núcleo");
-    expect(segunda[segunda.length - 1]).toBe("No");
+    // Detalle: una fila por pregunta, con lo que marcó y lo correcto
+    const detalle = hojas[1].filas;
+    expect(detalle).toHaveLength(2);
+    expect(detalle[0]).toContain("¿Qué organelo produce la energía de la célula?");
+    expect(detalle[0]).toContain("Mitocondria");
+    expect(detalle[0][detalle[0].length - 1]).toBe("Sí");
+    expect(detalle[1]).toContain("Citoplasma");
+    expect(detalle[1]).toContain("Núcleo");
+    expect(detalle[1][detalle[1].length - 1]).toBe("No");
   });
 });

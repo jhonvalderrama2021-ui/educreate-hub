@@ -153,25 +153,6 @@ export function formatearDuracion(segundos: number | null | undefined): string {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-/**
- * Descarga un CSV con punto y coma y BOM: es lo que Excel en español abre
- * sin pedir un asistente de importación.
- */
-export function descargarCSV(nombreArchivo: string, filas: (string | number)[][]) {
-  const escapar = (v: string | number) => {
-    const s = String(v ?? "");
-    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const texto = filas.map((f) => f.map(escapar).join(";")).join("\r\n");
-  const blob = new Blob(["﻿" + texto], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nombreArchivo;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 /** Iniciales para el avatar del estudiante. */
 export function iniciales(nombre: string | null | undefined): string {
   const partes = String(nombre || "").trim().split(/\s+/).filter(Boolean);

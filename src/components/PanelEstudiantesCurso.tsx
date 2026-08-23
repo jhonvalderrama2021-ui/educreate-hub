@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 import type { CourseResource, ResourceSubmission } from "@/lib/courses-types";
 import {
-  revisarEntrega, notaColombiana, formatearDuracion, descargarCSV, iniciales,
+  revisarEntrega, formatearDuracion, iniciales,
 } from "@/lib/examen-respuestas";
+import { descargarExcel, type ValorCelda } from "@/lib/export-excel";
 
 /**
  * Estudiantes del curso en cuadrícula, con lo que ha desarrollado cada uno.
@@ -114,60 +115,75 @@ export function PanelEstudiantesCurso({
   // Concuerda con el número de ACTIVIDADES, no con el de estudiantes
   const palabraActividad = recursosActivos.length === 1 ? "esta actividad" : "estas actividades";
 
+  const hoy = () => new Date().toLocaleDateString("es-CO",
+    { day: "2-digit", month: "long", year: "numeric" });
+
+  const nombreActividades = () =>
+    recursosSel.length === 0
+      ? "todas las actividades"
+      : recursosActivos.map((r) => r.title).join(", ");
+
   /**
-   * Resumen de todo el grupo. Una fila por estudiante y actividad, con la
-   * nota: es lo que se pega en el consolidado de notas del periodo.
+   * Resumen de todo el grupo, en Excel. Una fila por estudiante y actividad,
+   * con la nota como NÚMERO: en CSV llegaba como texto y ordenar por nota
+   * dejaba el 10 antes que el 2, que es justo lo contrario de lo que el
+   * docente necesita al armar el consolidado del periodo.
    */
-  const exportarResumen = () => {
+  const exportarResumen = async () => {
     if (entregasActivas.length === 0) return toast.error("Aún no hay entregas que exportar");
 
-    const filasCSV: (string | number)[][] = [
-      ["Estudiante", "Correo", "Actividad", "Aciertos", "Total", "Nota (1-5)", "Tiempo", "Fecha"],
-    ];
+    const filasExcel: ValorCelda[][] = [];
     for (const f of filas) {
       const nombre = f.inscripcion.profile?.full_name || "Sin nombre";
       const correo = f.inscripcion.profile?.email || "";
       if (f.entregas.length === 0) {
         // Quien no entregó también sale: es justo el dato que el docente busca
-        filasCSV.push([nombre, correo, "(sin entregas)", "", "", "", "", ""]);
+        filasExcel.push([nombre, correo, "(sin entregas)", null, null, null, "", ""]);
         continue;
       }
       for (const e of f.entregas) {
         const cr = recursos.find((r) => r.id === e.course_resource_id);
-        filasCSV.push([
+        const nota = e.score !== null && e.max_score ? (e.score / e.max_score) * 5 : null;
+        filasExcel.push([
           nombre, correo, cr?.title || "",
-          e.score ?? "", e.max_score ?? "",
-          notaColombiana(e.score, e.max_score),
+          e.score ?? null, e.max_score ?? null, nota,
           formatearDuracion(e.time_spent_seconds),
           new Date(e.submitted_at).toLocaleString("es-CO"),
         ]);
       }
     }
 
-    const sufijo = recursosSel.length === 1
-      ? (recursos.find((r) => r.id === recursosSel[0])?.title || "actividad")
-      : "todas-las-actividades";
-    descargarCSV(
-      `resumen-${nombreCurso}-${sufijo}.csv`.replace(/\s+/g, "_"),
-      filasCSV,
-    );
+    await descargarExcel(`Resumen ${nombreCurso}`, [{
+      nombre: "Resumen de notas",
+      titulo: `${nombreCurso} — Consolidado de notas`,
+      subtitulo: `${nombreActividades()} · ${filas.length} estudiantes · Generado el ${hoy()}`,
+      columnas: [
+        { titulo: "Estudiante", ancho: 30 },
+        { titulo: "Correo", ancho: 30 },
+        { titulo: "Actividad", ancho: 32 },
+        { titulo: "Aciertos", ancho: 11, alineacion: "right" },
+        { titulo: "Total", ancho: 9, alineacion: "right" },
+        { titulo: "Nota (1-5)", ancho: 12, formato: "0.0", alineacion: "right" },
+        { titulo: "Tiempo", ancho: 12 },
+        { titulo: "Fecha de entrega", ancho: 20 },
+      ],
+      filas: filasExcel,
+    }]);
     toast.success("Resumen descargado");
   };
 
   /** Detalle pregunta por pregunta de una actividad, para todo el grupo. */
-  const exportarDetalle = () => {
+  const exportarDetalle = async () => {
     if (entregasActivas.length === 0) return toast.error("Aún no hay entregas que exportar");
 
-    const filasCSV: (string | number)[][] = [
-      ["Estudiante", "Actividad", "N° pregunta", "Enunciado", "Respondió", "Correcta", "¿Acertó?"],
-    ];
+    const filasExcel: ValorCelda[][] = [];
     for (const f of filas) {
       const nombre = f.inscripcion.profile?.full_name || "Sin nombre";
       for (const e of f.entregas) {
         const cr = recursos.find((r) => r.id === e.course_resource_id);
         const preguntas = revisarEntrega(cr ? contenidos[cr.resource_id] : null, e);
         for (const p of preguntas) {
-          filasCSV.push([
+          filasExcel.push([
             nombre, cr?.title || "", p.numero, p.enunciado,
             p.opciones[p.marcada]?.text ?? "(sin responder)",
             p.opciones[p.correcta]?.text ?? "",
@@ -177,10 +193,25 @@ export function PanelEstudiantesCurso({
       }
     }
 
-    if (filasCSV.length === 1) {
+    if (filasExcel.length === 0) {
       return toast.error("Estas actividades no guardan respuestas por pregunta");
     }
-    descargarCSV(`detalle-${nombreCurso}.csv`.replace(/\s+/g, "_"), filasCSV);
+
+    await descargarExcel(`Detalle ${nombreCurso}`, [{
+      nombre: "Detalle por pregunta",
+      titulo: `${nombreCurso} — Respuesta por respuesta`,
+      subtitulo: `${nombreActividades()} · Generado el ${hoy()}`,
+      columnas: [
+        { titulo: "Estudiante", ancho: 28 },
+        { titulo: "Actividad", ancho: 28 },
+        { titulo: "N°", ancho: 6, alineacion: "center" },
+        { titulo: "Enunciado", ancho: 45 },
+        { titulo: "Respondió", ancho: 30 },
+        { titulo: "Correcta", ancho: 30 },
+        { titulo: "¿Acertó?", ancho: 11, alineacion: "center" },
+      ],
+      filas: filasExcel,
+    }]);
     toast.success("Detalle descargado");
   };
 
@@ -220,11 +251,11 @@ export function PanelEstudiantesCurso({
           className="w-[230px]"
         />
 
-        <Button variant="outline" size="sm" onClick={exportarResumen}>
-          <Download className="h-4 w-4 mr-2" /> Resumen de notas
+        <Button variant="outline" size="sm" onClick={() => { void exportarResumen(); }}>
+          <Download className="h-4 w-4 mr-2" /> Resumen en Excel
         </Button>
-        <Button variant="outline" size="sm" onClick={exportarDetalle}>
-          <ClipboardList className="h-4 w-4 mr-2" /> Detalle por pregunta
+        <Button variant="outline" size="sm" onClick={() => { void exportarDetalle(); }}>
+          <ClipboardList className="h-4 w-4 mr-2" /> Detalle en Excel
         </Button>
       </div>
 

@@ -10,8 +10,9 @@ import {
 } from "lucide-react";
 import type { ResourceSubmission, CourseResource } from "@/lib/courses-types";
 import {
-  revisarEntrega, notaColombiana, formatearDuracion, descargarCSV, iniciales,
+  revisarEntrega, notaColombiana, formatearDuracion, iniciales,
 } from "@/lib/examen-respuestas";
+import { descargarExcel, type ValorCelda, type HojaExcel } from "@/lib/export-excel";
 
 /**
  * Informe de un estudiante dentro de un mini curso.
@@ -93,44 +94,78 @@ export default function StudentReport() {
     : "—";
   const tiempoTotal = subs.reduce((a, s) => a + (s.time_spent_seconds || 0), 0);
 
-  const exportar = () => {
+  /**
+   * Informe del estudiante en Excel, con dos hojas: el resumen que se lleva a
+   * la reunión de evaluación y el detalle pregunta por pregunta para hablar
+   * con él. En una sola tabla, el resumen se perdía entre las preguntas.
+   */
+  const exportar = async () => {
     if (subs.length === 0) return toast.error("No hay actividades que exportar");
-    const filas: (string | number)[][] = [
-      ["Estudiante", "Actividad", "Tipo", "Aciertos", "Total", "Nota (1-5)", "Tiempo", "Fecha",
-       "N° pregunta", "Enunciado", "Respondió", "Correcta", "¿Acertó?"],
-    ];
-    for (const s of subs) {
+
+    const resumen: ValorCelda[][] = subs.map((s) => {
       const cr = recursoDe(s);
-      const preguntas = revisarEntrega(contenidoDe(s), s);
-      const cabecera = [
-        profile?.full_name || "",
-        cr?.title || "",
-        s.resource_type,
-        s.score ?? "",
-        s.max_score ?? "",
-        notaColombiana(s.score, s.max_score),
+      const nota = s.score !== null && s.max_score ? (s.score / s.max_score) * 5 : null;
+      return [
+        cr?.title || "", s.resource_type,
+        s.score ?? null, s.max_score ?? null, nota,
         formatearDuracion(s.time_spent_seconds),
         new Date(s.submitted_at).toLocaleString("es-CO"),
       ];
-      if (preguntas.length === 0) {
-        filas.push([...cabecera, "", "", "", "", ""]);
-        continue;
-      }
-      // Una fila por pregunta: así el docente puede filtrar en Excel cuáles
-      // falló todo el grupo, que es lo que sirve para reorientar la clase.
-      for (const p of preguntas) {
-        filas.push([
-          ...cabecera,
-          p.numero,
-          p.enunciado,
+    });
+
+    const detalle: ValorCelda[][] = [];
+    for (const s of subs) {
+      const cr = recursoDe(s);
+      for (const p of revisarEntrega(contenidoDe(s), s)) {
+        detalle.push([
+          cr?.title || "", p.numero, p.enunciado,
           p.opciones[p.marcada]?.text ?? "(sin responder)",
           p.opciones[p.correcta]?.text ?? "",
           p.acerto ? "Sí" : "No",
         ]);
       }
     }
-    const nombre = (profile?.full_name || "estudiante").replace(/\s+/g, "_");
-    descargarCSV(`resultados-${nombre}.csv`, filas);
+
+    const quien = profile?.full_name || "Estudiante";
+    const fecha = new Date().toLocaleDateString("es-CO",
+      { day: "2-digit", month: "long", year: "numeric" });
+
+    const hojas: HojaExcel[] = [{
+      nombre: "Resumen",
+      titulo: `${quien} — Informe de actividades`,
+      subtitulo: `${curso?.name ? curso.name + " · " : ""}Promedio ${promedio} sobre 5,0 · Generado el ${fecha}`,
+      columnas: [
+        { titulo: "Actividad", ancho: 34 },
+        { titulo: "Tipo", ancho: 14 },
+        { titulo: "Aciertos", ancho: 11, alineacion: "right" },
+        { titulo: "Total", ancho: 9, alineacion: "right" },
+        { titulo: "Nota (1-5)", ancho: 12, formato: "0.0", alineacion: "right" },
+        { titulo: "Tiempo", ancho: 12 },
+        { titulo: "Fecha de entrega", ancho: 20 },
+      ],
+      filas: resumen,
+    }];
+
+    // La segunda hoja solo si hay algo que poner: un libro con una hoja vacía
+    // hace dudar de si el archivo salió bien.
+    if (detalle.length > 0) {
+      hojas.push({
+        nombre: "Detalle por pregunta",
+        titulo: `${quien} — Respuesta por respuesta`,
+        subtitulo: `Generado el ${fecha}`,
+        columnas: [
+          { titulo: "Actividad", ancho: 28 },
+          { titulo: "N°", ancho: 6, alineacion: "center" },
+          { titulo: "Enunciado", ancho: 45 },
+          { titulo: "Respondió", ancho: 30 },
+          { titulo: "Correcta", ancho: 30 },
+          { titulo: "¿Acertó?", ancho: 11, alineacion: "center" },
+        ],
+        filas: detalle,
+      });
+    }
+
+    await descargarExcel(`Informe ${quien}`, hojas);
     toast.success("Archivo descargado");
   };
 
@@ -161,8 +196,8 @@ export default function StudentReport() {
             {curso?.name && ` · ${curso.name}`}
           </p>
         </div>
-        <Button variant="outline" onClick={exportar} disabled={subs.length === 0}>
-          <Download className="h-4 w-4 mr-2" /> Descargar resultados
+        <Button variant="outline" onClick={() => { void exportar(); }} disabled={subs.length === 0}>
+          <Download className="h-4 w-4 mr-2" /> Descargar en Excel
         </Button>
       </div>
 

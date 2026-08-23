@@ -20,13 +20,15 @@ import { MemoryRouter } from "react-router-dom";
  *    lee un promedio del curso entero creyendo que es de esa actividad.
  */
 
-const descargas: { nombre: string; filas: any[][] }[] = [];
+const descargas: { base: string; hojas: any[] }[] = [];
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock("@/lib/examen-respuestas", async (original) => {
-  const real = await original<typeof import("@/lib/examen-respuestas")>();
-  return { ...real, descargarCSV: (nombre: string, filas: any[][]) => { descargas.push({ nombre, filas }); } };
-});
+// Se intercepta la descarga, no la construcción del .xlsx: que el archivo
+// salga bien formado se comprueba aparte, en descargas.test.ts. Aquí interesa
+// QUÉ se exporta.
+vi.mock("@/lib/export-excel", () => ({
+  descargarExcel: async (base: string, hojas: any[]) => { descargas.push({ base, hojas }); },
+}));
 
 const { PanelEstudiantesCurso } = await import("@/components/PanelEstudiantesCurso");
 
@@ -170,35 +172,41 @@ describe("Cuadrícula de estudiantes del curso", () => {
     const user = userEvent.setup();
     montar();
 
-    await user.click(screen.getByRole("button", { name: /Resumen de notas/ }));
+    await user.click(screen.getByRole("button", { name: /Resumen en Excel/ }));
 
-    expect(descargas).toHaveLength(1);
-    const { filas } = descargas[0];
-    // Cabecera + 2 de Ana + 1 de Luis + 1 fila de Pedro sin entregas
-    expect(filas).toHaveLength(5);
-    expect(filas[0]).toContain("Nota (1-5)");
+    await waitFor(() => expect(descargas).toHaveLength(1));
+    const hoja = descargas[0].hojas[0];
+    // 2 de Ana + 1 de Luis + 1 fila de Pedro sin entregas. La cabecera ya no
+    // es una fila más: la pone el generador de Excel con su propio formato.
+    expect(hoja.filas).toHaveLength(4);
+    expect(hoja.columnas.map((c: any) => c.titulo)).toContain("Nota (1-5)");
 
-    const pedro = filas.find((f) => String(f[0]).includes("Pedro"));
+    const pedro = hoja.filas.find((f: any[]) => String(f[0]).includes("Pedro"));
     expect(pedro).toBeTruthy();
     expect(pedro).toContain("(sin entregas)");
 
-    const primeraDeAna = filas.find((f) => f[0] === "Ana Ruiz");
-    expect(primeraDeAna).toContain("5.0");
+    // La nota va como NÚMERO, no como texto. En CSV llegaba como "5.0" y
+    // ordenar por nota en Excel dejaba el 10 antes que el 2.
+    const deAna = hoja.filas.find((f: any[]) => f[0] === "Ana Ruiz" && f[3] === 10);
+    expect(deAna[5]).toBe(5);
+    expect(typeof deAna[5]).toBe("number");
   });
 
-  it("el resumen respeta el filtro por actividad y lo dice en el nombre del archivo", async () => {
+  it("el resumen respeta el filtro por actividad y lo dice en el subtítulo", async () => {
     const user = userEvent.setup();
     montar();
 
     await user.click(screen.getByRole("button", { name: /Filtrar por actividad/ }));
     await user.click(await screen.findByLabelText(/Examen de genética/));
-    await user.click(screen.getByRole("button", { name: /Resumen de notas/ }));
+    await user.click(screen.getByRole("button", { name: /Resumen en Excel/ }));
 
-    const { nombre, filas } = descargas[0];
-    expect(nombre).toContain("Examen_de_genética");
-    // Cabecera + Ana (la presentó) + Luis y Pedro (no la presentaron)
-    expect(filas).toHaveLength(4);
-    expect(filas.filter((f) => String(f[2]) === "(sin entregas)")).toHaveLength(2);
+    await waitFor(() => expect(descargas).toHaveLength(1));
+    const hoja = descargas[0].hojas[0];
+    expect(hoja.subtitulo).toContain("Examen de genética");
+    // Ana la presentó; Luis y Pedro no. Los tres salen: el consolidado de
+    // notas necesita al curso entero aunque la cuadrícula filtre.
+    expect(hoja.filas).toHaveLength(3);
+    expect(hoja.filas.filter((f: any[]) => String(f[2]) === "(sin entregas)")).toHaveLength(2);
   });
 
   it("cada tarjeta lleva al informe de ese estudiante", async () => {

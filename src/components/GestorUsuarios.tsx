@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   Search, Pencil, UserCheck, UserX, MailCheck, MailWarning, Loader2, Download,
 } from "lucide-react";
-import { descargarCSV } from "@/lib/examen-respuestas";
+import { descargarExcel } from "@/lib/export-excel";
 
 /**
  * Gestión de usuarios del panel de administración.
@@ -122,16 +122,29 @@ export function GestorUsuarios() {
     toast.success("Usuario actualizado");
   };
 
-  const exportar = () => {
-    descargarCSV("usuarios-nexprofe.csv", [
-      ["Nombre", "Usuario", "Correo", "Rol", "Estado", "Correo confirmado", "Último acceso", "Registrado"],
-      ...visibles.map((u) => [
+  const exportar = async () => {
+    await descargarExcel("Usuarios NexProfe", [{
+      nombre: "Usuarios",
+      titulo: "Usuarios de la plataforma",
+      subtitulo: `${visibles.length} de ${usuarios.length} · Generado el ` +
+        new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }),
+      columnas: [
+        { titulo: "Nombre", ancho: 30 },
+        { titulo: "Usuario", ancho: 18 },
+        { titulo: "Correo", ancho: 32 },
+        { titulo: "Rol", ancho: 13 },
+        { titulo: "Estado", ancho: 14 },
+        { titulo: "Correo confirmado", ancho: 18, alineacion: "center" },
+        { titulo: "Último acceso", ancho: 16 },
+        { titulo: "Registrado", ancho: 16 },
+      ],
+      filas: visibles.map((u) => [
         u.full_name || "", u.username || "", u.email || "", u.rol,
         u.activo ? "Activo" : "Desactivado",
         u.correo_confirmado ? "Sí" : "No",
         fecha(u.ultimo_acceso), fecha(u.creado_en),
       ]),
-    ]);
+    }]);
     toast.success("Archivo descargado");
   };
 
@@ -189,7 +202,7 @@ export function GestorUsuarios() {
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" onClick={exportar} disabled={visibles.length === 0}>
+          <Button variant="outline" size="sm" onClick={() => { void exportar(); }} disabled={visibles.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Exportar
           </Button>
         </div>

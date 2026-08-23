@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Clock, Download, Loader2, Search } from "lucide-react";
-import { descargarCSV, formatearDuracion } from "@/lib/examen-respuestas";
+import { formatearDuracion } from "@/lib/examen-respuestas";
+import { descargarExcel } from "@/lib/export-excel";
 
 /**
  * Auditoría de tiempos de acceso.
@@ -69,17 +70,34 @@ export function PanelAuditoria() {
   const conActividad = visibles.filter((f) => f.sesiones > 0);
   const nunca = visibles.length - conActividad.length;
 
-  const exportar = () => {
-    descargarCSV(`auditoria-accesos-${dias}dias.csv`, [
-      ["Nombre", "Correo", "Rol", "Sesiones", "Tiempo total", "Segundos", "Primer acceso", "Último acceso"],
-      ...visibles.map((f) => [
+  const exportar = async () => {
+    const periodo = PERIODOS.find((p) => p.valor === dias)?.etiqueta ?? `${dias} días`;
+    await descargarExcel(`Auditoria de accesos ${dias} dias`, [{
+      nombre: "Tiempos de acceso",
+      titulo: "Auditoría de tiempos de acceso",
+      subtitulo: `${periodo} · ${visibles.length} personas · Generado el ` +
+        new Date().toLocaleDateString("es-CO", { day: "2-digit", month: "long", year: "numeric" }),
+      columnas: [
+        { titulo: "Nombre", ancho: 30 },
+        { titulo: "Correo", ancho: 32 },
+        { titulo: "Rol", ancho: 13 },
+        { titulo: "Sesiones", ancho: 11, alineacion: "right" },
+        { titulo: "Tiempo total", ancho: 14 },
+        // Los segundos van como número para poder sumar y ordenar en Excel;
+        // la columna de al lado los muestra en un formato que se lee.
+        { titulo: "Segundos", ancho: 12, formato: "0", alineacion: "right" },
+        { titulo: "Primer acceso", ancho: 20 },
+        { titulo: "Último acceso", ancho: 20 },
+      ],
+      filas: visibles.map((f) => [
         f.nombre || "", f.email || "", f.rol,
         f.sesiones,
-        formatearDuracion(f.segundos_totales),
+        f.sesiones === 0 ? "—" : formatearDuracion(f.segundos_totales),
         f.segundos_totales,
-        fechaHora(f.primera_vez), fechaHora(f.ultima_vez),
+        fechaHora(f.primera_vez),
+        f.sesiones === 0 ? "Nunca entró" : fechaHora(f.ultima_vez),
       ]),
-    ]);
+    }]);
     toast.success("Archivo descargado");
   };
 
@@ -135,7 +153,7 @@ export function PanelAuditoria() {
             </Select>
           </div>
 
-          <Button variant="outline" size="sm" onClick={exportar} disabled={visibles.length === 0}>
+          <Button variant="outline" size="sm" onClick={() => { void exportar(); }} disabled={visibles.length === 0}>
             <Download className="h-4 w-4 mr-2" /> Exportar
           </Button>
         </div>
