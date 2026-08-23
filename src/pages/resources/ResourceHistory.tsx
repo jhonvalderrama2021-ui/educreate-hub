@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
-import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
@@ -37,6 +37,8 @@ interface Resource {
   content: any;
   is_public: boolean;
   created_at: string;
+  subject: string | null;
+  grade: string | null;
 }
 
 const RESOURCES_QK = (uid?: string) => ["generated_resources", uid] as const;
@@ -45,6 +47,8 @@ export default function ResourceHistory() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("all");
+  const [filtroAsignatura, setFiltroAsignatura] = useState("all");
+  const [filtroGrado, setFiltroGrado] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
@@ -81,9 +85,14 @@ export default function ResourceHistory() {
     return () => { supabase.removeChannel(channel); };
   }, [user, queryClient]);
 
-  const resources = filter === "all"
-    ? allResources
-    : allResources.filter((r) => r.resource_type === filter);
+  // Valores disponibles, tomados de los recursos que el docente ya tiene
+  const asignaturas = [...new Set(allResources.map((r) => r.subject).filter(Boolean))].sort() as string[];
+  const grados = [...new Set(allResources.map((r) => r.grade).filter(Boolean))].sort() as string[];
+
+  const resources = allResources.filter((r) =>
+    (filter === "all" || r.resource_type === filter) &&
+    (filtroAsignatura === "all" || r.subject === filtroAsignatura) &&
+    (filtroGrado === "all" || r.grade === filtroGrado));
   // Only show full-screen spinner on first load (no cache yet)
   const loading = isLoading && allResources.length === 0;
 
@@ -131,19 +140,62 @@ export default function ResourceHistory() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <Label className="text-sm">Filtrar:</Label>
-        <Select value={filter} onValueChange={setFilter}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {Object.entries(TYPE_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Tipo de recurso</Label>
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {asignaturas.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Asignatura</Label>
+            <Select value={filtroAsignatura} onValueChange={setFiltroAsignatura}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {asignaturas.map((a) => (
+                  <SelectItem key={a} value={a}>{a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {grados.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Grado</Label>
+            <Select value={filtroGrado} onValueChange={setFiltroGrado}>
+              <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                {grados.map((g) => (
+                  <SelectItem key={g} value={g}>Grado {g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {(filter !== "all" || filtroAsignatura !== "all" || filtroGrado !== "all") && (
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => { setFilter("all"); setFiltroAsignatura("all"); setFiltroGrado("all"); }}
+          >
+            Limpiar filtros
+          </Button>
+        )}
+
+        <p className="ml-auto text-sm text-muted-foreground">
+          {resources.length} de {allResources.length}
+        </p>
       </div>
 
       {loading ? (
@@ -173,7 +225,10 @@ export default function ResourceHistory() {
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">{r.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {typeInfo.label} · {new Date(r.created_at).toLocaleDateString("es-CO")}
+                        {typeInfo.label}
+                        {r.subject && ` · ${r.subject}`}
+                        {r.grade && ` · Grado ${r.grade}`}
+                        {" · "}{new Date(r.created_at).toLocaleDateString("es-CO")}
                       </p>
                     </div>
                   </div>

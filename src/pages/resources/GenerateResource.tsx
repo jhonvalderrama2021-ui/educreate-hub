@@ -401,6 +401,10 @@ export default function GenerateResource() {
         content: contentToSave,
         source_pdf_url: sourcePdfUrl,
         is_public: isPublic,
+        // Se guardan como columnas, no solo dentro del contenido, para poder
+        // filtrar y agrupar los recursos por asignatura y grado.
+        subject: (subject === "Otras" ? customSubject : subject)?.trim() || null,
+        grade: grade || null,
       });
 
       if (error) throw error;
