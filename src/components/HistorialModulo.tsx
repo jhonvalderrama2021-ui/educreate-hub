@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
 import { History, ChevronLeft, ChevronRight, Loader2, FileClock } from "lucide-react";
+import { BorrarRecurso } from "@/components/BorrarRecurso";
 
 /**
  * Franja lateral con los recursos que el docente ya creó en ESTE módulo.
@@ -45,9 +46,15 @@ interface Props {
   /** Id del recurso que se está viendo, para resaltarlo en la lista. */
   activo?: string | null;
   titulo?: string;
+  /**
+   * Avisa que se borró un recurso, por si el módulo lo tenía abierto en el
+   * visor: dejarlo en pantalla despues de borrarlo permitiría seguir
+   * editando y guardando algo que ya no existe.
+   */
+  onBorrado?: (id: string) => void;
 }
 
-export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados anteriormente" }: Props) {
+export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados anteriormente", onBorrado }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [pagina, setPagina] = useState(0);
@@ -178,16 +185,19 @@ export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados ante
         <>
           <ul className="space-y-1.5">
             {visibles.map((r) => (
-              <li key={r.id}>
+              <li
+                key={r.id}
+                className={`group flex items-start gap-1 rounded-lg transition-colors ${
+                  activo === r.id
+                    ? "bg-primary/10 border border-primary/40"
+                    : "hover:bg-muted/60 border border-transparent"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => onAbrir(r)}
                   aria-current={activo === r.id ? "true" : undefined}
-                  className={`w-full text-left rounded-lg px-3 py-2 transition-colors ${
-                    activo === r.id
-                      ? "bg-primary/10 border border-primary/40"
-                      : "hover:bg-muted/60 border border-transparent"
-                  }`}
+                  className="flex-1 min-w-0 text-left px-3 py-2"
                 >
                   <span className="block text-sm font-medium text-foreground line-clamp-2">
                     {r.title}
@@ -198,6 +208,14 @@ export function HistorialModulo({ tipos, onAbrir, activo, titulo = "Creados ante
                     {new Date(r.created_at).toLocaleDateString("es-CO")}
                   </span>
                 </button>
+                <div className="pt-2 pr-1">
+                  <BorrarRecurso
+                    recursoId={r.id}
+                    titulo={r.title}
+                    claveCache={CLAVE_RECURSOS(user?.id)}
+                    onBorrado={onBorrado}
+                  />
+                </div>
               </li>
             ))}
           </ul>

@@ -6,9 +6,27 @@ interface Props {
   content: CrosswordContent;
   showSolution?: boolean;
   interactive?: boolean;
+  /**
+   * Si se pintan las letras de verde o rojo segun acierten.
+   *
+   * En el curso va en false: el crucigrama llega del servidor SIN sus letras
+   * (solo la forma y las pistas), asi que aqui no hay contra que comparar.
+   * Dejarlo en true pintaria de rojo todo lo que el estudiante escriba.
+   * Ademas, marcar el acierto letra por letra convertiria el crucigrama en
+   * un juego de adivinar por prueba y error.
+   */
+  mostrarAciertos?: boolean;
+  /** Avisa hacia afuera lo que lleva escrito, para poder enviarlo. */
+  onCambio?: (letras: string[][]) => void;
 }
 
-export function CrosswordGrid({ content, showSolution = false, interactive = true }: Props) {
+export function CrosswordGrid({
+  content,
+  showSolution = false,
+  interactive = true,
+  mostrarAciertos = true,
+  onCambio,
+}: Props) {
   const { grid, rows, cols, numbered, across, down, placed } = content;
 
   // user input grid (uppercase letters)
@@ -27,6 +45,7 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
   }, [numbered]);
 
   const isCorrect = (r: number, c: number) => {
+    if (!mostrarAciertos) return null;
     const expected = grid[r][c];
     if (!expected) return null;
     const user = userGrid[r]?.[c]?.toUpperCase() || "";
@@ -35,13 +54,21 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
   };
 
   const allCorrect = useMemo(() => {
+    if (!mostrarAciertos) return false;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (grid[r][c] && userGrid[r][c]?.toUpperCase() !== grid[r][c]) return false;
       }
     }
     return true;
-  }, [userGrid, grid, rows, cols]);
+  }, [userGrid, grid, rows, cols, mostrarAciertos]);
+
+  // Se avisa despues de pintar, no dentro del manejador: asi el aviso sale
+  // una sola vez por cambio real y no en cada pulsacion de flecha.
+  useEffect(() => {
+    onCambio?.(userGrid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userGrid]);
 
   const handleChange = (r: number, c: number, val: string) => {
     const letter = val

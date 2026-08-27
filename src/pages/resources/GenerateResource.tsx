@@ -142,6 +142,17 @@ export default function GenerateResource() {
   // actualiza ese registro en vez de crear un duplicado.
   const [recursoId, setRecursoId] = useState<string | null>(null);
 
+  /*
+   * Si se borra el recurso que esta en pantalla, se limpia el visor. Dejarlo
+   * permitiria seguir editandolo y guardar sobre una fila que ya no existe.
+   */
+  const limpiarSiEsElAbierto = (id: string) => {
+    if (id !== recursoId) return;
+    setGeneratedContent(null);
+    setRecursoId(null);
+    setIsEditing(false);
+  };
+
   // Los mantiene el administrador desde el panel: el asesor pidio que
   // agregar una metodologia nueva no exigiera tocar el codigo.
   const SUBJECTS = useCatalogo("asignatura");
@@ -1026,6 +1037,7 @@ export default function GenerateResource() {
         onAbrir={abrirDelHistorial}
         activo={recursoId}
         titulo={`${currentType?.label || "Recursos"} anteriores`}
+        onBorrado={limpiarSiEsElAbierto}
       />
     </div>
   );

@@ -45,6 +45,16 @@ export default function Story() {
   const [searchParams, setSearchParams] = useSearchParams();
   const recursoParam = searchParams.get("recurso");
   const [content, setContent] = useState<StoryContent | null>(null);
+
+  /*
+   * Si se borra el cuento que esta en pantalla, se limpia el visor. Dejarlo
+   * permitiria seguir editandolo y guardar sobre una fila que ya no existe.
+   */
+  const limpiarSiEsElAbierto = (id: string) => {
+    if (id !== recursoId) return;
+    setContent(null);
+    setRecursoId(null);
+  };
   const [exportFormat, setExportFormat] = useState<"pdf" | "docx" | null>(null);
 
   const handleGenerate = async () => {
@@ -255,6 +265,7 @@ export default function Story() {
         onAbrir={abrirDelHistorial}
         activo={recursoId}
         titulo="Cuentos anteriores"
+        onBorrado={limpiarSiEsElAbierto}
       />
     </div>
   );

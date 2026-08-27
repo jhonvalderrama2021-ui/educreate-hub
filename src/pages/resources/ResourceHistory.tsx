@@ -15,6 +15,7 @@ import {
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
+import { BorrarRecurso } from "@/components/BorrarRecurso";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { rutaDelRecurso } from "@/lib/ruta-modulo";
 import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
@@ -122,23 +123,15 @@ export default function ResourceHistory() {
     }
   };
 
-  const deleteResource = async (id: string) => {
-    if (!confirm("¿Eliminar este recurso?")) return;
-    const prev = queryClient.getQueryData<Resource[]>(RESOURCES_QK(user?.id));
-    queryClient.setQueryData<Resource[]>(RESOURCES_QK(user?.id), (cur) =>
-      (cur || []).filter((r) => r.id !== id),
-    );
-    const { error } = await supabase
-      .from("generated_resources")
-      .delete()
-      .eq("id", id);
-    if (error) {
-      toast.error("Error al eliminar");
-      queryClient.setQueryData(RESOURCES_QK(user?.id), prev);
-      return;
-    }
-    toast.success("Recurso eliminado");
-  };
+  /*
+   * El borrado vive en BorrarRecurso, que antes de preguntar averigua si el
+   * recurso esta puesto en algun curso.
+   *
+   * Aqui se hacia con un confirm seco de una linea. El problema es lo que
+   * arrastra: las llaves de la base encadenan recurso -> fila del curso ->
+   * entregas, asi que borrar un examen ya aplicado borraba tambien las notas
+   * de los estudiantes, sin decirlo y sin vuelta atras.
+   */
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in space-y-6">
@@ -263,9 +256,12 @@ export default function ResourceHistory() {
                       >
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button variant="outline" size="sm" className="text-destructive" onClick={() => deleteResource(r.id)}>
-                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Eliminar
-                      </Button>
+                      <BorrarRecurso
+                        recursoId={r.id}
+                        titulo={r.title}
+                        claveCache={RESOURCES_QK(user?.id)}
+                        modo="boton"
+                      />
                     </div>
                     <div className="mb-3">
                       <AvisoContenidoIA meta={(r.content as any)?._meta} />

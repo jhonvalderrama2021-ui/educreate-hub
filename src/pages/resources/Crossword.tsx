@@ -61,6 +61,17 @@ export default function Crossword() {
   const [searchParams, setSearchParams] = useSearchParams();
   const recursoParam = searchParams.get("recurso");
   const [content, setContent] = useState<CrosswordContent | null>(null);
+
+  /*
+   * Si se borra el crucigrama que esta en pantalla, se limpia el visor.
+   * Dejarlo puesto permitiria seguir editandolo y pulsar guardar sobre una
+   * fila que ya no existe.
+   */
+  const limpiarSiEsElAbierto = (id: string) => {
+    if (id !== recursoId) return;
+    setContent(null);
+    setRecursoId(null);
+  };
   const [showSolution, setShowSolution] = useState(false);
   const [exportFormat, setExportFormat] = useState<"pdf" | "docx" | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -336,6 +347,7 @@ export default function Crossword() {
         onAbrir={abrirDelHistorial}
         activo={recursoId}
         titulo="Crucigramas anteriores"
+        onBorrado={limpiarSiEsElAbierto}
       />
     </div>
   );

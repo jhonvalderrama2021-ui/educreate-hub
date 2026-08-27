@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,20 @@ export default function BotChat() {
   const { botId } = useParams<{ botId: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [parametros] = useSearchParams();
+
+  /*
+   * A donde lleva la flecha de volver.
+   *
+   * El estudiante entra al bot desde su curso, asi que devolverlo a "Crear
+   * Bot" lo dejaba en un modulo que no es suyo y sin rastro de por donde
+   * habia entrado. Quien llego desde un curso vuelve al curso; quien llego
+   * desde la lista de bots vuelve a la lista.
+   */
+  const cursoDeOrigen = parametros.get("curso");
+  const volverA = cursoDeOrigen
+    ? `/resources/courses/${cursoDeOrigen}/student`
+    : "/resources/bots";
   const [bot, setBot] = useState<BotInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -55,7 +69,7 @@ export default function BotChat() {
       .maybeSingle();
     if (error || !data) {
       toast.error("Bot no encontrado");
-      navigate("/resources/bots");
+      navigate(volverA);
       return;
     }
     setBot(data);
@@ -120,7 +134,7 @@ export default function BotChat() {
     <div className="max-w-3xl mx-auto animate-fade-in flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="flex items-center gap-3 pb-4 border-b border-border shrink-0">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/resources/bots")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(volverA)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
