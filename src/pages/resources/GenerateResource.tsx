@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert } from "@/integrations/supabase/types";
-import { extractTextFromPDF } from "@/lib/pdf-extract";
+import { extraerTextoDeArchivo, ACEPTA } from "@/lib/extraer-texto";
 import { generateWithOpenAI, generateWithOllama, fetchOllamaModels } from "@/lib/ai-service";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { exportSlidesToPdf, exportSlidesToPptx } from "@/lib/slide-export";
@@ -13,6 +13,8 @@ import { SlideViewer } from "@/components/SlideViewer";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { useCatalogo } from "@/hooks/useCatalogo";
+import { useUserRole } from "@/hooks/useUserRole";
+import { esSoloDeDocente, NOMBRE_DEL_TIPO } from "@/lib/permisos";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 import { DialogoEditarRecurso } from "@/components/DialogoEditarRecurso";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
@@ -30,6 +32,8 @@ import {
   GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette, FilePlus,
 } from "lucide-react";
 
+// Ojo: esta lista es solo para el titulo y el icono. Quien puede generar
+// cada uno lo decide src/lib/permisos.ts, y lo hace cumplir el servidor.
 const RESOURCE_TYPES = [
   { value: "icfes", label: "Exámenes", icon: FileCheck },
   { value: "workshop", label: "Taller", icon: FileEdit },
@@ -82,6 +86,7 @@ const RESOURCE_FIELDS: Record<string, string[]> = {
 
 export default function GenerateResource() {
   const { user } = useAuth();
+  const { isDocente, loading: cargandoRol } = useUserRole();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
@@ -136,6 +141,17 @@ export default function GenerateResource() {
   // automatico) o al abrir uno del historial lateral. Mientras exista, guardar
   // actualiza ese registro en vez de crear un duplicado.
   const [recursoId, setRecursoId] = useState<string | null>(null);
+
+  /*
+   * Si se borra el recurso que esta en pantalla, se limpia el visor. Dejarlo
+   * permitiria seguir editandolo y guardar sobre una fila que ya no existe.
+   */
+  const limpiarSiEsElAbierto = (id: string) => {
+    if (id !== recursoId) return;
+    setGeneratedContent(null);
+    setRecursoId(null);
+    setIsEditing(false);
+  };
 
   // Los mantiene el administrador desde el panel: el asesor pidio que
   // agregar una metodologia nueva no exigiera tocar el codigo.
@@ -213,35 +229,15 @@ export default function GenerateResource() {
     }
   }, [customLevelCount, performanceLevels]);
 
-  const extractTextFromFile = async (file: File): Promise<string> => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") {
-      return await extractTextFromPDF(file);
-    } else if (ext === "txt") {
-      return await file.text();
-    } else if (ext === "docx" || ext === "doc") {
-      try {
-        const text = await file.text();
-        if (text && !text.includes('\0')) return text;
-      } catch {}
-      toast.info("Para archivos Word, se recomienda usar formato .txt o .pdf para mejores resultados");
-      return await file.text();
-    }
-    return await file.text();
-  };
-
   const handleFileUpload = useCallback(async (file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    const allowed = ["pdf", "txt", "docx", "doc"];
-    if (!allowed.includes(ext || "")) {
-      toast.error("Solo se permiten archivos PDF, Word (.docx) o texto (.txt)");
-      return;
-    }
-
     setUploadedFile(file);
     setExtractingFile(true);
     try {
-      const text = await extractTextFromFile(file);
+      // La lectura vive en src/lib/extraer-texto.ts. Antes el Word se
+      // "leia" con file.text(), que sobre un .docx devuelve el ZIP
+      // convertido a caracteres: el docente veia "48.213 caracteres
+      // extraidos" y creia que iba bien mientras al modelo le llegaba ruido.
+      const text = await extraerTextoDeArchivo(file);
       setFileText(text);
       toast.success(`Archivo procesado: ${text.length} caracteres extraídos`);
     } catch (e: any) {
@@ -261,9 +257,24 @@ export default function GenerateResource() {
     if (file) handleFileUpload(file);
   }, [handleFileUpload]);
 
+  /**
+   * Hay dos formas de crear un recurso, y son excluyentes:
+   *
+   *   a) llenando el formulario, donde el tema manda;
+   *   b) subiendo un documento, donde manda el documento.
+   *
+   * Exigir el tema en el segundo caso obligaba a inventarse uno, y ese tema
+   * inventado terminaba ganandole al archivo: se pedia un recurso sobre un
+   * PDF y salia sobre la palabra que se hubiera escrito para poder pasar de
+   * pantalla.
+   */
+  const hayDocumento = fileText.trim().length > 0;
+
   const validate = (): boolean => {
     const errors: string[] = [];
-    if (!tema.trim()) errors.push("El tema es obligatorio");
+    if (!tema.trim() && !hayDocumento) {
+      errors.push("Escribe el tema, o sube un documento para generar a partir de él");
+    }
     if (!subject) errors.push("La asignatura es obligatoria");
     if (subject === "Otras" && !customSubject.trim()) errors.push("Escribe la asignatura personalizada");
     if (methodology === "Otras" && extraFields.includes("methodology") && !customMethodology.trim()) {
@@ -289,7 +300,16 @@ export default function GenerateResource() {
     const resolvedMethodology = methodology === "Otras" ? customMethodology : methodology;
 
     const parts: string[] = [];
-    parts.push(`Tema: ${tema}`);
+    if (tema.trim()) {
+      parts.push(`Tema: ${tema}`);
+    } else if (hayDocumento) {
+      // Sin esta linea el modelo no sabe de que va el recurso y se inventa un
+      // tema; el nombre del archivo suele decirlo mejor que nada.
+      parts.push(
+        `Tema: el que trate el documento cargado${uploadedFile ? ` ("${uploadedFile.name.replace(/.[^.]+$/, "")}")` : ""}. ` +
+        `No inventes un tema distinto.`,
+      );
+    }
     parts.push(`Asignatura: ${resolvedSubject}`);
     parts.push(`Grado: ${grade}`);
     if (extraFields.includes("methodology") && resolvedMethodology) {
@@ -341,6 +361,10 @@ export default function GenerateResource() {
       const params: any = {
         resourceType: effectiveType,
         pdfContent: fileText || undefined,
+        // El documento manda cuando el docente no escribio tema: sin este
+        // aviso el servidor trata el archivo como material de apoyo y el
+        // recurso sale sobre otra cosa.
+        desdeDocumento: hayDocumento && !tema.trim(),
         instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
         numItems: resourceType === "slides" ? (numSlides || 8) : (numItems || 10),
       };
@@ -485,9 +509,41 @@ export default function GenerateResource() {
   const currentType = RESOURCE_TYPES.find((t) => t.value === resourceType);
   const TypeIcon = currentType?.icon || Sparkles;
 
+  // Un estudiante que escriba la direccion a mano —o que llegue por un enlace
+  // viejo— no debe encontrarse el formulario de examenes. El servidor ya lo
+  // rechaza con un 403, pero dejarle el formulario seria hacerle llenar algo
+  // que va a fallar al final, sin decirle por que.
+  const tipoVedado = !cargandoRol && esSoloDeDocente(resourceType) && !isDocente;
+
   // El visor de la página siempre muestra lo guardado. La edición vive en su
   // propio panel y solo escribe aquí cuando el docente guarda.
   const displayContent = generatedContent;
+
+  if (tipoVedado) {
+    return (
+      <div className="max-w-lg mx-auto animate-fade-in text-center py-16">
+        <div className="mx-auto h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mb-5">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <h1 className="text-xl font-bold text-foreground mb-2">
+          {NOMBRE_DEL_TIPO[resourceType] ?? "Este módulo"}: solo para docentes
+        </h1>
+        <p className="text-muted-foreground text-sm mb-6">
+          Este módulo lo usa tu docente para preparar las actividades del curso.
+          Tú puedes crear diapositivas, crucigramas, cuentos y bots, y responder
+          lo que tengas asignado en tus mini cursos.
+        </p>
+        <div className="flex gap-2 justify-center">
+          <Button variant="outline" onClick={() => window.location.assign("/resources/courses")}>
+            Ir a mis cursos
+          </Button>
+          <Button className="gradient-primary" onClick={() => window.location.assign("/resources/generate?type=slides")}>
+            Crear diapositivas
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     // El formulario a la izquierda y la franja con lo ya creado a la derecha,
@@ -530,8 +586,28 @@ export default function GenerateResource() {
           {/* Row 1: Tema + Título */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="campo-tema">Tema <span className="text-destructive">*</span></Label>
-              <Input id="campo-tema" value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ej: La fotosíntesis, Ecuaciones cuadráticas..." />
+              <Label htmlFor="campo-tema">
+                Tema {hayDocumento ? (
+                  <span className="text-muted-foreground font-normal">(opcional)</span>
+                ) : (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Input
+                id="campo-tema"
+                value={tema}
+                onChange={(e) => setTema(e.target.value)}
+                placeholder={hayDocumento
+                  ? "Se toma del documento"
+                  : "Ej: La fotosíntesis, Ecuaciones cuadráticas..."}
+              />
+              {hayDocumento && (
+                <p className="text-xs text-muted-foreground">
+                  {tema.trim()
+                    ? "Se usarán solo las partes del documento que traten este tema."
+                    : "El recurso saldrá del documento que subiste. Escribe un tema solo si quieres centrarlo en una parte."}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="campo-titulo">Título (opcional)</Label>
@@ -798,7 +874,7 @@ export default function GenerateResource() {
               <input
                 id="file-input"
                 type="file"
-                accept=".pdf,.docx,.doc,.txt"
+                accept={ACEPTA}
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -989,6 +1065,7 @@ export default function GenerateResource() {
         onAbrir={abrirDelHistorial}
         activo={recursoId}
         titulo={`${currentType?.label || "Recursos"} anteriores`}
+        onBorrado={limpiarSiEsElAbierto}
       />
     </div>
   );

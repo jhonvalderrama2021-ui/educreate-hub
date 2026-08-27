@@ -163,11 +163,32 @@ describe("Selección de pasajes del documento", () => {
     expect(r.texto).toContain("polígonos");
   });
 
-  it("sin consulta manda el documento completo: no hay con qué comparar", async () => {
+  it("sin consulta no vectoriza: no hay con qué comparar", async () => {
     const r = await seleccionarPasajes({
       texto: documentoLargo(), consulta: "   ", apiKey: "x",
     });
-    expect(r.metodo).toBe("completo");
+    // Sin tema no hay nada que puntuar, así que ni se llama a OpenAI.
+    expect(fetch).not.toHaveBeenCalled();
+    expect(r.texto).toContain("polígonos");
+  });
+
+  it("sin consulta se recorta al presupuesto en vez de mandar el documento entero", async () => {
+    /*
+     * Antes se devolvía el texto COMPLETO, sin tope. Eso pasó a importar
+     * cuando el docente pudo generar a partir de un documento sin escribir
+     * tema: es justo el caso sin consulta, y un manual de 150 KB se habría
+     * mandado entero en cada generación.
+     *
+     * El principio del documento es la mejor apuesta ciega —un documento
+     * suele decir de qué trata en sus primeras páginas— y sobre todo es
+     * acotada.
+     */
+    const r = await seleccionarPasajes({
+      texto: documentoLargo(), consulta: "", apiKey: "x", presupuesto: 5000,
+    });
+    expect(r.metodo).toBe("recorte");
+    expect(r.texto.length).toBe(5000);
+    expect(r.caracteresOriginales).toBeGreaterThan(5000);
     expect(fetch).not.toHaveBeenCalled();
   });
 

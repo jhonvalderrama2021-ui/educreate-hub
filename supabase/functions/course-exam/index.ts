@@ -7,6 +7,120 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+
+/*
+ * ─── CRUCIGRAMAS ─────────────────────────────────────────────────────────
+ *
+ * Un crucigrama no tiene `questions`, asi que la maquinaria de examenes lo
+ * leia como cero preguntas: el estudiante veia "Total de preguntas 0" y una
+ * pantalla sin nada que resolver.
+ *
+ * Se trata aparte, pero por el mismo camino: el estudiante NO puede leer el
+ * recurso directamente (la politica de la base lo impide justamente porque
+ * `grid` es la solucion escrita letra por letra), asi que el servidor le
+ * manda la forma y las pistas, y es el quien califica.
+ */
+
+function esCrucigrama(cr: any, resource: any): boolean {
+  return cr?.resource_type === "crossword" || resource?.resource_type === "crossword";
+}
+
+/** Las palabras colocadas, vengan en `placed` o repartidas en las pistas. */
+function palabrasDelCrucigrama(content: any): any[] {
+  if (Array.isArray(content?.placed) && content.placed.length) return content.placed;
+  const across = (content?.across ?? []).map((c: any) => ({ ...c, direction: "across" }));
+  const down = (content?.down ?? []).map((c: any) => ({ ...c, direction: "down" }));
+  return [...across, ...down];
+}
+
+/** Solo letras A-Z, sin tildes: es como se compara dentro de la cuadricula. */
+function normalizarLetra(v: unknown): string {
+  return String(v ?? "")
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-ZÑ]/g, "")
+    .slice(0, 1);
+}
+
+/**
+ * El crucigrama SIN sus letras: la forma, la numeracion y las pistas.
+ *
+ * Se manda `mascara` (que celdas se pueden escribir) en vez de `grid`, y de
+ * cada pista solo el numero, el texto y cuantas letras tiene. Los campos
+ * `word` y `display` se quedan en el servidor: son la respuesta.
+ */
+function crucigramaSinSolucion(content: any) {
+  const filas = Number(content?.rows) || 0;
+  const columnas = Number(content?.cols) || 0;
+  const grid = content?.grid ?? [];
+  const mascara: boolean[][] = Array.from({ length: filas }, (_, r) =>
+    Array.from({ length: columnas }, (_, c) => !!grid?.[r]?.[c]),
+  );
+  const pista = (c: any) => ({
+    number: c?.number,
+    clue: c?.clue ?? "",
+    longitud: String(c?.word ?? c?.display ?? "").replace(/[^A-Za-zÑñ]/g, "").length,
+  });
+  return {
+    theme: content?.theme ?? "",
+    difficulty: content?.difficulty ?? "",
+    rows: filas,
+    cols: columnas,
+    numbered: content?.numbered ?? [],
+    mascara,
+    across: (content?.across ?? []).map(pista),
+    down: (content?.down ?? []).map(pista),
+  };
+}
+
+/**
+ * Califica por PALABRAS completas, no por letras sueltas.
+ *
+ * Contar letras premiaria rellenar la cuadricula al azar: en un crucigrama
+ * de cinco letras por palabra, escribir vocales a ciegas ya daria puntos.
+ * Una palabra vale si esta entera y bien.
+ */
+function calificarCrucigrama(content: any, respuestas: any) {
+  const grid = content?.grid ?? [];
+  const escritas: string[][] = Array.isArray(respuestas) ? respuestas : [];
+  const palabras = palabrasDelCrucigrama(content);
+
+  let aciertos = 0;
+  const detalle = palabras.map((p: any, i: number) => {
+    const fila = Number(p?.row) || 0;
+    const col = Number(p?.col) || 0;
+    const haciaAbajo = String(p?.direction) === "down";
+    const esperada = String(p?.word ?? p?.display ?? "").replace(/[^A-Za-zÑñ]/g, "").toUpperCase();
+
+    let escrita = "";
+    let bien = esperada.length > 0;
+    for (let k = 0; k < esperada.length; k++) {
+      const r = haciaAbajo ? fila + k : fila;
+      const c = haciaAbajo ? col : col + k;
+      const letra = normalizarLetra(escritas?.[r]?.[c]);
+      escrita += letra || "·";
+      const correcta = normalizarLetra(grid?.[r]?.[c]) || esperada[k];
+      if (letra !== correcta) bien = false;
+    }
+    if (bien) aciertos++;
+
+    return {
+      i,
+      numero: p?.number ?? i + 1,
+      direccion: haciaAbajo ? "Vertical" : "Horizontal",
+      pista: p?.clue ?? "",
+      ok: bien,
+      escrita,
+      // La respuesta correcta solo se adjunta si el docente dejo la
+      // retroalimentacion activada; quien decide eso es el, no esta funcion.
+      esperada,
+    };
+  });
+
+  return { score: aciertos, max: palabras.length, detalle };
+}
+
 function normalizeQuestions(content: any): any[] {
   if (!content) return [];
   if (Array.isArray(content)) return content;
@@ -240,6 +354,25 @@ serve(async (req) => {
       }
     }
 
+    const infoDelRecurso = {
+      id: cr.id,
+      course_id: cr.course_id,
+      title: cr.title,
+      time_limit_minutes: cr.time_limit_minutes,
+      shuffle_questions: cr.shuffle_questions,
+      show_grade: cr.show_grade,
+      show_feedback: cr.show_feedback,
+      resource_type: cr.resource_type,
+    };
+
+    if (action === "get" && esCrucigrama(cr, resource)) {
+      return new Response(JSON.stringify({
+        courseResource: infoDelRecurso,
+        questions: [],
+        crucigrama: crucigramaSinSolucion(resource.content),
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (action === "get") {
       // Strip correct answers and explanations before returning to student
       const safeQuestions = questions.map((q: any) => {
@@ -274,6 +407,42 @@ serve(async (req) => {
       }
       const answers = body.answers ?? {};
       const timeSpent = Math.max(0, Math.floor(Number(body.timeSpentSeconds) || 0));
+
+      if (esCrucigrama(cr, resource)) {
+        const { score: aciertos, max: total, detalle } = calificarCrucigrama(resource.content, answers);
+
+        const { count: intentosCrucigrama } = await admin
+          .from("resource_submissions")
+          .select("id", { count: "exact", head: true })
+          .eq("course_resource_id", cr.id)
+          .eq("student_id", userId);
+
+        const { error: errCrucigrama } = await admin.from("resource_submissions").insert({
+          course_resource_id: cr.id,
+          course_id: cr.course_id,
+          student_id: userId,
+          resource_type: cr.resource_type,
+          attempt_number: (intentosCrucigrama ?? 0) + 1,
+          answers,
+          score: aciertos,
+          max_score: total,
+          time_spent_seconds: timeSpent,
+          feedback: detalle,
+        });
+        if (errCrucigrama) throw errCrucigrama;
+
+        return new Response(JSON.stringify({
+          score: aciertos,
+          max: total,
+          showGrade: cr.show_grade,
+          showFeedback: cr.show_feedback,
+          // Sin retroalimentacion no se manda el detalle: ahi van las
+          // palabras correctas, y con varios intentos permitidos seria
+          // regalar el crucigrama en el primero.
+          feedback: cr.show_feedback ? detalle : null,
+          esCrucigrama: true,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       let score = 0;
       const max = questions.length;

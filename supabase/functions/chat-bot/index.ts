@@ -98,12 +98,15 @@ serve(async (req) => {
     }
 
     // Get bot info
+    // El cliente se creo con el JWT de quien llama, asi que las politicas de
+    // la base son las que deciden si puede ver este bot: por ser suyo, o por
+    // estar inscrito en un curso donde el docente lo puso. Comprobarlo aqui
+    // ademas con user_id dejaria fuera al estudiante del curso.
     const { data: bot, error: botError } = await supabase
       .from("bots")
       .select("*")
       .eq("id", botId)
-      .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (botError || !bot) {
       return new Response(JSON.stringify({ error: "Bot no encontrado" }), {

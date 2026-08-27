@@ -190,6 +190,45 @@ test("el estudiante entra y ve sus cursos sin reventar", async ({ page }) => {
   expect(errores).toEqual([]);
 });
 
+test("el panel principal del estudiante no ofrece módulos de docente", async ({ page }) => {
+  // El docente lo encontro probando: en el menu lateral el estudiante veia
+  // solo lo suyo, pero al entrar a "dashboard" le aparecian todos los
+  // modulos y podia crear examenes y planes de clase.
+  const errores = vigilar(page);
+  await entrar(page, estudiante);
+  await page.goto("/dashboard");
+  await expect(page.getByText(/Tu espacio/i)).toBeVisible({ timeout: 20_000 });
+
+  for (const vedado of [/Examen ICFES/i, /Plan de clase/i, /Rúbrica/i]) {
+    await expect(page.getByRole("link", { name: vedado })).toHaveCount(0);
+  }
+  // Y conserva lo que si es suyo
+  await expect(page.getByRole("link", { name: /Mis cursos/i })).toBeVisible();
+
+  expect(errores).toEqual([]);
+});
+
+test("un estudiante que escribe la dirección de exámenes no ve el formulario", async ({ page }) => {
+  // Ocultar el enlace no basta: la direccion se puede escribir a mano o
+  // llegar por un enlace viejo. El servidor ya responde 403, pero dejarle
+  // llenar el formulario para fallar al final seria hacerle perder el tiempo
+  // sin decirle por que.
+  await entrar(page, estudiante);
+  await page.goto("/resources/generate?type=icfes");
+  await expect(page.getByText(/solo para docentes/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel(/^Tema/)).toHaveCount(0);
+});
+
+test("la portada de recursos del estudiante no lista módulos de docente", async ({ page }) => {
+  await entrar(page, estudiante);
+  await page.goto("/resources");
+  await expect(page.getByText(/Centro de Recursos/i).first()).toBeVisible({ timeout: 20_000 });
+  for (const vedado of ["Exámenes", "Talleres", "Planes de clase", "Rúbricas"]) {
+    await expect(page.getByText(vedado, { exact: true })).toHaveCount(0);
+  }
+  await expect(page.getByText("Mis cursos", { exact: true })).toBeVisible();
+});
+
 test("un estudiante no puede entrar al panel de administración", async ({ page }) => {
   await entrar(page, estudiante);
   await page.goto("/admin");

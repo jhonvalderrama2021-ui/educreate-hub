@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +8,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import {
   FileText, Plus, Users, BarChart3, ArrowRight, Sparkles,
-  BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, TrendingUp
+  BookOpen, ClipboardList, Table2, FileCheck, HelpCircle, FileEdit, TrendingUp,
+  Presentation, Puzzle, BookText, Bot
 } from "lucide-react";
 import { CalendarPopover } from "@/components/CalendarPopover";
 
@@ -31,6 +33,7 @@ const RECENT_TYPE_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
+  const { isDocente } = useUserRole();
   const navigate = useNavigate();
 
   const [totalResources, setTotalResources] = useState(0);
@@ -121,7 +124,9 @@ export default function Dashboard() {
             ¡Hola, {displayName}! 👋
           </h1>
           <p className="text-muted-foreground mt-1">
-            Aquí tienes un resumen de tu actividad educativa.
+            {isDocente
+              ? "Aquí tienes un resumen de tu actividad educativa."
+              : "Aquí tienes tus cursos y lo que has creado."}
           </p>
         </div>
 
@@ -182,7 +187,7 @@ export default function Dashboard() {
                 <div className="p-10 text-center">
                   <FileText className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
                   <p className="text-muted-foreground text-sm">Aún no has creado recursos</p>
-                  <Link to="/resources/generate">
+                  <Link to={isDocente ? "/resources/generate" : "/resources/generate?type=slides"}>
                     <Button size="sm" className="mt-3 gradient-primary">
                       <Sparkles className="h-3.5 w-3.5 mr-1" /> Crear primero
                     </Button>
@@ -214,16 +219,29 @@ export default function Dashboard() {
             <div className="rounded-xl border border-border bg-card shadow-sm p-5">
               <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
                 <Plus className="h-4 w-4 text-primary" />
-                Acciones rápidas
+                {isDocente ? "Acciones rápidas" : "Tu espacio"}
               </h3>
               <div className="space-y-2">
-                {[
-                  { label: "Generar con IA", icon: Sparkles, to: "/resources/generate" },
-                  { label: "Examen ICFES", icon: FileCheck, to: "/resources/generate?type=icfes" },
-                  { label: "Plan de clase", icon: ClipboardList, to: "/resources/generate?type=lesson_plan" },
-                  { label: "Rúbrica", icon: Table2, to: "/resources/generate?type=rubric" },
-                  { label: "Cuestionario", icon: HelpCircle, to: "/resources/generate?type=quiz" },
-                ].map((action) => (
+                {/* El estudiante veia aqui los mismos accesos que el docente y
+                    podia crear examenes y planes de clase: el menu lateral si
+                    los ocultaba, pero este panel no miraba el rol. Ahora cada
+                    quien ve lo que le corresponde. */}
+                {(isDocente
+                  ? [
+                      { label: "Generar con IA", icon: Sparkles, to: "/resources/generate" },
+                      { label: "Examen ICFES", icon: FileCheck, to: "/resources/generate?type=icfes" },
+                      { label: "Plan de clase", icon: ClipboardList, to: "/resources/generate?type=lesson_plan" },
+                      { label: "Rúbrica", icon: Table2, to: "/resources/generate?type=rubric" },
+                      { label: "Mis mini cursos", icon: BookOpen, to: "/resources/courses" },
+                    ]
+                  : [
+                      { label: "Mis cursos", icon: BookOpen, to: "/resources/courses" },
+                      { label: "Diapositivas", icon: Presentation, to: "/resources/generate?type=slides" },
+                      { label: "Crucigrama", icon: Puzzle, to: "/resources/crossword" },
+                      { label: "Crear cuento", icon: BookText, to: "/resources/story" },
+                      { label: "Mis bots", icon: Bot, to: "/resources/bots" },
+                    ]
+                ).map((action) => (
                   <Link key={action.label} to={action.to}>
                     <Button variant="ghost" className="w-full justify-start h-10 text-sm font-normal hover:bg-primary/5 hover:text-primary">
                       <action.icon className="h-4 w-4 mr-2.5 text-primary" />

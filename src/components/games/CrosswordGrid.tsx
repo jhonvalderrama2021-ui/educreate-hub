@@ -6,9 +6,27 @@ interface Props {
   content: CrosswordContent;
   showSolution?: boolean;
   interactive?: boolean;
+  /**
+   * Si se pintan las letras de verde o rojo segun acierten.
+   *
+   * En el curso va en false: el crucigrama llega del servidor SIN sus letras
+   * (solo la forma y las pistas), asi que aqui no hay contra que comparar.
+   * Dejarlo en true pintaria de rojo todo lo que el estudiante escriba.
+   * Ademas, marcar el acierto letra por letra convertiria el crucigrama en
+   * un juego de adivinar por prueba y error.
+   */
+  mostrarAciertos?: boolean;
+  /** Avisa hacia afuera lo que lleva escrito, para poder enviarlo. */
+  onCambio?: (letras: string[][]) => void;
 }
 
-export function CrosswordGrid({ content, showSolution = false, interactive = true }: Props) {
+export function CrosswordGrid({
+  content,
+  showSolution = false,
+  interactive = true,
+  mostrarAciertos = true,
+  onCambio,
+}: Props) {
   const { grid, rows, cols, numbered, across, down, placed } = content;
 
   // user input grid (uppercase letters)
@@ -27,6 +45,7 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
   }, [numbered]);
 
   const isCorrect = (r: number, c: number) => {
+    if (!mostrarAciertos) return null;
     const expected = grid[r][c];
     if (!expected) return null;
     const user = userGrid[r]?.[c]?.toUpperCase() || "";
@@ -35,13 +54,21 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
   };
 
   const allCorrect = useMemo(() => {
+    if (!mostrarAciertos) return false;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (grid[r][c] && userGrid[r][c]?.toUpperCase() !== grid[r][c]) return false;
       }
     }
     return true;
-  }, [userGrid, grid, rows, cols]);
+  }, [userGrid, grid, rows, cols, mostrarAciertos]);
+
+  // Se avisa despues de pintar, no dentro del manejador: asi el aviso sale
+  // una sola vez por cambio real y no en cada pulsacion de flecha.
+  useEffect(() => {
+    onCambio?.(userGrid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userGrid]);
 
   const handleChange = (r: number, c: number, val: string) => {
     const letter = val
@@ -109,9 +136,21 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[auto_1fr] gap-6">
+      {/*
+        La cuadrícula arriba y las pistas debajo, no al lado.
+
+        Antes iban en dos columnas, `[auto_1fr]`: la cuadrícula pedía su ancho
+        natural y con un crucigrama de dieciséis columnas se quedaba con casi
+        todo, dejando a las pistas una franja donde cabía una palabra por
+        línea. Los propios títulos "HORIZONTALES" y "VERTICALES" se montaban
+        uno encima del otro y las pistas eran ilegibles.
+
+        Debajo es además como se imprimen los crucigramas, y deja la
+        cuadrícula tan ancha como necesite.
+      */}
+      <div className="space-y-6">
         {/* Grid */}
-        <div className="overflow-auto">
+        <div className="overflow-x-auto">
           <div
             className="inline-grid bg-foreground/80 p-px rounded-md"
             style={{
@@ -180,23 +219,40 @@ export function CrosswordGrid({ content, showSolution = false, interactive = tru
         </div>
 
         {/* Clues */}
-        <div className="grid sm:grid-cols-2 gap-4 text-sm">
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 uppercase tracking-wide text-xs">Horizontales</h3>
-            <ol className="space-y-1 text-muted-foreground">
-              {across.map((c) => (
-                <li key={`a-${c.number}`}><span className="font-semibold text-foreground">{c.number}.</span> {c.clue}</li>
-              ))}
-            </ol>
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground mb-2 uppercase tracking-wide text-xs">Verticales</h3>
-            <ol className="space-y-1 text-muted-foreground">
-              {down.map((c) => (
-                <li key={`d-${c.number}`}><span className="font-semibold text-foreground">{c.number}.</span> {c.clue}</li>
-              ))}
-            </ol>
-          </div>
+        <div className="grid gap-6 sm:grid-cols-2 text-sm">
+          {([
+            ["Horizontales", across, "a"],
+            ["Verticales", down, "d"],
+          ] as const).map(([encabezado, lista, prefijo]) => (
+            <div key={prefijo} className="min-w-0">
+              <h3 className="font-semibold text-foreground mb-2 uppercase tracking-wide text-xs">
+                {encabezado}
+              </h3>
+              <ol className="space-y-1.5 text-muted-foreground">
+                {lista.map((c) => (
+                  <li key={`${prefijo}-${c.number}`} className="flex gap-2">
+                    <span className="font-semibold text-foreground shrink-0 tabular-nums">
+                      {c.number}.
+                    </span>
+                    {/* min-w-0 en el <li> y aqui: sin eso el texto largo de
+                        una pista ensancha la columna y vuelve a descuadrar
+                        todo, que es el fallo que se acaba de arreglar. */}
+                    <span className="min-w-0">
+                      {c.clue}
+                      {/* Cuantas letras tiene. Es la ayuda de siempre en un
+                          crucigrama y no revela nada: en el curso la palabra
+                          llega enmascarada y solo se conserva su largo. */}
+                      {c.word?.length > 0 && (
+                        <span className="text-muted-foreground/60 ml-1 whitespace-nowrap">
+                          ({c.word.length})
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
         </div>
       </div>
     </div>
