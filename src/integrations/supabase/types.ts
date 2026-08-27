@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -336,6 +336,61 @@ export type Database = {
           valor?: string
         }
         Relationships: []
+      }
+      course_bots: {
+        Row: {
+          bot_id: string
+          course_id: string
+          created_at: string
+          descripcion: string | null
+          id: string
+          position: number
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          bot_id: string
+          course_id: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          position?: number
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bot_id?: string
+          course_id?: string
+          created_at?: string
+          descripcion?: string | null
+          id?: string
+          position?: number
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_bots_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_bots_bot_id_fkey"
+            columns: ["bot_id"]
+            isOneToOne: false
+            referencedRelation: "bots_con_documentos"
+            referencedColumns: ["bot_id"]
+          },
+          {
+            foreignKeyName: "course_bots_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "mini_courses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       course_enrollments: {
         Row: {
@@ -891,6 +946,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      bot_esta_en_mi_curso: {
+        Args: { _bot_id: string; _user_id: string }
+        Returns: boolean
+      }
       buscar_en_documentos_bot: {
         Args: { p_bot_id: string; p_embedding: string; p_limite?: number }
         Returns: {
@@ -961,6 +1020,10 @@ export type Database = {
         Returns: boolean
       }
       join_course_by_code: { Args: { _code: string }; Returns: string }
+      recurso_visible_en_mi_curso: {
+        Args: { _resource_id: string; _user_id: string }
+        Returns: boolean
+      }
       registrar_acceso: { Args: never; Returns: string }
       resumen_accesos: {
         Args: { p_dias?: number }

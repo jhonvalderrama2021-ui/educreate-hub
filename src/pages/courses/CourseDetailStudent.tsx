@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  ArrowLeft, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, FileText, CheckCircle2, Lock,
+  ArrowLeft, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, FileText, CheckCircle2, Lock, Bot, MessageSquare,
 } from "lucide-react";
 import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/courses-types";
 
@@ -52,6 +52,25 @@ export default function CourseDetailStudent() {
         .eq("course_id", courseId!).eq("student_id", user!.id);
       if (error) throw error;
       return data as ResourceSubmission[];
+    },
+  });
+
+  // Los bots que el docente puso en este curso. Se puede preguntar a
+  // cualquier hora, sin esperar a que el docente conteste.
+  const { data: bots = [] } = useQuery({
+    queryKey: ["course_bots_student", courseId],
+    enabled: !!courseId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("course_bots")
+        .select("id, bot_id, titulo, descripcion, bots(name, specialty)")
+        .eq("course_id", courseId!)
+        .order("position", { ascending: true });
+      if (error) throw error;
+      return (data ?? []) as unknown as Array<{
+        id: string; bot_id: string; titulo: string | null; descripcion: string | null;
+        bots: { name: string; specialty: string | null } | null;
+      }>;
     },
   });
 
@@ -127,6 +146,33 @@ export default function CourseDetailStudent() {
           })
         )}
       </div>
+
+      {bots.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+            Pregúntale al bot del curso
+          </h2>
+          {bots.map((cb) => (
+            <div key={cb.id} className="glass-card rounded-lg p-4 flex items-center gap-3">
+              <Bot className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-foreground line-clamp-1">
+                  {cb.titulo || cb.bots?.name || "Bot del curso"}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                  {cb.descripcion || cb.bots?.specialty || "Resuelve tus dudas de la clase"}
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate(`/resources/bot-chat/${cb.bot_id}?curso=${courseId}`)}
+                className="gradient-primary shrink-0"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />Conversar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

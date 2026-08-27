@@ -44,11 +44,14 @@ export default function BotChat() {
   }, [messages]);
 
   const loadBot = async () => {
+    // Sin filtro por dueño a proposito: quien puede ver este bot lo decide
+    // la base de datos. Es tuyo, o tu docente lo puso en un curso donde estas
+    // inscrito. Si no es ninguna de las dos, la consulta no devuelve nada y
+    // se cae al mensaje de "no encontrado", que es justo lo que debe pasar.
     const { data, error } = await supabase
       .from("bots")
       .select("id, name, specialty")
       .eq("id", botId!)
-      .eq("user_id", user!.id)
       .maybeSingle();
     if (error || !data) {
       toast.error("Bot no encontrado");

@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
+import { exigirPermisoDeGeneracion, SinPermisoError } from "../_compartido/permisos.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -161,6 +162,13 @@ serve(async (req) => {
 
     const apiKey = setting.value as string;
 
+    // ── Quien pide, puede pedir esto? ──────────────────────────────────
+    // Antes de cobrar y antes de gastar la clave de OpenAI. Se comprobo con
+    // un estudiante real: llamando esta API a mano generaba examenes
+    // completos con su hoja de respuestas. El menu lateral ya no se los
+    // muestra, pero ocultar un boton no cierra la puerta.
+    await exigirPermisoDeGeneracion(supabaseAdmin, userData.user.id, resourceType);
+
     // ── Tokens ─────────────────────────────────────────────────────────
     // Se cobra antes de llamar a OpenAI. Si algo falla despues, se devuelve
     // en el catch: el docente no debe pagar una generacion que no recibio.
@@ -314,6 +322,15 @@ serve(async (req) => {
     if (e instanceof SinTokensError) {
       return new Response(JSON.stringify({ error: e.message, sinTokens: true }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Se sale antes de la devolucion: la comprobacion de rol ocurre antes de
+    // cobrar, asi que no hay nada que devolver y anotar un movimiento de cero
+    // solo ensuciaria el historial que revisa el administrador.
+    if (e instanceof SinPermisoError) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

@@ -13,6 +13,8 @@ import { SlideViewer } from "@/components/SlideViewer";
 import { AvisoContenidoIA } from "@/components/AvisoContenidoIA";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { useCatalogo } from "@/hooks/useCatalogo";
+import { useUserRole } from "@/hooks/useUserRole";
+import { esSoloDeDocente, NOMBRE_DEL_TIPO } from "@/lib/permisos";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
 import { DialogoEditarRecurso } from "@/components/DialogoEditarRecurso";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
@@ -30,6 +32,8 @@ import {
   GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette, FilePlus,
 } from "lucide-react";
 
+// Ojo: esta lista es solo para el titulo y el icono. Quien puede generar
+// cada uno lo decide src/lib/permisos.ts, y lo hace cumplir el servidor.
 const RESOURCE_TYPES = [
   { value: "icfes", label: "Exámenes", icon: FileCheck },
   { value: "workshop", label: "Taller", icon: FileEdit },
@@ -82,6 +86,7 @@ const RESOURCE_FIELDS: Record<string, string[]> = {
 
 export default function GenerateResource() {
   const { user } = useAuth();
+  const { isDocente, loading: cargandoRol } = useUserRole();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
@@ -485,9 +490,41 @@ export default function GenerateResource() {
   const currentType = RESOURCE_TYPES.find((t) => t.value === resourceType);
   const TypeIcon = currentType?.icon || Sparkles;
 
+  // Un estudiante que escriba la direccion a mano —o que llegue por un enlace
+  // viejo— no debe encontrarse el formulario de examenes. El servidor ya lo
+  // rechaza con un 403, pero dejarle el formulario seria hacerle llenar algo
+  // que va a fallar al final, sin decirle por que.
+  const tipoVedado = !cargandoRol && esSoloDeDocente(resourceType) && !isDocente;
+
   // El visor de la página siempre muestra lo guardado. La edición vive en su
   // propio panel y solo escribe aquí cuando el docente guarda.
   const displayContent = generatedContent;
+
+  if (tipoVedado) {
+    return (
+      <div className="max-w-lg mx-auto animate-fade-in text-center py-16">
+        <div className="mx-auto h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mb-5">
+          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <h1 className="text-xl font-bold text-foreground mb-2">
+          {NOMBRE_DEL_TIPO[resourceType] ?? "Este módulo"}: solo para docentes
+        </h1>
+        <p className="text-muted-foreground text-sm mb-6">
+          Este módulo lo usa tu docente para preparar las actividades del curso.
+          Tú puedes crear diapositivas, crucigramas, cuentos y bots, y responder
+          lo que tengas asignado en tus mini cursos.
+        </p>
+        <div className="flex gap-2 justify-center">
+          <Button variant="outline" onClick={() => window.location.assign("/resources/courses")}>
+            Ir a mis cursos
+          </Button>
+          <Button className="gradient-primary" onClick={() => window.location.assign("/resources/generate?type=slides")}>
+            Crear diapositivas
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     // El formulario a la izquierda y la franja con lo ya creado a la derecha,

@@ -16,7 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus, Inbox, Clock,
+  ArrowLeft, Plus, Trash2, Settings, Users, FileText, Copy, UserPlus, FileCheck, Puzzle, BookText, FileEdit, Presentation, ClipboardList, Table2, CopyPlus, Inbox, Clock, Bot,
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAccessCode } from "@/lib/courses-types";
@@ -24,6 +24,7 @@ import type { CourseResource, MiniCourse, ResourceSubmission } from "@/lib/cours
 import { PanelEstudiantesCurso } from "@/components/PanelEstudiantesCurso";
 import { RevisarEntregas } from "@/components/RevisarEntregas";
 import { ConexionesDelCurso } from "@/components/ConexionesDelCurso";
+import { BotsDelCurso } from "@/components/BotsDelCurso";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -168,6 +169,7 @@ export default function CourseDetailTeacher() {
           {resources.some((r) => r.requiere_entrega) && (
             <TabsTrigger value="entregas"><Inbox className="h-4 w-4 mr-2" />Trabajos recibidos</TabsTrigger>
           )}
+          <TabsTrigger value="bots"><Bot className="h-4 w-4 mr-2" />Bots</TabsTrigger>
           <TabsTrigger value="conexiones"><Clock className="h-4 w-4 mr-2" />Conexiones</TabsTrigger>
         </TabsList>
 
@@ -212,6 +214,12 @@ export default function CourseDetailTeacher() {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="bots" className="space-y-4 mt-4">
+          {/* Un bot entrenado con el material de la clase, para que el
+              estudiante pregunte a cualquier hora sin esperar al docente. */}
+          <BotsDelCurso courseId={courseId!} />
         </TabsContent>
 
         <TabsContent value="conexiones" className="space-y-4 mt-4">
