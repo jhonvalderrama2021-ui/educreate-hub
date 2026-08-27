@@ -119,8 +119,14 @@ export default function TakeCourseExam() {
       grid: crucigrama.mascara.map((fila) => fila.map((activa) => (activa ? "·" : ""))),
       numbered: crucigrama.numbered,
       placed: [],
-      across: crucigrama.across.map((c) => ({ number: c.number, clue: c.clue, word: "", display: "" })),
-      down: crucigrama.down.map((c) => ({ number: c.number, clue: c.clue, word: "", display: "" })),
+      // La palabra llega enmascarada: se conserva su LARGO, que es la ayuda
+      // de siempre en un crucigrama, sin revelar ninguna letra.
+      across: crucigrama.across.map((c) => ({
+        number: c.number, clue: c.clue, word: "?".repeat(c.longitud), display: "",
+      })),
+      down: crucigrama.down.map((c) => ({
+        number: c.number, clue: c.clue, word: "?".repeat(c.longitud), display: "",
+      })),
     };
   }, [crucigrama]);
 

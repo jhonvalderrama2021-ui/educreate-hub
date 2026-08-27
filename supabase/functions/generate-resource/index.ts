@@ -110,7 +110,22 @@ serve(async (req) => {
 
     // ────────────────────────────────────────────────────────────
 
-    const { resourceType, pdfContent, instructions, numItems, theme } = await leerJson(req);
+    const { resourceType, pdfContent, instructions, numItems, theme, desdeDocumento } =
+      await leerJson(req);
+
+    /*
+     * Hay dos formas de pedir un recurso, y cambian quien manda:
+     *
+     *   - Con tema escrito: el documento, si lo hay, es material de apoyo y
+     *     se le sacan los pasajes que traten ese tema.
+     *   - Sin tema, solo con documento: el documento ES el recurso. El
+     *     docente subio un PDF y espera que salga de ahi.
+     *
+     * Se comprueba tambien que haya documento de verdad: la señal viene del
+     * navegador y sin archivo no significaria nada.
+     */
+    const mandaElDocumento =
+      desdeDocumento === true && typeof pdfContent === "string" && pdfContent.trim().length > 0;
 
     // ─── INPUT VALIDATION ───────────────────────────────────────
     const ALLOWED_TYPES = new Set([
@@ -182,9 +197,14 @@ serve(async (req) => {
     // completa del area y pedia un taller de fracciones, el modelo tenia que
     // encontrar esas tres paginas entre cien. Ahora se eligen los pasajes
     // relacionados con lo que pidio.
+    //
+    // Salvo cuando el documento manda: ahi no hay tema contra el cual elegir,
+    // y filtrar por las instrucciones —que solo dicen asignatura y grado—
+    // dejaria fuera justo lo que se quiere usar. Va el documento tal cual, y
+    // el recorte por presupuesto lo hace la propia seleccion.
     const seleccion = await seleccionarPasajes({
       texto: typeof pdfContent === "string" ? pdfContent : "",
-      consulta: typeof instructions === "string" ? instructions : "",
+      consulta: mandaElDocumento ? "" : (typeof instructions === "string" ? instructions : ""),
       apiKey,
     });
     const documentoFuente = seleccion.texto;
@@ -201,6 +221,7 @@ serve(async (req) => {
         instructions: instructions || "",
         pdfContent: hasSourcePdf ? documentoFuente : "",
         total,
+        mandaElDocumento: mandaElDocumento && hasSourcePdf,
       });
 
       // Phase 2 — One LLM call per slide, in parallel (faster + more variety)
@@ -239,21 +260,37 @@ serve(async (req) => {
     // ============================================================
     const systemPrompt = getSystemPrompt(resourceType, numItems || 10);
     const userParts: string[] = [];
-    if (instructions) userParts.push(`Instrucciones del docente: ${instructions}`);
+    if (instructions) {
+      userParts.push(
+        mandaElDocumento
+          // Sin tema, esto ya no es "lo que se pidió" sino los datos del
+          // curso. Anunciarlo como instrucciones invitaría al modelo a
+          // tratarlas como el encargo y a buscarse un tema por su cuenta.
+          ? `Datos del curso (asignatura, grado y demás): ${instructions}`
+          : `Instrucciones del docente: ${instructions}`,
+      );
+    }
 
     // Cuando hay documento fuente, el recurso debe salir de él. Sin esta
     // instrucción explícita el modelo tendía a producir contenido genérico
     // sobre el tema y a ignorar el material que el docente había cargado.
     if (documentoFuente) {
-      userParts.push(
+      const bloque =
         `\n=== DOCUMENTO FUENTE ===\n` +
         `El siguiente material fue cargado por el docente y es la BASE OBLIGATORIA del recurso.\n` +
+        (mandaElDocumento
+          ? `El docente NO escribió un tema: el tema es el que trate este documento. No inventes otro.\n`
+          : "") +
         `Genera el contenido a partir de la información, los conceptos, los datos y los ejemplos que aparecen aquí.\n` +
         `No produzcas contenido genérico sobre el tema: usa ESTE documento.\n` +
         `Si el documento no alcanza para cubrir todo lo solicitado, apóyate en él en lo que sí cubre y complementa el resto de forma coherente con su enfoque.\n\n` +
         `${documentoFuente}\n` +
-        `=== FIN DEL DOCUMENTO FUENTE ===`,
-      );
+        `=== FIN DEL DOCUMENTO FUENTE ===`;
+
+      // Cuando el documento manda va primero: lo que abre el mensaje pesa
+      // más que lo que lo cierra.
+      if (mandaElDocumento) userParts.unshift(bloque);
+      else userParts.push(bloque);
     }
     if (!documentoFuente && !instructions)
       userParts.push("Genera contenido educativo de ejemplo sobre un tema general apropiado.");
@@ -360,9 +397,9 @@ serve(async (req) => {
 // PHASE 1: OUTLINE — assigns layout + image flag per slide
 // ============================================================
 async function generateOutline(apiKey: string, args: {
-  instructions: string; pdfContent: string; total: number;
+  instructions: string; pdfContent: string; total: number; mandaElDocumento?: boolean;
 }) {
-  const { instructions, pdfContent, total } = args;
+  const { instructions, pdfContent, total, mandaElDocumento } = args;
 
   // Layouts available in the middle pool — heavy variety with new creative ones.
   const middleLayouts = [
@@ -393,7 +430,33 @@ REGLAS:
 4. El "imageQuery" debe ser muy específico al sub-tema en INGLÉS, 3-5 palabras (ej: "amazon rainforest canopy birds", "ancient maya pyramid stones"). NO genérico.
 5. El "summary" debe ser concreto y educativamente útil — describe el ÁNGULO único de esa slide.`;
 
-  const userPrompt = `Instrucciones del docente:\n${instructions}\n\n${pdfContent ? `Documento fuente (extracto):\n${pdfContent.slice(0, 6000)}` : "Sin documento fuente — usa conocimiento general riguroso."}`;
+  /*
+   * Cuando el documento manda va PRIMERO y encabezado como obligatorio.
+   *
+   * Antes iba siempre al final, presentado como "Documento fuente
+   * (extracto)" y recortado a 6.000 caracteres, detrás de unas instrucciones
+   * que empezaban por "Tema: ...". El modelo hacía lo razonable: obedecer el
+   * tema y mirar el documento de reojo. Un docente subió un PDF, el
+   * formulario le exigió un tema, escribió una palabra cualquiera para poder
+   * continuar, y le salieron unas diapositivas sobre esa palabra.
+   *
+   * El recorte también sube: 6.000 caracteres son unas tres páginas, y de
+   * ahí no sale el esqueleto de una presentación sobre el documento entero.
+   * El texto ya viene acotado por la selección de pasajes.
+   */
+  const userPrompt = mandaElDocumento
+    ? [
+        "=== DOCUMENTO FUENTE (OBLIGATORIO) ===",
+        "Esta presentación debe salir DE ESTE DOCUMENTO. El tema es el que trate el documento.",
+        "No inventes un tema distinto ni produzcas contenido genérico.",
+        "El título y las diapositivas deben reflejar lo que dice este material.",
+        "",
+        pdfContent.slice(0, 14000),
+        "=== FIN DEL DOCUMENTO ===",
+        "",
+        `Datos del curso (asignatura, grado y demás):\n${instructions}`,
+      ].join("\n")
+    : `Instrucciones del docente:\n${instructions}\n\n${pdfContent ? `Documento fuente (extracto):\n${pdfContent.slice(0, 6000)}` : "Sin documento fuente — usa conocimiento general riguroso."}`;
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

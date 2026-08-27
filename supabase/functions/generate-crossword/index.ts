@@ -349,13 +349,23 @@ serve(async (req) => {
       }
     }
 
-    const { theme, totalWords, acrossCount, downCount, difficulty, pdfContent } = await leerJson(req);
+    const { theme, totalWords, acrossCount, downCount, difficulty, pdfContent, desdeDocumento } =
+      await leerJson(req);
 
+    /*
+     * O hay tema, o hay documento del que sacarlo. Antes el tema era
+     * obligatorio siempre, así que quien subía un PDF tenía que inventarse
+     * una palabra para poder continuar, y el crucigrama salía sobre esa
+     * palabra en vez de sobre su documento.
+     */
+    const hayDocumento = typeof pdfContent === "string" && pdfContent.trim().length > 0;
+    const mandaElDocumento = desdeDocumento === true && hayDocumento;
+    const temaLimpio = typeof theme === "string" ? theme.trim() : "";
 
-    if (typeof theme !== "string" || theme.trim().length < 2) {
-      return new Response(JSON.stringify({ error: "Tema requerido" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (temaLimpio.length < 2 && !hayDocumento) {
+      return new Response(JSON.stringify({
+        error: "Indica una temática, o sube un documento para sacarla de él",
+      }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const total = Math.max(4, Math.min(20, Number(totalWords) || 10));
     const across = Math.max(1, Math.min(total - 1, Number(acrossCount) || Math.ceil(total / 2)));
@@ -393,15 +403,25 @@ serve(async (req) => {
     // Del documento solo se toman los pasajes que hablan del tema del
     // crucigrama: con la cartilla entera las palabras salían de cualquier
     // capítulo, no del que el docente está trabajando.
+    //
+    // Salvo cuando el documento manda: no hay tema contra el cual elegir, y
+    // filtrar por un tema vacío dejaría fuera justo lo que se quiere usar.
     const seleccion = await seleccionarPasajes({
       texto: typeof pdfContent === "string" ? pdfContent : "",
-      consulta: `Tema del crucigrama: ${theme}`,
+      consulta: mandaElDocumento ? "" : `Tema del crucigrama: ${temaLimpio}`,
       apiKey,
       presupuesto: 8000,
     });
 
     const sourceContext = seleccion.texto
-      ? `\n\nBasado en el siguiente material:\n${seleccion.texto}`
+      ? (mandaElDocumento
+          // Encabezado como obligatorio y no como un "basado en": el modelo
+          // trata de forma muy distinta un material de referencia y un
+          // material del que tiene que salir todo.
+          ? `\n\n=== DOCUMENTO FUENTE (OBLIGATORIO) ===\n` +
+            `Las palabras y las pistas deben salir DE ESTE DOCUMENTO. El tema es el que trate el documento.\n` +
+            `No uses palabras de otros temas.\n\n${seleccion.texto}\n=== FIN DEL DOCUMENTO ===`
+          : `\n\nBasado en el siguiente material:\n${seleccion.texto}`)
       : "";
 
     // Ask the AI for MANY more words than needed so the backtracking algorithm
@@ -409,7 +429,9 @@ serve(async (req) => {
     const poolSize = Math.min(60, total * 3);
     const systemPrompt = `Eres un generador de crucigramas en español. Genera EXACTAMENTE ${poolSize} palabras únicas relacionadas con el tema dado, variadas en longitud (entre 3 y 10 letras es lo ideal). Cada palabra debe ser una sola palabra (sustantivo común o propio), sin espacios, guiones ni tildes en la palabra misma. Usa palabras españolas comunes. Las pistas deben ser definiciones claras y educativas en español, dificultad ${difficultyLabel}. NUNCA incluyas la palabra dentro de su propia pista. Es CRÍTICO devolver al menos ${poolSize} palabras para que el algoritmo pueda armar el crucigrama.`;
 
-    const userPrompt = `Tema: ${theme}\nGenera ${poolSize} palabras con sus pistas para un crucigrama (necesitamos un pool grande para encontrar combinaciones que se crucen)${sourceContext}`;
+    const userPrompt = mandaElDocumento
+      ? `${sourceContext}\n\nGenera ${poolSize} palabras con sus pistas para un crucigrama a partir del documento de arriba (necesitamos un pool grande para encontrar combinaciones que se crucen).`
+      : `Tema: ${temaLimpio}\nGenera ${poolSize} palabras con sus pistas para un crucigrama (necesitamos un pool grande para encontrar combinaciones que se crucen)${sourceContext}`;
 
     const aiResp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -444,8 +466,17 @@ serve(async (req) => {
                     additionalProperties: false,
                   },
                 },
+                // Cuando el crucigrama sale de un documento no hay tema
+                // escrito, y el titulo quedaria en "Crucigrama: " a secas.
+                // Se le pide al modelo que lo nombre a partir de lo que leyo.
+                tema: {
+                  type: "string",
+                  description:
+                    "De que trata el crucigrama, en 2 a 5 palabras. Si viene de un documento, " +
+                    "describe el contenido del documento (ej: 'Industrias 4.0').",
+                },
               },
-              required: ["words"],
+              required: ["words", "tema"],
               additionalProperties: false,
             },
           },
@@ -483,6 +514,18 @@ serve(async (req) => {
     const parsed = JSON.parse(toolCall.function.arguments);
     const rawWords: { word: string; clue: string }[] = parsed.words || [];
 
+    /*
+     * Cómo se llama el crucigrama.
+     *
+     * Manda lo que escribió el docente. Si no escribió nada —porque subió un
+     * documento— vale el nombre que le puso el modelo tras leerlo. Y si
+     * tampoco eso, un rótulo antes que dejar el título a medias: el docente
+     * puede renombrarlo, pero un "Crucigrama: " colgando no lo puede
+     * interpretar nadie.
+     */
+    const temaFinal =
+      temaLimpio || String(parsed.tema ?? "").trim() || "el documento cargado";
+
     // Normalize and dedupe
     const seen = new Set<string>();
     const items: WordItem[] = [];
@@ -512,7 +555,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        theme,
+        theme: temaFinal,
         difficulty: difficultyLabel,
         rows: result.rows,
         cols: result.cols,

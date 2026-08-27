@@ -97,10 +97,31 @@ export async function seleccionarPasajes(opciones: {
     };
   }
 
-  if (limpio.length <= UMBRAL_SELECCION || !consulta.trim()) {
+  if (limpio.length <= UMBRAL_SELECCION) {
     return {
       texto: limpio, metodo: "completo",
       caracteresOriginales: limpio.length, caracteresUsados: limpio.length,
+      fragmentosTotales: 1, fragmentosUsados: 1,
+    };
+  }
+
+  /*
+   * Sin consulta no hay contra qué comparar, así que no se puede elegir: se
+   * toma el principio del documento hasta agotar el presupuesto.
+   *
+   * Ocurre cuando el docente sube un archivo y no escribe tema: el recurso
+   * sale del documento, y no hay tema que sirva de filtro. El principio es
+   * la mejor apuesta ciega —un documento suele decir de qué trata en sus
+   * primeras páginas— y sobre todo es acotada: antes se devolvía el texto
+   * entero, hasta 150 KB, en cada generación.
+   */
+  if (!consulta.trim()) {
+    const recortado = limpio.slice(0, presupuesto);
+    return {
+      texto: recortado,
+      metodo: recortado.length < limpio.length ? "recorte" : "completo",
+      caracteresOriginales: limpio.length,
+      caracteresUsados: recortado.length,
       fragmentosTotales: 1, fragmentosUsados: 1,
     };
   }

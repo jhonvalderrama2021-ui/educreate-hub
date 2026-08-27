@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { extractTextFromPDF } from "@/lib/pdf-extract";
+import { extraerTextoDeArchivo, ACEPTA } from "@/lib/extraer-texto";
 import { exportToDocx, exportToPdf } from "@/lib/export-resource";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
 import { CrosswordGrid } from "@/components/games/CrosswordGrid";
@@ -87,18 +87,29 @@ export default function Crossword() {
     const f = e.target.files?.[0];
     if (!f) return;
     try {
-      const text = await extractTextFromPDF(f);
+      const text = await extraerTextoDeArchivo(f);
       setPdfText(text);
       setPdfName(f.name);
-      toast.success("PDF cargado");
-    } catch {
-      toast.error("No se pudo leer el PDF");
+      toast.success(`Documento cargado: ${text.length.toLocaleString("es-CO")} caracteres`);
+    } catch (err) {
+      // Si no se pudo leer, no se deja el nombre puesto: verlo ahi hacia
+      // creer que el crucigrama saldria de ese documento.
+      setPdfText("");
+      setPdfName("");
+      toast.error(
+        err instanceof Error ? err.message : "No se pudo leer el documento",
+        { duration: 10000 },
+      );
     }
   };
 
   const handleGenerate = async () => {
-    if (!theme.trim()) {
-      toast.error("Indica una temática");
+    // Con documento la temática sobra: sale de él. Exigirla obligaba a
+    // inventarse una, y esa palabra inventada terminaba desplazando al
+    // archivo que se había subido.
+    const hayDocumento = pdfText.trim().length > 0;
+    if (!theme.trim() && !hayDocumento) {
+      toast.error("Indica una temática, o sube un documento para sacarla de él");
       return;
     }
     if (acrossCount + downCount > totalWords + 4) {
@@ -115,6 +126,7 @@ export default function Crossword() {
           downCount,
           difficulty,
           pdfContent: pdfText || undefined,
+          desdeDocumento: hayDocumento && !theme.trim(),
         },
       });
       if (error) throw error;
@@ -215,12 +227,29 @@ export default function Crossword() {
         <div className="glass-card rounded-xl p-6 space-y-4">
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Temática del crucigrama *</Label>
+              <Label htmlFor="campo-tematica">
+                Temática del crucigrama{" "}
+                {pdfText.trim() ? (
+                  <span className="text-muted-foreground font-normal">(opcional)</span>
+                ) : (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
               <Input
+                id="campo-tematica"
                 value={theme}
                 onChange={(e) => setTheme(e.target.value)}
-                placeholder="Ej: Sistema solar, Independencia de Colombia, Animales..."
+                placeholder={pdfText.trim()
+                  ? "Se toma del documento"
+                  : "Ej: Sistema solar, Independencia de Colombia, Animales..."}
               />
+              {pdfText.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  {theme.trim()
+                    ? "Se usarán solo las partes del documento que traten esta temática."
+                    : "Las palabras saldrán del documento que subiste."}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Dificultad</Label>
@@ -271,19 +300,20 @@ export default function Crossword() {
           </div>
 
           <div className="space-y-2">
-            <Label>PDF de referencia (opcional)</Label>
+            <Label>Documento de referencia (opcional)</Label>
             <div className="flex items-center gap-2">
               <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="h-3.5 w-3.5 mr-1" /> Subir PDF
+                <Upload className="h-3.5 w-3.5 mr-1" /> Subir documento
               </Button>
               {pdfName && <span className="text-xs text-muted-foreground truncate">{pdfName}</span>}
               <input
-                ref={fileInputRef} type="file" accept=".pdf,.txt"
+                ref={fileInputRef} type="file" accept={ACEPTA}
                 className="hidden" onChange={onPdfChange}
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              Si lo subes, las palabras se extraerán del contenido del PDF.
+              PDF, Word (.docx) o texto. Si lo subes, las palabras saldrán de ahí
+              y no hace falta escribir la temática.
             </p>
           </div>
 

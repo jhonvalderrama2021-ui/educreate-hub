@@ -5,6 +5,15 @@ interface GenerateParams {
   pdfContent?: string;
   instructions?: string;
   numItems?: number;
+  theme?: string;
+  /**
+   * El recurso debe salir del documento cargado, no de un tema escrito.
+   *
+   * Se activa cuando el docente subio un archivo y NO escribio tema. Sin
+   * esta señal el servidor trata el documento como material de apoyo, y el
+   * resultado sale sobre otra cosa.
+   */
+  desdeDocumento?: boolean;
 }
 
 // Generate via OpenAI (through edge function)
@@ -33,7 +42,24 @@ export async function generateWithOllama(
   const systemPrompt = getOllamaPrompt(params.resourceType, params.numItems || 10);
   const userParts: string[] = [];
   if (params.instructions) userParts.push(`Instrucciones: ${params.instructions}`);
-  if (params.pdfContent) userParts.push(`\nContenido fuente:\n${params.pdfContent}`);
+  if (params.pdfContent) {
+    // Cuando el documento manda va PRIMERO y se dice que es obligatorio.
+    // Adjuntarlo al final como "contenido fuente" lo deja en el papel de
+    // referencia, y el modelo responde sobre lo que sugieran las
+    // instrucciones en vez de sobre el documento.
+    if (params.desdeDocumento) {
+      userParts.unshift([
+        "=== DOCUMENTO FUENTE (OBLIGATORIO) ===",
+        "Genera el recurso A PARTIR DE ESTE DOCUMENTO. El tema es el que trate el documento.",
+        "No produzcas contenido generico ni cambies de tema.",
+        "",
+        params.pdfContent,
+        "=== FIN DEL DOCUMENTO ===",
+      ].join("\n"));
+    } else {
+      userParts.push(["", "Contenido fuente:", params.pdfContent].join("\n"));
+    }
+  }
   if (!params.pdfContent && !params.instructions) {
     userParts.push("Genera contenido educativo de ejemplo sobre un tema general.");
   }
