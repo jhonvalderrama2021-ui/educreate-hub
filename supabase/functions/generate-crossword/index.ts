@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
+import { asegurarEspanol } from "../_compartido/idioma.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
@@ -526,6 +527,18 @@ serve(async (req) => {
     const temaFinal =
       temaLimpio || String(parsed.tema ?? "").trim() || "el documento cargado";
 
+    /*
+     * Que las pistas estén en español antes de armar nada.
+     *
+     * Se revisa AQUÍ y no al final por dos razones: la palabra ya viene
+     * filtrada a A-Z por normalizeWord, así que lo único que puede salir en
+     * otro alfabeto es la pista; y corregirlas antes de colocar evita rehacer
+     * la cuadrícula, que es lo caro. Ver _compartido/idioma.ts.
+     */
+    const paquete = { tema: temaFinal, palabras: rawWords };
+    await asegurarEspanol(paquete, apiKey, "gpt-5.4-mini");
+    const temaRevisado = paquete.tema;
+
     // Normalize and dedupe
     const seen = new Set<string>();
     const items: WordItem[] = [];
@@ -555,7 +568,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        theme: temaFinal,
+        theme: temaRevisado,
         difficulty: difficultyLabel,
         rows: result.rows,
         cols: result.cols,

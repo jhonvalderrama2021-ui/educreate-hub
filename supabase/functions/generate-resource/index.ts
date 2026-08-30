@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 import { exigirPermisoDeGeneracion, SinPermisoError } from "../_compartido/permisos.ts";
+import { asegurarEspanol, IdiomaIrrecuperableError } from "../_compartido/idioma.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -250,6 +251,18 @@ serve(async (req) => {
       };
       await resolveSlideImages(presentation);
 
+      // Las diapositivas se arman en muchas llamadas, asi que basta con que
+      // una se descarrie. Se revisan todas juntas al final.
+      const corregidasEnSlides = await asegurarEspanol(presentation, apiKey, MODEL_ECONOMICO);
+      presentation._meta = {
+        generadoPorIA: true,
+        modelo: pickModel(resourceType),
+        proveedor: "OpenAI",
+        fecha: new Date().toISOString(),
+        requiereValidacionDocente: true,
+        ...(corregidasEnSlides > 0 ? { textosCorregidosDeIdioma: corregidasEnSlides } : {}),
+      };
+
       return new Response(JSON.stringify(presentation), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -324,11 +337,17 @@ serve(async (req) => {
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
 
+    // Antes de entregarlo: que este entero en español. Ver _compartido/idioma.ts.
+    const textosCorregidos = await asegurarEspanol(content, apiKey, MODEL_ECONOMICO);
+
     // Trazabilidad del contenido generado (Marco Ético para la IA en Colombia,
     // MinTIC 2023, y CONPES 3975 de 2019): se acompaña el recurso con el origen
     // de su generación para que el docente sepa qué lo produjo y lo valide.
     content._meta = {
       generadoPorIA: true,
+      // Se deja constancia de las correcciones de idioma: si un dia empiezan
+      // a ser muchas, se vera en los recursos y no en una corazonada.
+      ...(textosCorregidos > 0 ? { textosCorregidosDeIdioma: textosCorregidos } : {}),
       modelo: pickModel(resourceType),
       proveedor: "OpenAI",
       fecha: new Date().toISOString(),
@@ -365,6 +384,12 @@ serve(async (req) => {
     // Se sale antes de la devolucion: la comprobacion de rol ocurre antes de
     // cobrar, asi que no hay nada que devolver y anotar un movimiento de cero
     // solo ensuciaria el historial que revisa el administrador.
+    // Se cae al camino de abajo, que devuelve los tokens: el docente no
+    // debe pagar una generacion que no puede usar.
+    if (e instanceof IdiomaIrrecuperableError) {
+      console.error("Idioma irrecuperable:", e.muestra);
+    }
+
     if (e instanceof SinPermisoError) {
       return new Response(JSON.stringify({ error: e.message }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -710,7 +735,7 @@ Generas material listo para llevar al aula, no borradores. Responde SIEMPRE en J
 
 PRINCIPIOS OBLIGATORIOS:
 1. Alinea el contenido con los EBC y los DBA del grado indicado. Si no conoces el código exacto del DBA, describe el aprendizaje esperado sin inventar códigos.
-2. Escribe en español de Colombia. Usa contextos y ejemplos del país cuando aporten al aprendizaje (geografía, historia, economía, cultura, situaciones cotidianas).
+2. Escribe en español de Colombia, SIN EXCEPCIÓN. Cada palabra de cada campo va en español: nada de palabras sueltas en inglés, hebreo, árabe u otro alfabeto, ni siquiera dentro de una frase. Usa contextos y ejemplos del país cuando aporten al aprendizaje (geografía, historia, economía, cultura, situaciones cotidianas).
 3. PROHIBIDO EL RELLENO. Cada elemento debe aportar valor pedagógico verificable. Nada de frases genéricas, vagas o intercambiables entre temas.
 4. Si recibes un documento fuente, el contenido debe basarse en él: no lo contradigas ni lo ignores.
 5. Ajusta el vocabulario y la exigencia cognitiva al grado indicado.`;
