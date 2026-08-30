@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 import { exigirPermisoDeGeneracion, SinPermisoError } from "../_compartido/permisos.ts";
+import { asegurarIdioma, idiomaDeLaAsignatura, IdiomaIrrecuperableError } from "../_compartido/idioma.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,8 +111,15 @@ serve(async (req) => {
 
     // ────────────────────────────────────────────────────────────
 
-    const { resourceType, pdfContent, instructions, numItems, theme, desdeDocumento } =
+    const { resourceType, pdfContent, instructions, numItems, theme, desdeDocumento, asignatura } =
       await leerJson(req);
+
+    /*
+     * El idioma sale de la asignatura: un taller de Inglés va en inglés.
+     * Se resuelve aquí y no en el navegador para que valga igual si la
+     * petición llega por otra vía.
+     */
+    const idioma = idiomaDeLaAsignatura(typeof asignatura === "string" ? asignatura : null);
 
     /*
      * Hay dos formas de pedir un recurso, y cambian quien manda:
@@ -222,6 +230,7 @@ serve(async (req) => {
         pdfContent: hasSourcePdf ? documentoFuente : "",
         total,
         mandaElDocumento: mandaElDocumento && hasSourcePdf,
+        idioma,
       });
 
       // Phase 2 — One LLM call per slide, in parallel (faster + more variety)
@@ -250,6 +259,18 @@ serve(async (req) => {
       };
       await resolveSlideImages(presentation);
 
+      // Las diapositivas se arman en muchas llamadas, asi que basta con que
+      // una se descarrie. Se revisan todas juntas al final.
+      const corregidasEnSlides = await asegurarIdioma(presentation, apiKey, MODEL_ECONOMICO, idioma);
+      presentation._meta = {
+        generadoPorIA: true,
+        modelo: pickModel(resourceType),
+        proveedor: "OpenAI",
+        fecha: new Date().toISOString(),
+        requiereValidacionDocente: true,
+        ...(corregidasEnSlides > 0 ? { textosCorregidosDeIdioma: corregidasEnSlides } : {}),
+      };
+
       return new Response(JSON.stringify(presentation), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -258,7 +279,7 @@ serve(async (req) => {
     // ============================================================
     // OTHER RESOURCE TYPES — single-shot generation (unchanged)
     // ============================================================
-    const systemPrompt = getSystemPrompt(resourceType, numItems || 10);
+    const systemPrompt = getSystemPrompt(resourceType, numItems || 10, idioma);
     const userParts: string[] = [];
     if (instructions) {
       userParts.push(
@@ -324,11 +345,17 @@ serve(async (req) => {
     const data = await response.json();
     const content = JSON.parse(data.choices[0].message.content);
 
+    // Antes de entregarlo: que este entero en español. Ver _compartido/idioma.ts.
+    const textosCorregidos = await asegurarIdioma(content, apiKey, MODEL_ECONOMICO, idioma);
+
     // Trazabilidad del contenido generado (Marco Ético para la IA en Colombia,
     // MinTIC 2023, y CONPES 3975 de 2019): se acompaña el recurso con el origen
     // de su generación para que el docente sepa qué lo produjo y lo valide.
     content._meta = {
       generadoPorIA: true,
+      // Se deja constancia de las correcciones de idioma: si un dia empiezan
+      // a ser muchas, se vera en los recursos y no en una corazonada.
+      ...(textosCorregidos > 0 ? { textosCorregidosDeIdioma: textosCorregidos } : {}),
       modelo: pickModel(resourceType),
       proveedor: "OpenAI",
       fecha: new Date().toISOString(),
@@ -365,6 +392,12 @@ serve(async (req) => {
     // Se sale antes de la devolucion: la comprobacion de rol ocurre antes de
     // cobrar, asi que no hay nada que devolver y anotar un movimiento de cero
     // solo ensuciaria el historial que revisa el administrador.
+    // Se cae al camino de abajo, que devuelve los tokens: el docente no
+    // debe pagar una generacion que no puede usar.
+    if (e instanceof IdiomaIrrecuperableError) {
+      console.error("Idioma irrecuperable:", e.muestra);
+    }
+
     if (e instanceof SinPermisoError) {
       return new Response(JSON.stringify({ error: e.message }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -397,9 +430,9 @@ serve(async (req) => {
 // PHASE 1: OUTLINE — assigns layout + image flag per slide
 // ============================================================
 async function generateOutline(apiKey: string, args: {
-  instructions: string; pdfContent: string; total: number; mandaElDocumento?: boolean;
+  instructions: string; pdfContent: string; total: number; mandaElDocumento?: boolean; idioma?: string;
 }) {
-  const { instructions, pdfContent, total, mandaElDocumento } = args;
+  const { instructions, pdfContent, total, mandaElDocumento, idioma = "español de Colombia" } = args;
 
   // Layouts available in the middle pool — heavy variety with new creative ones.
   const middleLayouts = [
@@ -413,7 +446,7 @@ async function generateOutline(apiKey: string, args: {
   ]);
   const heroLayouts = ["hero", "circleHero"];
 
-  const sysPrompt = `Eres un experto pedagogo. Genera el ESQUELETO (outline) de una presentación educativa profesional en español. Devuelve JSON estricto con esta forma:
+  const sysPrompt = `Eres un experto pedagogo. Genera el ESQUELETO (outline) de una presentación educativa profesional en ${idioma}. Devuelve JSON estricto con esta forma:
 
 {
   "title": "Título atractivo de la presentación (4-10 palabras)",
@@ -703,14 +736,24 @@ const DEFAULT_THEME = {
 // ============================================================
 // SYSTEM PROMPTS for non-slide resource types (UNCHANGED)
 // ============================================================
-function getSystemPrompt(type: string, numItems: number): string {
+function getSystemPrompt(type: string, numItems: number, idioma = "español de Colombia"): string {
+  /*
+   * En un recurso de Inglés o de Francés, el contenido que lee el estudiante
+   * va en ese idioma: es el material de la clase, no una traducción. En el
+   * resto, todo en español.
+   */
+  const esEnOtroIdioma = idioma !== "español de Colombia";
+  const reglaDeIdioma = esEnOtroIdioma
+    ? `2. El recurso es para la clase de ${idioma}: el contenido que lee y responde el estudiante va EN ${idioma.toUpperCase()}. Los rótulos dirigidos al docente (objetivo, materiales, criterios de evaluación) pueden ir en español. Ajusta el nivel del idioma al grado.`
+    : `2. Escribe en español de Colombia, SIN EXCEPCIÓN: nada de palabras sueltas en otro idioma ni en otro alfabeto dentro de una frase. Usa contextos y ejemplos del país cuando aporten al aprendizaje (geografía, historia, economía, cultura, situaciones cotidianas). Los símbolos matemáticos y las fórmulas se escriben como tales (x², √, π, ≤, H₂O), no en palabras.`;
+
   const base = `Eres un pedagogo experto del sistema educativo colombiano, con dominio de los Estándares Básicos de Competencias (EBC) y los Derechos Básicos de Aprendizaje (DBA) del Ministerio de Educación Nacional.
 
 Generas material listo para llevar al aula, no borradores. Responde SIEMPRE en JSON válido según la estructura indicada, sin ningún texto fuera del JSON.
 
 PRINCIPIOS OBLIGATORIOS:
 1. Alinea el contenido con los EBC y los DBA del grado indicado. Si no conoces el código exacto del DBA, describe el aprendizaje esperado sin inventar códigos.
-2. Escribe en español de Colombia. Usa contextos y ejemplos del país cuando aporten al aprendizaje (geografía, historia, economía, cultura, situaciones cotidianas).
+${reglaDeIdioma}
 3. PROHIBIDO EL RELLENO. Cada elemento debe aportar valor pedagógico verificable. Nada de frases genéricas, vagas o intercambiables entre temas.
 4. Si recibes un documento fuente, el contenido debe basarse en él: no lo contradigas ni lo ignores.
 5. Ajusta el vocabulario y la exigencia cognitiva al grado indicado.`;

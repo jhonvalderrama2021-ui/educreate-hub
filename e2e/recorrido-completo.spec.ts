@@ -278,3 +278,52 @@ test("navegar por el menú lateral no deja ninguna pantalla en blanco", async ({
 
   expect(rotos, `Problemas al navegar:\n${rotos.join("\n")}`).toEqual([]);
 });
+
+test("cambiar de módulo no arrastra los datos del anterior", async ({ page }) => {
+  /*
+   * El docente lo encontro probando: llenaba el formulario en Plan de clase,
+   * pasaba a Rubricas, y seguian ahi el mismo tema, grado y asignatura.
+   *
+   * Importa mas de lo que parece: con el tema pegado de antes, subir un PDF
+   * ya no bastaba para que el recurso saliera de el, porque el campo no
+   * estaba vacio y el documento quedaba relegado a material de apoyo
+   * filtrado por un tema que el docente no habia escrito esta vez.
+   */
+  await entrar(page, docente);
+  await page.goto("/resources/generate?type=lesson_plan");
+
+  const tema = page.getByLabel(/^Tema/);
+  await expect(tema).toBeVisible({ timeout: 20_000 });
+  await tema.fill("La colmena Langstroth");
+  await page.getByLabel("Instrucciones adicionales (opcional)").fill("Con ejemplos del altiplano");
+  await expect(tema).toHaveValue("La colmena Langstroth");
+
+  // Se pasa a otro modulo por el menu, que es como lo hace el docente
+  await page.getByRole("link", { name: "Rúbricas" }).first().click();
+  await page.waitForURL(/type=rubric/, { timeout: 15_000 });
+
+  await expect(page.getByLabel(/^Tema/)).toHaveValue("");
+  await expect(page.getByLabel("Instrucciones adicionales (opcional)")).toHaveValue("");
+});
+
+test("al subir un documento el tema deja de ser obligatorio", async ({ page }) => {
+  // Las dos formas de crear: llenar el formulario, o subir un archivo. Con
+  // archivo el tema sobra, y la pantalla tiene que decirlo: si sigue
+  // marcado como obligatorio, el docente se inventa uno y ese tema
+  // inventado le gana al documento.
+  await entrar(page, docente);
+  await page.goto("/resources/generate?type=lesson_plan");
+  await expect(page.getByLabel(/^Tema/)).toBeVisible({ timeout: 20_000 });
+
+  await page.setInputFiles("#file-input", {
+    name: "manual-apicultura.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "La colmena Langstroth consta de camara de cria con diez cuadros moviles " +
+      "y alzas melarias separadas por rejilla excluidora de reinas.",
+    ),
+  });
+
+  await expect(page.getByText(/El recurso saldrá del documento/i)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/manual-apicultura\.txt/)).toBeVisible();
+});

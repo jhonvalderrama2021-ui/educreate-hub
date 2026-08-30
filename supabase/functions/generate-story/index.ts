@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
+import { asegurarIdioma } from "../_compartido/idioma.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -283,6 +284,15 @@ ILUSTRACIONES
     const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
     if (!toolCall) throw new Error("No se generó cuento");
     const story = JSON.parse(toolCall.function.arguments) as StoryStructure & { coverPrompt: string };
+
+    /*
+     * Que el cuento esté entero en español, antes de ilustrarlo.
+     *
+     * Antes de las imágenes a propósito: ilustrar son varias llamadas caras,
+     * y no tiene sentido pagarlas por un cuento que va a haber que rehacer.
+     * Ver _compartido/idioma.ts.
+     */
+    await asegurarIdioma(story, apiKey, "gpt-5.4-mini");
 
     // Generate images in parallel: cover + 3 chapter illustrations
     const chaptersToIllustrate = story.chapters.slice(0, 3);

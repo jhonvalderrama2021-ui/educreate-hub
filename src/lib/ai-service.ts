@@ -7,6 +7,11 @@ interface GenerateParams {
   numItems?: number;
   theme?: string;
   /**
+   * La asignatura elegida. Decide el idioma del recurso: uno de Inglés va en
+   * inglés, porque es el material de la clase y no una traducción.
+   */
+  asignatura?: string;
+  /**
    * El recurso debe salir del documento cargado, no de un tema escrito.
    *
    * Se activa cuando el docente subio un archivo y NO escribio tema. Sin
