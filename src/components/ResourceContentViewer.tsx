@@ -1,3 +1,4 @@
+import { createContext, useContext, useMemo, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +13,96 @@ interface Props {
   onContentChange?: (content: any) => void;
 }
 
-export function ResourceContentViewer({ type, content, editable = false, onContentChange }: Props) {
+/**
+ * Si se está editando, y cómo escribir el cambio.
+ *
+ * Va por contexto y no por props porque los campos editables se usan en
+ * medio centenar de sitios de este archivo, y pasarles dos props a cada uno
+ * no aportaría nada: la alternativa era declararlos dentro del componente,
+ * y eso es justo lo que rompía la escritura.
+ */
+const ContextoDeEdicion = createContext<{
+  editable: boolean;
+  update: (path: string[], value: any) => void;
+}>({ editable: false, update: () => {} });
+
+/**
+ * Un texto del recurso, editable o no.
+ *
+ * Vive AQUÍ, a nivel de módulo, y no dentro del componente que lo pinta.
+ * Declarado dentro, React ve un tipo de componente distinto en cada
+ * renderizado: destruye el campo, lo vuelve a crear, y el cursor se pierde.
+ * Solo entraba la primera letra de lo que el docente escribiera.
+ */
+function EditableText({ value, path, multiline = false, className = "" }: {
+  value: string; path: string[]; multiline?: boolean; className?: string;
+}) {
+  const { editable, update } = useContext(ContextoDeEdicion);
+  if (!editable) return <span className={className}>{value}</span>;
+  if (multiline) {
+    return (
+      <Textarea
+        value={value || ""}
+        onChange={(e) => update(path, e.target.value)}
+        className={`text-sm ${className}`}
+        rows={2}
+      />
+    );
+  }
+  return (
+    <Input
+      value={value || ""}
+      onChange={(e) => update(path, e.target.value)}
+      className={`text-sm ${className}`}
+    />
+  );
+}
+
+/**
+ * Una lista de textos donde cada punto se puede editar.
+ *
+ * Sustituye a las viñetas sueltas que cada caso repintaba por su cuenta: así
+ * unas quedaban editables y otras no, sin más razón que el orden en que se
+ * fueron escribiendo. Las acciones de una fase del plan de clase son justo lo
+ * que el docente ajusta antes de entrar al aula.
+ */
+function ListaEditable({ items, path, icon, className = "" }: {
+  items?: string[]; path: string[]; icon?: string; className?: string;
+}) {
+  const { editable } = useContext(ContextoDeEdicion);
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return (
+    <ul className={`space-y-1 text-sm text-foreground ${className}`}>
+      {items.map((it: string, i: number) => (
+        <li key={i} className="flex gap-2 items-start">
+          <span className="text-primary shrink-0 mt-1.5">{icon || "\u2022"}</span>
+          {editable ? (
+            // Caja alta solo para lo que no cabe en una línea: con treinta
+            // campos en pantalla, poner todos altos vuelve el plan de clase
+            // imposible de recorrer.
+            <EditableText
+              value={it}
+              path={[...path, String(i)]}
+              multiline={String(it || "").length > 70}
+              className="flex-1"
+            />
+          ) : (
+            <span>{it}</span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Pinta el contenido del recurso. La edición la habilita el contexto.
+ *
+ * El componente exportado es el de más abajo: este es el cuerpo, y se separa
+ * solo para que el proveedor del contexto quede por fuera.
+ */
+
+function VisorDeContenido({ type, content, editable = false, onContentChange }: Props) {
   const update = (path: string[], value: any) => {
     if (!onContentChange) return;
     const copy = JSON.parse(JSON.stringify(content));
@@ -42,46 +132,6 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
     });
     onContentChange(copy);
   };
-
-  const EditableText = ({ value, path, multiline = false, className = "" }: { value: string; path: string[]; multiline?: boolean; className?: string }) => {
-    if (!editable) return <span className={className}>{value}</span>;
-    if (multiline) return <Textarea value={value || ""} onChange={(e) => update(path, e.target.value)} className={`text-sm ${className}`} rows={2} />;
-    return <Input value={value || ""} onChange={(e) => update(path, e.target.value)} className={`text-sm ${className}`} />;
-  };
-
-  /**
-   * Una lista de textos donde cada punto se puede editar.
-   *
-   * Sustituye a las viñetas sueltas que cada caso repintaba por su cuenta:
-   * así unas quedaban editables y otras no, sin más razón que el orden en
-   * que se fueron escribiendo. Las acciones de una fase del plan de clase
-   * son justo lo que el docente ajusta antes de entrar al aula.
-   */
-  const ListaEditable = ({ items, path, icon, className = "" }: {
-    items?: string[]; path: string[]; icon?: string; className?: string;
-  }) =>
-    Array.isArray(items) && items.length > 0 ? (
-      <ul className={`space-y-1 text-sm text-foreground ${className}`}>
-        {items.map((it: string, i: number) => (
-          <li key={i} className="flex gap-2 items-start">
-            <span className="text-primary shrink-0 mt-1.5">{icon || "\u2022"}</span>
-            {editable ? (
-              // Caja alta solo para lo que no cabe en una línea: con treinta
-              // campos en pantalla, poner todos altos vuelve el plan de clase
-              // imposible de recorrer.
-              <EditableText
-                value={it}
-                path={[...path, String(i)]}
-                multiline={String(it || "").length > 70}
-                className="flex-1"
-              />
-            ) : (
-              <span>{it}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    ) : null;
 
   switch (type) {
     case "icfes":
@@ -660,4 +710,31 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
     default:
       return <pre className="text-xs overflow-auto">{JSON.stringify(content, null, 2)}</pre>;
   }
+}
+
+/**
+ * Pinta el contenido de un recurso, y deja editarlo si se le pide.
+ *
+ * Solo monta el contexto con el que los campos saben si se está editando y
+ * dónde escribir el cambio. El trabajo lo hace VisorDeContenido.
+ */
+export function ResourceContentViewer(props: Props) {
+  const { content, editable = false, onContentChange } = props;
+
+  const update = useCallback((path: string[], value: any) => {
+    if (!onContentChange) return;
+    const copia = JSON.parse(JSON.stringify(content));
+    let obj = copia;
+    for (let i = 0; i < path.length - 1; i++) obj = obj[path[i]];
+    obj[path[path.length - 1]] = value;
+    onContentChange(copia);
+  }, [content, onContentChange]);
+
+  const contexto = useMemo(() => ({ editable, update }), [editable, update]);
+
+  return (
+    <ContextoDeEdicion.Provider value={contexto}>
+      <VisorDeContenido {...props} />
+    </ContextoDeEdicion.Provider>
+  );
 }

@@ -29,10 +29,20 @@ const IDIOMA_POR_ASIGNATURA: Record<string, string> = {
   "frances": "francés",
 };
 
-/** El idioma en que debe salir el recurso de esa asignatura. */
+/**
+ * El idioma en que debe salir el recurso de esa asignatura.
+ *
+ * Se comprueba que la clave sea PROPIA del mapa, en vez de confiar en
+ * `?? valorPorDefecto`. Un objeto corriente hereda las claves de
+ * Object.prototype, así que `IDIOMA_POR_ASIGNATURA["constructor"]` NO es
+ * undefined: es una función. El `??` no salta, y esa función acababa metida
+ * dentro de las instrucciones que se le mandan al modelo. Basta con que la
+ * asignatura venga escrita así.
+ */
 export function idiomaDeLaAsignatura(asignatura?: string | null): string {
   const clave = String(asignatura ?? "").trim().toLowerCase();
-  return IDIOMA_POR_ASIGNATURA[clave] ?? "español de Colombia";
+  const suya = Object.prototype.hasOwnProperty.call(IDIOMA_POR_ASIGNATURA, clave);
+  return suya ? IDIOMA_POR_ASIGNATURA[clave] : "español de Colombia";
 }
 
 /**
@@ -45,9 +55,44 @@ export function idiomaDeLaAsignatura(asignatura?: string | null): string {
  * legitimidad en matemáticas y física, y marcarlas convertiría cada plan de
  * clase de trigonometría en un falso positivo. Se persiguen alfabetos
  * enteros ajenos, no símbolos sueltos.
+ *
+ * Los rangos van en \u y con nombre, no como caracteres pegados: escritos
+ * literalmente no hay forma de leerlos ni de comprobar que el rango es el que
+ * se cree, y algunos son marcas combinantes que se funden visualmente con el
+ * carácter anterior. Un error de un rango aquí se traduce en recursos buenos
+ * bloqueados o en basura que pasa de largo, y de ninguna de las dos cosas se
+ * enteraría nadie leyendo la línea.
  */
-const ESCRITURAS_AJENAS =
-  /[Ѐ-ӿ԰-֏֐-׿؀-ۿ܀-ݏݐ-ݿऀ-ॿঀ-৿฀-๿Ⴀ-ჿ぀-ゟ゠-ヿ㐀-䶿一-鿿가-힯]/;
+const RANGOS_AJENOS: { nombre: string; desde: number; hasta: number }[] = [
+  { nombre: "cirílico", desde: 0x0400, hasta: 0x052f },
+  { nombre: "armenio", desde: 0x0530, hasta: 0x058f },
+  { nombre: "hebreo", desde: 0x0590, hasta: 0x05ff },
+  { nombre: "árabe", desde: 0x0600, hasta: 0x06ff },
+  { nombre: "siríaco", desde: 0x0700, hasta: 0x074f },
+  { nombre: "árabe (suplemento)", desde: 0x0750, hasta: 0x077f },
+  { nombre: "devanagari", desde: 0x0900, hasta: 0x097f },
+  { nombre: "bengalí", desde: 0x0980, hasta: 0x09ff },
+  { nombre: "tailandés", desde: 0x0e00, hasta: 0x0e7f },
+  { nombre: "georgiano", desde: 0x10a0, hasta: 0x10ff },
+  { nombre: "hiragana", desde: 0x3040, hasta: 0x309f },
+  { nombre: "katakana", desde: 0x30a0, hasta: 0x30ff },
+  { nombre: "chino (extensión A)", desde: 0x3400, hasta: 0x4dbf },
+  { nombre: "chino", desde: 0x4e00, hasta: 0x9fff },
+  { nombre: "hangul", desde: 0xac00, hasta: 0xd7af },
+];
+
+const enHex = (n: number) => `\\u${n.toString(16).padStart(4, "0")}`;
+
+const ESCRITURAS_AJENAS = new RegExp(
+  `[${RANGOS_AJENOS.map((r) => `${enHex(r.desde)}-${enHex(r.hasta)}`).join("")}]`,
+  "u",
+);
+
+/** Los alfabetos que se persiguen, con un carácter de muestra de cada uno. */
+export const ALFABETOS_VIGILADOS = RANGOS_AJENOS.map((r) => ({
+  nombre: r.nombre,
+  ejemplo: String.fromCodePoint(r.desde + 1),
+}));
 
 /** Un texto del recurso que salió en otro alfabeto, y dónde está. */
 export interface TextoAjeno {

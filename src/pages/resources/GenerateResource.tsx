@@ -76,6 +76,21 @@ const PERFORMANCE_LEVELS = [
   { value: "custom", label: "Personalizado" },
 ];
 
+/** Los tipos que este módulo sabe generar. */
+const TIPOS_VALIDOS = new Set(RESOURCE_TYPES.map((t) => t.value));
+
+/**
+ * El tipo pedido, o `icfes` si no es uno de los que existen.
+ *
+ * Se usa un Set y no una comprobación contra un objeto: un objeto corriente
+ * responde a "constructor" o a "toString" con lo que hereda de
+ * Object.prototype, y el valor colado desde la dirección acababa usándose
+ * como si fuera un tipo real.
+ */
+export function normalizarTipo(tipo: string | null | undefined): string {
+  return tipo && TIPOS_VALIDOS.has(tipo) ? tipo : "icfes";
+}
+
 const RESOURCE_FIELDS: Record<string, string[]> = {
   icfes: ["numItems", "examType", "examComplexity"],
   workshop: ["methodology", "duration"],
@@ -89,10 +104,22 @@ export default function GenerateResource() {
   const { isDocente, loading: cargandoRol } = useUserRole();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const typeParam = searchParams.get("type");
   const recursoParam = searchParams.get("recurso");
 
-  const [resourceType, setResourceType] = useState(typeParam || "icfes");
+  /*
+   * El tipo llega de la dirección, así que se comprueba contra los que
+   * existen antes de usarlo.
+   *
+   * Sin comprobarlo, `/resources/generate?type=constructor` dejaba la
+   * pantalla en blanco: RESOURCE_FIELDS es un objeto corriente y hereda las
+   * claves de Object.prototype, de modo que RESOURCE_FIELDS["constructor"]
+   * devuelve una función en vez de undefined. El `|| []` no salta, y la
+   * siguiente línea llama a .includes() sobre una función. Un enlace mal
+   * copiado bastaba.
+   */
+  const typeParam = normalizarTipo(searchParams.get("type"));
+
+  const [resourceType, setResourceType] = useState(typeParam);
 
   // Common fields
   const [tema, setTema] = useState("");
@@ -235,7 +262,7 @@ export default function GenerateResource() {
   }, [user]);
 
   useEffect(() => {
-    setResourceType(typeParam || "icfes");
+    setResourceType(typeParam);
     if (recursoParam) return; // lo carga el efecto de abajo
     setGeneratedContent(null);
     setIsEditing(false);
@@ -263,7 +290,7 @@ export default function GenerateResource() {
       if (cancelado) return;
       if (error || !data) {
         toast.error("No se encontró ese recurso");
-        setSearchParams({ type: typeParam || "icfes" }, { replace: true });
+        setSearchParams({ type: typeParam }, { replace: true });
         return;
       }
       abrirDelHistorial(data as RecursoHistorial);

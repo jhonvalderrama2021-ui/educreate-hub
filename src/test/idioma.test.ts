@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  hallarTextosAjenos, asegurarIdioma, idiomaDeLaAsignatura, IdiomaIrrecuperableError,
+  hallarTextosAjenos, asegurarIdioma, idiomaDeLaAsignatura, ALFABETOS_VIGILADOS, IdiomaIrrecuperableError,
 } from "../../supabase/functions/_compartido/idioma";
 
 /**
@@ -199,5 +199,64 @@ describe("el idioma lo decide la asignatura", () => {
     expect(hallarTextosAjenos({ t: "Write five sentences using the verb to be" })).toEqual([]);
     expect(hallarTextosAjenos({ t: "Écris cinq phrases avec le verbe être" })).toEqual([]);
     expect(hallarTextosAjenos({ t: "Write five להשתמש sentences" })).toHaveLength(1);
+  });
+});
+
+describe("cada alfabeto vigilado se detecta de verdad", () => {
+  /*
+   * Los rangos se escribían como caracteres pegados dentro de la expresión.
+   * Así no hay forma de leerlos ni de comprobar que el rango es el que se
+   * cree, y algunos son marcas combinantes que se funden con el carácter
+   * anterior —el linter lo señalaba—. Un rango mal puesto se traduce en
+   * recursos buenos bloqueados, o en basura que pasa de largo, y de ninguna
+   * de las dos cosas se entera nadie leyendo la línea.
+   *
+   * Se recorre la lista y se comprueba uno por uno, en vez de fiarse.
+   */
+  it("la lista no está vacía ni se quedó a medias", () => {
+    expect(ALFABETOS_VIGILADOS.length).toBeGreaterThanOrEqual(15);
+  });
+
+  for (const { nombre, ejemplo } of ALFABETOS_VIGILADOS) {
+    it(`detecta ${nombre}`, () => {
+      const hallados = hallarTextosAjenos({ t: `Texto normal con ${ejemplo} dentro` });
+      expect(hallados, `no se detectó ${nombre} (${ejemplo})`).toHaveLength(1);
+    });
+  }
+
+  it("no se cuela nada del alfabeto latino ni de la puntuación española", () => {
+    const español = "áéíóúüñÁÉÍÓÚÜÑ ¿? ¡! «» — … 0123456789 abcXYZ";
+    expect(hallarTextosAjenos({ t: español })).toEqual([]);
+  });
+
+  it("los símbolos matemáticos y científicos siguen pasando", () => {
+    const ciencia = "√49 ≤ x ≠ 0, π·r², ∑ ∫ ∞ ± × ÷ ° H₂O 2⁵ α β Δ Ω → ∈ ∅";
+    expect(hallarTextosAjenos({ t: ciencia })).toEqual([]);
+  });
+});
+
+describe("claves heredadas de Object.prototype", () => {
+  /*
+   * Un objeto corriente responde a "constructor", "toString" o "valueOf" con
+   * lo que hereda de Object.prototype. Así que `MAPA[clave] ?? porDefecto` NO
+   * cae en el valor por defecto para esas claves: devuelve una función.
+   *
+   * Aquí eso significaba que una asignatura llamada "constructor" metía el
+   * código fuente de una función dentro de las instrucciones que se le mandan
+   * al modelo. Basta con escribirla así en el formulario.
+   */
+  const heredadas = ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__"];
+
+  for (const clave of heredadas) {
+    it(`"${clave}" cae en español, no en una función heredada`, () => {
+      const idioma = idiomaDeLaAsignatura(clave);
+      expect(typeof idioma).toBe("string");
+      expect(idioma).toBe("español de Colombia");
+    });
+  }
+
+  it("y las asignaturas de verdad siguen funcionando", () => {
+    expect(idiomaDeLaAsignatura("Inglés")).toBe("inglés");
+    expect(idiomaDeLaAsignatura("Matemáticas")).toBe("español de Colombia");
   });
 });
