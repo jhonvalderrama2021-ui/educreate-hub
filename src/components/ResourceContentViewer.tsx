@@ -49,6 +49,40 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
     return <Input value={value || ""} onChange={(e) => update(path, e.target.value)} className={`text-sm ${className}`} />;
   };
 
+  /**
+   * Una lista de textos donde cada punto se puede editar.
+   *
+   * Sustituye a las viñetas sueltas que cada caso repintaba por su cuenta:
+   * así unas quedaban editables y otras no, sin más razón que el orden en
+   * que se fueron escribiendo. Las acciones de una fase del plan de clase
+   * son justo lo que el docente ajusta antes de entrar al aula.
+   */
+  const ListaEditable = ({ items, path, icon, className = "" }: {
+    items?: string[]; path: string[]; icon?: string; className?: string;
+  }) =>
+    Array.isArray(items) && items.length > 0 ? (
+      <ul className={`space-y-1 text-sm text-foreground ${className}`}>
+        {items.map((it: string, i: number) => (
+          <li key={i} className="flex gap-2 items-start">
+            <span className="text-primary shrink-0 mt-1.5">{icon || "\u2022"}</span>
+            {editable ? (
+              // Caja alta solo para lo que no cabe en una línea: con treinta
+              // campos en pantalla, poner todos altos vuelve el plan de clase
+              // imposible de recorrer.
+              <EditableText
+                value={it}
+                path={[...path, String(i)]}
+                multiline={String(it || "").length > 70}
+                className="flex-1"
+              />
+            ) : (
+              <span>{it}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    ) : null;
+
   switch (type) {
     case "icfes":
     case "quiz":
@@ -198,7 +232,11 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
                 Actividad {a.number || idx + 1}:{" "}
                 <EditableText value={a.title} path={["activities", String(idx), "title"]} />
               </h3>
-              {a.purpose && <p className="text-xs text-muted-foreground italic mb-2">{a.purpose}</p>}
+              {a.purpose && (
+                <div className="text-xs text-muted-foreground italic mb-2">
+                  <EditableText value={a.purpose} path={["activities", String(idx), "purpose"]} multiline />
+                </div>
+              )}
 
               {/* Formato anterior: descripción como texto */}
               {a.description && (
@@ -211,11 +249,20 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
               {Array.isArray(a.instructions) ? (
                 <ol className="space-y-1 text-sm text-foreground mb-2">
                   {a.instructions.map((paso: string, i: number) => (
-                    <li key={i} className="flex gap-2">
-                      <span className="shrink-0 h-5 w-5 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
+                    <li key={i} className="flex gap-2 items-start">
+                      <span className="shrink-0 h-5 w-5 mt-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center">
                         {i + 1}
                       </span>
-                      <span>{paso}</span>
+                      {editable ? (
+                        <EditableText
+                          value={paso}
+                          path={["activities", String(idx), "instructions", String(i)]}
+                          multiline={String(paso || "").length > 70}
+                          className="flex-1"
+                        />
+                      ) : (
+                        <span>{paso}</span>
+                      )}
                     </li>
                   ))}
                 </ol>
@@ -228,20 +275,26 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
               {Array.isArray(a.questions) && a.questions.length > 0 && (
                 <div className="bg-muted/30 rounded-md p-2 mb-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Preguntas orientadoras</p>
-                  <ul className="space-y-1 text-sm">
-                    {a.questions.map((q: string, i: number) => (
-                      <li key={i} className="flex gap-2"><span className="text-primary shrink-0">?</span><span>{q}</span></li>
-                    ))}
-                  </ul>
+                  <ListaEditable
+                    items={a.questions}
+                    path={["activities", String(idx), "questions"]}
+                    icon="?"
+                  />
                 </div>
               )}
 
               {a.product && (
-                <p className="text-xs text-foreground bg-primary/5 rounded-md p-2">
-                  <strong>Producto:</strong> {a.product}
-                </p>
+                <div className="text-xs text-foreground bg-primary/5 rounded-md p-2">
+                  <strong>Producto:</strong>{" "}
+                  <EditableText value={a.product} path={["activities", String(idx), "product"]} multiline />
+                </div>
               )}
-              {a.duration && <p className="text-xs text-muted-foreground mt-1">⏱ {a.duration}</p>}
+              {a.duration && (
+                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <span>⏱</span>
+                  <EditableText value={a.duration} path={["activities", String(idx), "duration"]} />
+                </div>
+              )}
             </div>
           ))}
 
@@ -250,13 +303,17 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
               {content.differentiation.support && (
                 <div className="p-3 border border-border rounded-lg">
                   <h3 className="font-semibold text-foreground text-sm mb-1">Apoyo adicional</h3>
-                  <p className="text-sm text-foreground">{content.differentiation.support}</p>
+                  <div className="text-sm text-foreground">
+                    <EditableText value={content.differentiation.support} path={["differentiation", "support"]} multiline />
+                  </div>
                 </div>
               )}
               {content.differentiation.extension && (
                 <div className="p-3 border border-border rounded-lg">
                   <h3 className="font-semibold text-foreground text-sm mb-1">Reto de profundización</h3>
-                  <p className="text-sm text-foreground">{content.differentiation.extension}</p>
+                  <div className="text-sm text-foreground">
+                    <EditableText value={content.differentiation.extension} path={["differentiation", "extension"]} multiline />
+                  </div>
                 </div>
               )}
             </div>
@@ -271,14 +328,30 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
               ) : (
                 <div className="space-y-2">
                   {content.evaluation.instrument && (
-                    <p><span className="text-muted-foreground">Instrumento:</span> {content.evaluation.instrument}</p>
+                    <div><span className="text-muted-foreground">Instrumento:</span>{" "}
+                      <EditableText value={content.evaluation.instrument} path={["evaluation", "instrument"]} />
+                    </div>
                   )}
                   {Array.isArray(content.evaluation.criteria) && content.evaluation.criteria.length > 0 && (
                     <ul className="space-y-1">
                       {content.evaluation.criteria.map((c: any, i: number) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-primary shrink-0">•</span>
-                          <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                        <li key={i} className="flex gap-2 items-start">
+                          <span className="text-primary shrink-0 mt-1.5">•</span>
+                          {editable ? (
+                            <div className="flex-1 space-y-1">
+                              <EditableText
+                                value={c.criterion}
+                                path={["evaluation", "criteria", String(i), "criterion"]}
+                              />
+                              <EditableText
+                                value={c.indicator}
+                                path={["evaluation", "criteria", String(i), "indicator"]}
+                                multiline
+                              />
+                            </div>
+                          ) : (
+                            <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -342,19 +415,6 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
       );
 
     case "lesson_plan": {
-      // Lista simple reutilizable para los campos que ahora son arreglos.
-      const Bullets = ({ items, icon }: { items?: string[]; icon?: string }) =>
-        Array.isArray(items) && items.length > 0 ? (
-          <ul className="space-y-1 text-sm text-foreground">
-            {items.map((it: string, i: number) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-primary shrink-0">{icon || "•"}</span>
-                <span>{it}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null;
-
       return (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -366,8 +426,16 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
 
           {(content.standard || content.dba) && (
             <div className="text-xs text-muted-foreground space-y-1 border-l-2 border-primary/30 pl-3">
-              {content.standard && <p><strong>Estándar:</strong> {content.standard}</p>}
-              {content.dba && <p><strong>DBA:</strong> {content.dba}</p>}
+              {content.standard && (
+                <div><strong>Estándar:</strong>{" "}
+                  <EditableText value={content.standard} path={["standard"]} multiline />
+                </div>
+              )}
+              {content.dba && (
+                <div><strong>DBA:</strong>{" "}
+                  <EditableText value={content.dba} path={["dba"]} multiline />
+                </div>
+              )}
             </div>
           )}
 
@@ -381,7 +449,7 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
           {Array.isArray(content.learningGoals) && content.learningGoals.length > 0 && (
             <div className="p-3 border border-border rounded-lg">
               <h3 className="font-semibold text-foreground text-sm mb-2">Metas de aprendizaje</h3>
-              <Bullets items={content.learningGoals} icon="✓" />
+              <ListaEditable items={content.learningGoals} path={["learningGoals"]} icon="✓" />
             </div>
           )}
 
@@ -389,13 +457,13 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
             {Array.isArray(content.priorKnowledge) && content.priorKnowledge.length > 0 && (
               <div className="p-3 border border-border rounded-lg">
                 <h3 className="font-semibold text-foreground text-sm mb-2">Saberes previos</h3>
-                <Bullets items={content.priorKnowledge} />
+                <ListaEditable items={content.priorKnowledge} path={["priorKnowledge"]} />
               </div>
             )}
             {Array.isArray(content.materials) && content.materials.length > 0 && (
               <div className="p-3 border border-border rounded-lg">
                 <h3 className="font-semibold text-foreground text-sm mb-2">Materiales</h3>
-                <Bullets items={content.materials} icon="▪" />
+                <ListaEditable items={content.materials} path={["materials"]} icon="▪" />
               </div>
             )}
           </div>
@@ -403,27 +471,36 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
           {content.phases?.map((p: any, i: number) => (
             <div key={i} className="p-4 border border-border rounded-lg">
               <h3 className="font-semibold text-foreground mb-1">
-                <EditableText value={p.name} path={["phases", String(i), "name"]} /> ({p.duration})
+                <EditableText value={p.name} path={["phases", String(i), "name"]} />{" "}
+                {p.duration && (
+                  editable
+                    ? <EditableText value={p.duration} path={["phases", String(i), "duration"]} className="w-28 inline-block" />
+                    : <span>({p.duration})</span>
+                )}
               </h3>
-              {p.purpose && <p className="text-xs text-muted-foreground italic mb-3">{p.purpose}</p>}
+              {p.purpose && (
+                <div className="text-xs text-muted-foreground italic mb-3">
+                  <EditableText value={p.purpose} path={["phases", String(i), "purpose"]} multiline />
+                </div>
+              )}
 
               {/* Formato nuevo: acciones separadas por actor */}
               {Array.isArray(p.teacherActions) && p.teacherActions.length > 0 && (
                 <div className="mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Docente</p>
-                  <Bullets items={p.teacherActions} icon="→" />
+                  <ListaEditable items={p.teacherActions} path={["phases", String(i), "teacherActions"]} icon="→" />
                 </div>
               )}
               {Array.isArray(p.studentActions) && p.studentActions.length > 0 && (
                 <div className="mb-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Estudiantes</p>
-                  <Bullets items={p.studentActions} icon="→" />
+                  <ListaEditable items={p.studentActions} path={["phases", String(i), "studentActions"]} icon="→" />
                 </div>
               )}
               {Array.isArray(p.questions) && p.questions.length > 0 && (
                 <div className="mb-3 bg-muted/30 rounded-md p-2">
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Preguntas orientadoras</p>
-                  <Bullets items={p.questions} icon="?" />
+                  <ListaEditable items={p.questions} path={["phases", String(i), "questions"]} icon="?" />
                 </div>
               )}
 
@@ -443,13 +520,17 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
               {content.differentiation.support && (
                 <div className="p-3 border border-border rounded-lg">
                   <h3 className="font-semibold text-foreground text-sm mb-1">Apoyo adicional</h3>
-                  <p className="text-sm text-foreground">{content.differentiation.support}</p>
+                  <div className="text-sm text-foreground">
+                    <EditableText value={content.differentiation.support} path={["differentiation", "support"]} multiline />
+                  </div>
                 </div>
               )}
               {content.differentiation.extension && (
                 <div className="p-3 border border-border rounded-lg">
                   <h3 className="font-semibold text-foreground text-sm mb-1">Reto de profundización</h3>
-                  <p className="text-sm text-foreground">{content.differentiation.extension}</p>
+                  <div className="text-sm text-foreground">
+                    <EditableText value={content.differentiation.extension} path={["differentiation", "extension"]} multiline />
+                  </div>
                 </div>
               )}
             </div>
@@ -463,14 +544,36 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
                 <EditableText value={content.evaluation} path={["evaluation"]} multiline />
               ) : (
                 <div className="space-y-2">
-                  {content.evaluation.type && <p><span className="text-muted-foreground">Tipo:</span> {content.evaluation.type}</p>}
-                  {content.evaluation.instrument && <p><span className="text-muted-foreground">Instrumento:</span> {content.evaluation.instrument}</p>}
+                  {content.evaluation.type && (
+                    <div><span className="text-muted-foreground">Tipo:</span>{" "}
+                      <EditableText value={content.evaluation.type} path={["evaluation", "type"]} />
+                    </div>
+                  )}
+                  {content.evaluation.instrument && (
+                    <div><span className="text-muted-foreground">Instrumento:</span>{" "}
+                      <EditableText value={content.evaluation.instrument} path={["evaluation", "instrument"]} />
+                    </div>
+                  )}
                   {Array.isArray(content.evaluation.criteria) && content.evaluation.criteria.length > 0 && (
                     <ul className="space-y-1">
                       {content.evaluation.criteria.map((c: any, i: number) => (
-                        <li key={i} className="flex gap-2">
-                          <span className="text-primary shrink-0">•</span>
-                          <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                        <li key={i} className="flex gap-2 items-start">
+                          <span className="text-primary shrink-0 mt-1.5">•</span>
+                          {editable ? (
+                            <div className="flex-1 space-y-1">
+                              <EditableText
+                                value={c.criterion}
+                                path={["evaluation", "criteria", String(i), "criterion"]}
+                              />
+                              <EditableText
+                                value={c.indicator}
+                                path={["evaluation", "criteria", String(i), "indicator"]}
+                                multiline
+                              />
+                            </div>
+                          ) : (
+                            <span><strong>{c.criterion}:</strong> {c.indicator}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -482,14 +585,15 @@ export function ResourceContentViewer({ type, content, editable = false, onConte
 
           {content.homework && (
             <div className="text-sm p-3 border border-border rounded-lg">
-              <strong>Tarea:</strong> {content.homework}
+              <strong>Tarea:</strong>{" "}
+              <EditableText value={content.homework} path={["homework"]} multiline />
             </div>
           )}
 
           {Array.isArray(content.references) && content.references.length > 0 && (
             <div className="p-3 border border-border rounded-lg">
               <h3 className="font-semibold text-foreground text-sm mb-2">Referencias</h3>
-              <Bullets items={content.references} />
+              <ListaEditable items={content.references} path={["references"]} />
             </div>
           )}
         </div>

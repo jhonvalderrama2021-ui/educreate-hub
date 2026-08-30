@@ -142,6 +142,19 @@ export default function GenerateResource() {
   // actualiza ese registro en vez de crear un duplicado.
   const [recursoId, setRecursoId] = useState<string | null>(null);
 
+  /**
+   * Con qué se guardó el recurso que está en pantalla.
+   *
+   * Antes esto se leía del formulario también al actualizar. Ahora que el
+   * formulario se limpia al terminar, guardar una corrección sobre el
+   * recurso abierto le habría escrito encima una asignatura y un grado
+   * vacíos. La ficha se fija al generarlo o al abrirlo, y no se mueve
+   * porque el docente empiece a llenar el formulario del siguiente.
+   */
+  const [fichaDelRecurso, setFichaDelRecurso] = useState<{
+    titulo: string; subject: string | null; grade: string | null;
+  } | null>(null);
+
   /*
    * Si se borra el recurso que esta en pantalla, se limpia el visor. Dejarlo
    * permitiria seguir editandolo y guardar sobre una fila que ya no existe.
@@ -151,6 +164,48 @@ export default function GenerateResource() {
     setGeneratedContent(null);
     setRecursoId(null);
     setIsEditing(false);
+  };
+
+  /**
+   * El nombre del archivo sin su extensión, para nombrar el recurso.
+   *
+   * El punto va escapado. Sin escapar, el punto significa "cualquier
+   * carácter", y un archivo sin extensión —"apuntes"— se quedaba en cadena
+   * vacía: al modelo le llegaba `Tema: ("")`, que no le dice nada.
+   */
+  const quitarExtension = (nombre: string) =>
+    nombre.replace(/\.[^.]+$/, "") || nombre;
+
+  /**
+   * Deja el formulario como recién llegado.
+   *
+   * No toca el motor de IA ni la paleta de diapositivas: son preferencias de
+   * cómo trabaja el docente, no datos del recurso, y reiniciarlas en cada
+   * creación sería pelear con él.
+   */
+  const limpiarFormulario = () => {
+    setTema("");
+    setTitle("");
+    setSubject("");
+    setCustomSubject("");
+    setGrade("6");
+    setMethodology("");
+    setCustomMethodology("");
+    setDuration("");
+    setInstructions("");
+    setNumItems(10);
+    setExamType("icfes");
+    setExamComplexity("icfes");
+    setNumSlides(8);
+    setRubricType("analitica");
+    setCustomRubricType("");
+    setPerformanceLevels("4");
+    setCustomLevelNames([]);
+    setRubricObjective("");
+    setUploadedFile(null);
+    setFileText("");
+    setIsPublic(false);
+    setValidationErrors([]);
   };
 
   // Los mantiene el administrador desde el panel: el asesor pidio que
@@ -185,6 +240,11 @@ export default function GenerateResource() {
     setGeneratedContent(null);
     setIsEditing(false);
     setRecursoId(null);
+    setFichaDelRecurso(null);
+    // Pasar de plan de clase a rúbricas arrastraba el tema, el grado y la
+    // asignatura del anterior. Cada módulo empieza en limpio.
+    limpiarFormulario();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeParam, recursoParam]);
 
   // Llegar con ?recurso=<id> abre ese recurso listo para modificarlo. Es el
@@ -306,7 +366,7 @@ export default function GenerateResource() {
       // Sin esta linea el modelo no sabe de que va el recurso y se inventa un
       // tema; el nombre del archivo suele decirlo mejor que nada.
       parts.push(
-        `Tema: el que trate el documento cargado${uploadedFile ? ` ("${uploadedFile.name.replace(/.[^.]+$/, "")}")` : ""}. ` +
+        `Tema: el que trate el documento cargado${uploadedFile ? ` ("${quitarExtension(uploadedFile.name)}")` : ""}. ` +
         `No inventes un tema distinto.`,
       );
     }
@@ -377,7 +437,13 @@ export default function GenerateResource() {
         result = await generateWithOllama(params, ollamaUrl, ollamaModel);
       }
 
-      if (!title && result.title) setTitle(result.title);
+      // La ficha se anota ANTES de limpiar: es con lo que se guardará el
+      // recurso y con lo que se guardarán sus correcciones después.
+      setFichaDelRecurso({
+        titulo: title?.trim() || result.title || "Recurso sin título",
+        subject: (subject === "Otras" ? customSubject : subject)?.trim() || null,
+        grade: grade || null,
+      });
       setGeneratedContent(result);
       setRecursoId(null);
 
@@ -390,6 +456,10 @@ export default function GenerateResource() {
       } else {
         toast.success("Recurso generado. No se pudo guardar solo; usa el boton Guardar.");
       }
+
+      // El formulario queda listo para el siguiente. El recurso recién hecho
+      // sigue en pantalla y ya está guardado, así que no se pierde nada.
+      limpiarFormulario();
     } catch (e: any) {
       toast.error(e.message || "Error al generar el recurso");
     } finally {
@@ -419,16 +489,28 @@ export default function GenerateResource() {
         if (!uploadError) sourcePdfUrl = filePath;
       }
 
+      // Al CREAR, los datos salen del formulario, que es lo que el docente
+      // acaba de llenar. Al ACTUALIZAR salen de la ficha del recurso: el
+      // formulario ya se limpió y puede llevar lo del siguiente recurso.
+      const delFormulario = {
+        titulo: tituloExplicito?.trim() || title || contenido.title || "Recurso sin título",
+        subject: (subject === "Otras" ? customSubject : subject)?.trim() || null,
+        grade: grade || null,
+      };
+      const ficha = id && fichaDelRecurso
+        ? { ...fichaDelRecurso, titulo: tituloExplicito?.trim() || fichaDelRecurso.titulo }
+        : delFormulario;
+
       const datos: TablesInsert<"generated_resources"> = {
         user_id: user.id,
-        title: tituloExplicito?.trim() || title || contenido.title || "Recurso sin título",
+        title: ficha.titulo,
         resource_type: resourceType,
         content: contenido,
         is_public: isPublic,
         // Se guardan como columnas, no solo dentro del contenido, para poder
         // filtrar y agrupar los recursos por asignatura y grado.
-        subject: (subject === "Otras" ? customSubject : subject)?.trim() || null,
-        grade: grade || null,
+        subject: ficha.subject,
+        grade: ficha.grade,
       };
       if (sourcePdfUrl) datos.source_pdf_url = sourcePdfUrl;
 
@@ -474,12 +556,12 @@ export default function GenerateResource() {
    */
   const abrirDelHistorial = (r: RecursoHistorial) => {
     setRecursoId(r.id);
-    setTitle(r.title);
     setIsPublic(r.is_public);
     setGeneratedContent(r.content);
-    if (r.subject) setSubject(SUBJECTS.includes(r.subject) ? r.subject : "Otras");
-    if (r.subject && !SUBJECTS.includes(r.subject)) setCustomSubject(r.subject);
-    if (r.grade) setGrade(r.grade);
+    // Los datos del recurso van a su ficha, no al formulario. Volcarlos ahí
+    // era otra vía por la que el tema y la asignatura de un recurso viejo
+    // terminaban metidos en el siguiente que se fuera a crear.
+    setFichaDelRecurso({ titulo: r.title, subject: r.subject, grade: r.grade });
     window.scrollTo({ top: 0, behavior: "smooth" });
     setIsEditing(true);
   };
@@ -490,7 +572,8 @@ export default function GenerateResource() {
     setRecursoId(null);
     setGeneratedContent(null);
     setIsEditing(false);
-    setTitle("");
+    setFichaDelRecurso(null);
+    limpiarFormulario();
   };
   const savePreferences = async () => {
     if (!user) return;
