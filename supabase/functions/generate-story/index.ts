@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
-import { asegurarEspanol } from "../_compartido/idioma.ts";
+import { asegurarIdioma } from "../_compartido/idioma.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -292,7 +292,7 @@ ILUSTRACIONES
      * y no tiene sentido pagarlas por un cuento que va a haber que rehacer.
      * Ver _compartido/idioma.ts.
      */
-    await asegurarEspanol(story, apiKey, "gpt-5.4-mini");
+    await asegurarIdioma(story, apiKey, "gpt-5.4-mini");
 
     // Generate images in parallel: cover + 3 chapter illustrations
     const chaptersToIllustrate = story.chapters.slice(0, 3);

@@ -425,6 +425,8 @@ export default function GenerateResource() {
         // aviso el servidor trata el archivo como material de apoyo y el
         // recurso sale sobre otra cosa.
         desdeDocumento: hayDocumento && !tema.trim(),
+        // De la asignatura sale el idioma: un taller de Ingles va en ingles.
+        asignatura: subject === "Otras" ? customSubject : subject,
         instructions: buildInstructions() + (palette ? `\nPaleta de colores: ${palette.name} - ${palette.description}` : ""),
         numItems: resourceType === "slides" ? (numSlides || 8) : (numItems || 10),
       };

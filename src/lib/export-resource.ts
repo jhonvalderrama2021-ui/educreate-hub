@@ -1,6 +1,7 @@
 import { Document, Packer, Paragraph, TextRun, AlignmentType, HeadingLevel, BorderStyle, ImageRun, Header, PageBreak, Table, TableRow, TableCell, WidthType, ShadingType, VerticalAlign } from "docx";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
+import { escribirConSimbolos, partirEnRenglones } from "@/lib/simbolos-pdf";
 
 const cellBorder = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
 const cellBorders = { top: cellBorder, bottom: cellBorder, left: cellBorder, right: cellBorder };
@@ -189,12 +190,21 @@ export async function construirPdf(
   };
 
   const addText = (text: string, size: number, bold = false, indent = 0) => {
+    /*
+     * Se escribe con el ayudante de símbolos porque las fuentes estándar del
+     * PDF no tienen √ ≠ ≤ π ni los subíndices, y jsPDF los cambia por otro
+     * carácter sin avisar: un examen de matemáticas perdía la raíz cuadrada y
+     * H₂O se imprimía roto. Ver src/lib/simbolos-pdf.ts.
+     *
+     * Cuando el texto no lleva símbolos —lo normal— el ayudante escribe de
+     * una sola vez, igual que antes.
+     */
     doc.setFontSize(size);
     doc.setFont("helvetica", bold ? "bold" : "normal");
-    const lines = doc.splitTextToSize(text, maxWidth - indent);
+    const lines = partirEnRenglones(doc, text, maxWidth - indent, { size, bold });
     for (const line of lines) {
       if (y > pageHeight - 20) newPage();
-      doc.text(line, margin + indent, y);
+      escribirConSimbolos(doc, line, margin + indent, y, { size, bold });
       y += size * 0.5;
     }
     y += 2;
@@ -275,7 +285,7 @@ export async function construirPdf(
             col = 0;
           }
           const x = margin + col * colWidth;
-          doc.text(`${num}. ${q.correct ?? "—"}`, x, rowY);
+          escribirConSimbolos(doc, `${num}. ${q.correct ?? "—"}`, x, rowY, { size: 10 });
           col++;
           if (col >= cols) { col = 0; rowY += 8; }
         });
@@ -543,10 +553,10 @@ export async function construirPdf(
         doc.setFontSize(12);
         const paragraphs = text.split(/\n\n+/);
         for (const para of paragraphs) {
-          const lines = doc.splitTextToSize(para, maxWidth);
+          const lines = partirEnRenglones(doc, para, maxWidth, { size: 12 });
           for (const line of lines) {
             if (y > pageHeight - 20) newPage();
-            doc.text(line, margin, y);
+            escribirConSimbolos(doc, line, margin, y, { size: 12 });
             y += 6;
           }
           y += 3;

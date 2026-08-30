@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  hallarTextosAjenos, asegurarEspanol, IdiomaIrrecuperableError,
+  hallarTextosAjenos, asegurarIdioma, idiomaDeLaAsignatura, IdiomaIrrecuperableError,
 } from "../../supabase/functions/_compartido/idioma";
 
 /**
@@ -83,7 +83,7 @@ describe("corregir el idioma", () => {
     );
 
     const plan = JSON.parse(JSON.stringify(PLAN_CONTAMINADO));
-    const corregidos = await asegurarEspanol(plan, "clave", "gpt-5.4-mini");
+    const corregidos = await asegurarIdioma(plan, "clave", "gpt-5.4-mini");
 
     expect(corregidos).toBe(1);
     expect(plan.objective).toBe("Identificar y usar verbos esenciales en oraciones sencillas");
@@ -95,7 +95,7 @@ describe("corregir el idioma", () => {
 
   it("solo se manda a corregir lo contaminado, no el recurso entero", async () => {
     (fetch as any).mockResolvedValue(respuesta(["Identificar y usar verbos"]));
-    await asegurarEspanol(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini");
+    await asegurarIdioma(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini");
 
     const cuerpo = JSON.parse((fetch as any).mock.calls[0][1].body);
     const enviado = JSON.parse(cuerpo.messages[1].content);
@@ -104,7 +104,7 @@ describe("corregir el idioma", () => {
 
   it("si el recurso ya está en español no gasta una llamada", async () => {
     const limpio = { objective: "Identificar y usar verbos" };
-    const corregidos = await asegurarEspanol(limpio, "clave", "gpt-5.4-mini");
+    const corregidos = await asegurarIdioma(limpio, "clave", "gpt-5.4-mini");
     expect(corregidos).toBe(0);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -115,7 +115,7 @@ describe("corregir el idioma", () => {
     (fetch as any).mockResolvedValue(respuesta(["Identificar y להשתמש verbos"]));
 
     await expect(
-      asegurarEspanol(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini"),
+      asegurarIdioma(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini"),
     ).rejects.toBeInstanceOf(IdiomaIrrecuperableError);
   });
 
@@ -123,7 +123,7 @@ describe("corregir el idioma", () => {
     (fetch as any).mockResolvedValue({ ok: false, status: 500, text: async () => "boom" });
 
     const plan = JSON.parse(JSON.stringify(PLAN_CONTAMINADO));
-    await expect(asegurarEspanol(plan, "clave", "gpt-5.4-mini")).rejects.toThrow(/tokens/i);
+    await expect(asegurarIdioma(plan, "clave", "gpt-5.4-mini")).rejects.toThrow(/tokens/i);
     // Y el original no queda a medio arreglar.
     expect(plan.objective).toBe(PLAN_CONTAMINADO.objective);
   });
@@ -133,7 +133,7 @@ describe("corregir el idioma", () => {
     // un campo encima de otro: peor que no corregir.
     (fetch as any).mockResolvedValue(respuesta(["uno", "dos"]));
     await expect(
-      asegurarEspanol(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini"),
+      asegurarIdioma(JSON.parse(JSON.stringify(PLAN_CONTAMINADO)), "clave", "gpt-5.4-mini"),
     ).rejects.toBeInstanceOf(IdiomaIrrecuperableError);
   });
 
@@ -146,10 +146,58 @@ describe("corregir el idioma", () => {
       respuesta(["Verbos y acciones", "Activar saberes previos"]),
     );
 
-    const corregidos = await asegurarEspanol(sucio, "clave", "gpt-5.4-mini");
+    const corregidos = await asegurarIdioma(sucio, "clave", "gpt-5.4-mini");
     expect(corregidos).toBe(2);
     expect(sucio.title).toBe("Verbos y acciones");
     expect(sucio.phases[0].purpose).toBe("Activar saberes previos");
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("el idioma lo decide la asignatura", () => {
+  /*
+   * Al reforzar "escribe todo en español" se rompió la clase de Inglés: un
+   * taller de inglés va EN INGLÉS, es material para que el estudiante lea y
+   * practique en ese idioma, no una traducción.
+   */
+  it("un recurso de Inglés va en inglés", () => {
+    expect(idiomaDeLaAsignatura("Inglés")).toBe("inglés");
+  });
+
+  it("uno de Francés, en francés", () => {
+    expect(idiomaDeLaAsignatura("Francés")).toBe("francés");
+  });
+
+  it("da igual cómo venga escrito el nombre", () => {
+    // El docente puede escribirla a mano en "Otras", sin tilde o en minúscula.
+    for (const escrito of ["inglés", "INGLES", " Ingles ", "english"]) {
+      expect(idiomaDeLaAsignatura(escrito), escrito).toBe("inglés");
+    }
+  });
+
+  const enEspanol = [
+    "Matemáticas", "Ciencias Naturales", "Lengua Castellana", "Química",
+    // Programación y Robótica llevan palabras en inglés del lenguaje de
+    // programación, pero el recurso se explica en español.
+    "Programación y Computación", "Robótica",
+  ];
+  for (const asignatura of enEspanol) {
+    it(`${asignatura} va en español`, () => {
+      expect(idiomaDeLaAsignatura(asignatura)).toBe("español de Colombia");
+    });
+  }
+
+  it("sin asignatura, español por defecto", () => {
+    expect(idiomaDeLaAsignatura(null)).toBe("español de Colombia");
+    expect(idiomaDeLaAsignatura(undefined)).toBe("español de Colombia");
+    expect(idiomaDeLaAsignatura("")).toBe("español de Colombia");
+  });
+
+  it("la comprobación de alfabetos vale igual para inglés y francés", () => {
+    // Los tres idiomas usan alfabeto latino, así que una palabra en hebreo
+    // sigue siendo un fallo en un taller de inglés.
+    expect(hallarTextosAjenos({ t: "Write five sentences using the verb to be" })).toEqual([]);
+    expect(hallarTextosAjenos({ t: "Écris cinq phrases avec le verbe être" })).toEqual([]);
+    expect(hallarTextosAjenos({ t: "Write five להשתמש sentences" })).toHaveLength(1);
   });
 });

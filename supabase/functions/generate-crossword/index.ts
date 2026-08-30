@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { seleccionarPasajes } from "../_compartido/seleccionar-pasajes.ts";
-import { asegurarEspanol } from "../_compartido/idioma.ts";
+import { asegurarIdioma } from "../_compartido/idioma.ts";
 import { cobrarTokens, devolverTokens, SinTokensError, type Cobro } from "../_compartido/tokens.ts";
 
 const corsHeaders = {
@@ -536,7 +536,7 @@ serve(async (req) => {
      * la cuadrícula, que es lo caro. Ver _compartido/idioma.ts.
      */
     const paquete = { tema: temaFinal, palabras: rawWords };
-    await asegurarEspanol(paquete, apiKey, "gpt-5.4-mini");
+    await asegurarIdioma(paquete, apiKey, "gpt-5.4-mini");
     const temaRevisado = paquete.tema;
 
     // Normalize and dedupe

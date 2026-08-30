@@ -11,7 +11,35 @@
  */
 
 /**
- * Escrituras que no tienen nada que hacer en un recurso en español.
+ * En qué idioma va el recurso, según la asignatura.
+ *
+ * Un recurso para la clase de Inglés va en inglés: es material para que el
+ * estudiante lea y practique en ese idioma, no una traducción. Lo mismo con
+ * Francés. Exigir español ahí sería romper la clase.
+ *
+ * El resto de asignaturas van en español, incluidas Programación y Robótica:
+ * ahí el inglés aparece solo en las palabras del lenguaje de programación, y
+ * eso no lo toca nadie porque va en alfabeto latino.
+ */
+const IDIOMA_POR_ASIGNATURA: Record<string, string> = {
+  "inglés": "inglés",
+  "ingles": "inglés",
+  "english": "inglés",
+  "francés": "francés",
+  "frances": "francés",
+};
+
+/** El idioma en que debe salir el recurso de esa asignatura. */
+export function idiomaDeLaAsignatura(asignatura?: string | null): string {
+  const clave = String(asignatura ?? "").trim().toLowerCase();
+  return IDIOMA_POR_ASIGNATURA[clave] ?? "español de Colombia";
+}
+
+/**
+ * Escrituras que no tienen nada que hacer en un recurso escolar colombiano.
+ *
+ * Ni en español ni en inglés ni en francés: las tres se escriben en alfabeto
+ * latino, así que la misma comprobación sirve para todas.
  *
  * El griego se deja fuera a propósito: π, α, Δ y compañía aparecen con toda
  * legitimidad en matemáticas y física, y marcarlas convertiría cada plan de
@@ -66,6 +94,7 @@ async function pedirTraduccion(
   apiKey: string,
   textos: string[],
   modelo: string,
+  idioma: string,
 ): Promise<string[]> {
   const r = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -81,7 +110,7 @@ async function pedirTraduccion(
             "fallo de generación. Devuelve JSON {\"textos\": [...]} con la MISMA cantidad de " +
             "elementos y en el MISMO orden.\n" +
             "REGLAS:\n" +
-            "1. Escribe TODO en español de Colombia.\n" +
+            `1. El texto va en ${idioma}. Devuélvelo en ${idioma}.\n` +
             "2. Sustituye la palabra ajena por la que corresponda en español según el sentido " +
             "de la frase. No la borres dejando un hueco ni la dejes entre paréntesis.\n" +
             "3. No cambies nada más: ni el sentido, ni el tono, ni la longitud aproximada.\n" +
@@ -124,10 +153,11 @@ export class IdiomaIrrecuperableError extends Error {
  * vuelva a generar —sin coste, porque el error devuelve los tokens— a que se
  * lleve al aula un plan de clase con una palabra en hebreo dentro.
  */
-export async function asegurarEspanol(
+export async function asegurarIdioma(
   contenido: any,
   apiKey: string,
   modelo: string,
+  idioma = "español de Colombia",
 ): Promise<number> {
   let corregidos = 0;
 
@@ -137,7 +167,7 @@ export async function asegurarEspanol(
 
     let arreglados: string[];
     try {
-      arreglados = await pedirTraduccion(apiKey, ajenos.map((a) => a.texto), modelo);
+      arreglados = await pedirTraduccion(apiKey, ajenos.map((a) => a.texto), modelo, idioma);
     } catch (e) {
       console.warn("No se pudo corregir el idioma:", e);
       break;
