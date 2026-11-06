@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { avisarError } from "@/lib/errores";
+import { Explicacion } from "@/components/Explicacion";
 
 export default function CoursesList() {
   const { user } = useAuth();
@@ -195,7 +196,13 @@ export default function CoursesList() {
                     <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Clave de acceso</Label>
+                    <Label className="flex items-center gap-1.5">
+                      Clave de acceso
+                      <Explicacion titulo="la clave de acceso">
+                        <p>Es lo que dictas a tus estudiantes para que entren al curso. Solo quien la tenga puede inscribirse.</p>
+                        <p>Puedes cambiarla cuando quieras con el botón de la derecha: los ya inscritos siguen dentro.</p>
+                      </Explicacion>
+                    </Label>
                     <div className="flex gap-2">
                       <Input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="font-mono uppercase" />
                       <Button type="button" variant="outline" size="icon" onClick={() => setCode(generateAccessCode())}>

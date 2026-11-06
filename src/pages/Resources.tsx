@@ -4,6 +4,7 @@ import { useEffect, Suspense, lazy } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ResourcesSidebar } from "@/components/ResourcesSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AtajosDeTeclado } from "@/components/AtajosDeTeclado";
 import { UserMenu } from "@/components/UserMenu";
 import { ContadorTokens } from "@/components/ContadorTokens";
 import { CalendarPopover } from "@/components/CalendarPopover";
@@ -109,6 +110,7 @@ export default function Resources() {
 
   return (
     <SidebarProvider>
+      <AtajosDeTeclado />
       <div className="min-h-screen flex w-full bg-background overflow-x-hidden">
         <ResourcesSidebar />
         <div className="flex-1 flex flex-col min-w-0">

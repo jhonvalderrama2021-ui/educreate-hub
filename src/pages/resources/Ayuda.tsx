@@ -2,11 +2,15 @@ import { useEffect, useState } from "react";
 import {
   HelpCircle, ChevronDown, FileCheck, ClipboardList, Table2, FileEdit,
   Presentation, Bot, Puzzle, BookText, GraduationCap, History, Upload,
-  Pencil, Download, ShieldCheck, Sparkles, X, Check, Lightbulb,
+  Pencil, Download, ShieldCheck, Sparkles, X, Check, Lightbulb, Search,
 } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { urlImagenAyuda } from "@/components/GestorImagenesAyuda";
 import { supabase } from "@/integrations/supabase/client";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { buscarEnAyuda } from "@/lib/buscar-ayuda";
+import { ATAJOS } from "@/lib/atajos";
 
 /* ─────────────────────────── Tipos ─────────────────────────── */
 
@@ -324,9 +328,16 @@ interface ImagenAyuda {
   descripcion: string | null;
 }
 
-function Acordeon({ modulo, imagenes }: { modulo: Modulo; imagenes: ImagenAyuda[] }) {
+function Acordeon(
+  { modulo, imagenes, abierto: abrirPorBusqueda = false }:
+  { modulo: Modulo; imagenes: ImagenAyuda[]; abierto?: boolean },
+) {
   const [abierto, setAbierto] = useState(false);
   const Icono = modulo.icono;
+
+  // Al filtrar, el resultado se muestra ya desplegado: obligar a un clic más
+  // para ver lo que se acaba de buscar no tendría sentido.
+  useEffect(() => { if (abrirPorBusqueda) setAbierto(true); }, [abrirPorBusqueda]);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
@@ -461,6 +472,8 @@ function Acordeon({ modulo, imagenes }: { modulo: Modulo; imagenes: ImagenAyuda[
 
 export default function Ayuda() {
   const [imagenes, setImagenes] = useState<ImagenAyuda[]>([]);
+  const [consulta, setConsulta] = useState("");
+  const resultado = buscarEnAyuda(consulta, PRIMEROS_PASOS, MODULOS, PROBLEMAS);
 
   useEffect(() => {
     supabase
@@ -485,35 +498,126 @@ export default function Ayuda() {
         </p>
       </header>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Primeros pasos</h2>
-        <p className="text-sm text-muted-foreground">
-          Si es tu primera vez, empieza por aquí.
+      {/* Buscador. Antes habia que recorrer trece secciones a ojo para dar con
+          una explicacion; quien no sabe como se llama lo que busca no llegaba. */}
+      <div className="space-y-2">
+        <Label htmlFor="buscar-ayuda" className="sr-only">
+          Buscar en el centro de ayuda
+        </Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            id="buscar-ayuda"
+            type="search"
+            value={consulta}
+            onChange={(e) => setConsulta(e.target.value)}
+            placeholder="Busca por módulo, campo o problema: examen, rúbrica, PDF…"
+            className="pl-9 pr-10"
+            aria-describedby="buscar-ayuda-resultado"
+          />
+          {consulta && (
+            <button
+              type="button"
+              onClick={() => setConsulta("")}
+              aria-label="Borrar la búsqueda"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {/* El recuento se anuncia solo: quien usa lector de pantalla necesita
+            saber que la lista cambió sin tener que recorrerla. */}
+        <p
+          id="buscar-ayuda-resultado"
+          role="status"
+          aria-live="polite"
+          className="text-sm text-muted-foreground min-h-[1.25rem]"
+        >
+          {resultado.filtrando &&
+            (resultado.total === 0
+              ? `Ningún apartado menciona «${consulta.trim()}». Prueba con una palabra más corta.`
+              : `${resultado.total} ${resultado.total === 1 ? "apartado" : "apartados"} coinciden con «${consulta.trim()}».`)}
         </p>
-        {PRIMEROS_PASOS.map((m) => <Acordeon key={m.id} modulo={m} imagenes={deSeccion(m.id)} />)}
-      </section>
+      </div>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Guía de cada módulo</h2>
-        <p className="text-sm text-muted-foreground">
-          Qué hace, cuándo usar cada opción y un ejemplo de qué escribir.
-        </p>
-        {MODULOS.map((m) => <Acordeon key={m.id} modulo={m} imagenes={deSeccion(m.id)} />)}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Si algo no funciona</h2>
-        <div className="space-y-2">
-          {PROBLEMAS.map((item, i) => (
-            <div key={i} className="border border-border rounded-lg p-4">
-              <p className="font-medium text-foreground text-sm mb-1">{item.p}</p>
-              <p className="text-sm text-muted-foreground leading-relaxed">{item.r}</p>
-            </div>
+      {resultado.primerosPasos.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">Primeros pasos</h2>
+          {!resultado.filtrando && (
+            <p className="text-sm text-muted-foreground">
+              Si es tu primera vez, empieza por aquí.
+            </p>
+          )}
+          {resultado.primerosPasos.map((m) => (
+            <Acordeon key={m.id} modulo={m as Modulo} imagenes={deSeccion(m.id)} abierto={resultado.filtrando} />
           ))}
+        </section>
+      )}
+
+      {resultado.modulos.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">Guía de cada módulo</h2>
+          {!resultado.filtrando && (
+            <p className="text-sm text-muted-foreground">
+              Qué hace, cuándo usar cada opción y un ejemplo de qué escribir.
+            </p>
+          )}
+          {resultado.modulos.map((m) => (
+            <Acordeon key={m.id} modulo={m as Modulo} imagenes={deSeccion(m.id)} abierto={resultado.filtrando} />
+          ))}
+        </section>
+      )}
+
+      {resultado.problemas.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-foreground">Si algo no funciona</h2>
+          <div className="space-y-2">
+            {resultado.problemas.map((item, i) => (
+              <div key={i} className="border border-border rounded-lg p-4">
+                <p className="font-medium text-foreground text-sm mb-1">{item.p}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.r}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Los atajos se listan aquí porque un atajo que nadie conoce no acelera
+          a nadie: hasta ahora existían solo dentro del visor de diapositivas y
+          del crucigrama, sin que se informara en ninguna parte. */}
+      <section className={`space-y-3 ${resultado.filtrando ? "hidden" : ""}`}>
+        <h2 className="text-lg font-semibold text-foreground">Atajos de teclado</h2>
+        <p className="text-sm text-muted-foreground">
+          Si prefieres el teclado al ratón. Pulsa{" "}
+          <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">?</kbd>{" "}
+          en cualquier pantalla para ver esta lista sin venir hasta aquí.
+        </p>
+        <div className="border border-border rounded-lg p-4">
+          <ul className="space-y-2">
+            {ATAJOS.map((a) => (
+              <li key={a.teclas.join("+")} className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-muted-foreground">{a.descripcion}</span>
+                <span className="flex items-center gap-1 shrink-0">
+                  {a.teclas.map((t, i) => (
+                    <kbd key={i} className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">
+                      {t}
+                    </kbd>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground mt-3">
+            Las secuencias de dos teclas se pulsan una después de otra, no a la
+            vez. No funcionan mientras escribes dentro de un campo.
+          </p>
         </div>
       </section>
 
-      <section className="space-y-3">
+      {/* Al filtrar se oculta: no forma parte de la búsqueda y aparecer bajo
+          unos resultados haría creer que es uno de ellos. */}
+      <section className={`space-y-3 ${resultado.filtrando ? "hidden" : ""}`}>
         <h2 className="text-lg font-semibold text-foreground">Uso responsable de la IA</h2>
 
         <div className="border border-border rounded-lg p-4 space-y-3 text-sm">

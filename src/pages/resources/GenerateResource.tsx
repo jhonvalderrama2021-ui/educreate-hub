@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { Explicacion } from "@/components/Explicacion";
 import type { TablesInsert } from "@/integrations/supabase/types";
 import { extraerTextoDeArchivo, ACEPTA } from "@/lib/extraer-texto";
 import { generateWithOpenAI, generateWithOllama, fetchOllamaModels } from "@/lib/ai-service";
@@ -947,7 +948,13 @@ export default function GenerateResource() {
           {/* Number of items */}
           {extraFields.includes("numItems") && (
             <div className="space-y-2">
-              <Label htmlFor="campo-num-preguntas">Número de preguntas</Label>
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="campo-num-preguntas">Número de preguntas</Label>
+                <Explicacion titulo="el número de preguntas">
+                  <p>Entre 1 y 50. Cuantas más pidas, más tarda: un examen de 20 preguntas puede tomar cerca de un minuto.</p>
+                  <p>Si la generación falla, bájalo y vuelve a intentarlo.</p>
+                </Explicacion>
+              </div>
               <Input
                 type="number"
                 min={1}
@@ -971,7 +978,13 @@ export default function GenerateResource() {
 
           {/* Additional instructions */}
           <div className="space-y-2">
-            <Label htmlFor="campo-instrucciones">Instrucciones adicionales (opcional)</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="campo-instrucciones">Instrucciones adicionales (opcional)</Label>
+              <Explicacion titulo="las instrucciones adicionales">
+                <p>Lo que no cabe en los otros campos: el enfoque que quieres, el contexto de tu región, qué evitar.</p>
+                <p>Ejemplo: «usa situaciones del campo y evita ejemplos de ciudad».</p>
+              </Explicacion>
+            </div>
             <Textarea id="campo-instrucciones" value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Ej: Incluye preguntas de análisis, agrega ejemplos prácticos..." rows={3} />
           </div>
 
@@ -1017,10 +1030,16 @@ export default function GenerateResource() {
 
           {/* AI Engine */}
           <div className="space-y-3 p-4 bg-muted/30 rounded-lg border border-border">
-            <Label className="text-sm font-semibold flex items-center gap-2">
-              <Beaker className="h-4 w-4 text-primary" />
-              Motor de IA
-            </Label>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Beaker className="h-4 w-4 text-primary" />
+                Motor de IA
+              </Label>
+              <Explicacion titulo="el motor de IA">
+                <p><strong className="text-foreground">OpenAI</strong> trabaja en internet. Es el que da mejores resultados y el que debes usar normalmente.</p>
+                <p><strong className="text-foreground">Ollama</strong> corre en tu propio computador, sin internet, pero hay que instalarlo aparte. Sirve si en tu sede la conexión falla.</p>
+              </Explicacion>
+            </div>
             <div className="flex gap-3">
               <Button variant={aiProvider === "openai" ? "default" : "outline"} size="sm" onClick={() => setAiProvider("openai")} className={aiProvider === "openai" ? "gradient-primary" : ""}>
                 <Cloud className="h-4 w-4 mr-1" /> OpenAI
