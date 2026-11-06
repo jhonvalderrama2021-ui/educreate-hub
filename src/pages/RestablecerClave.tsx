@@ -116,7 +116,10 @@ export default function RestablecerClave() {
                 <p className="text-muted-foreground mb-6 text-sm text-center">
                   Escribe la contraseña que usarás de ahora en adelante.
                 </p>
-                <form onSubmit={guardar} className="space-y-4">
+                {/* Igual que en Auth: sin noValidate el navegador atrapa el
+                    campo vacío con su propio globo y los mensajes de abajo,
+                    que sí quedan enlazados por aria-describedby, no aparecen. */}
+                <form onSubmit={guardar} className="space-y-4" noValidate>
                   <div className="space-y-2">
                     <Label htmlFor="password">
                       Contraseña nueva <span className="text-destructive">*</span>

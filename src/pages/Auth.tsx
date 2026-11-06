@@ -185,7 +185,14 @@ export default function Auth() {
                 : "Únete y comienza a crear recursos educativos"}
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {/* noValidate desactiva la validación del navegador. Sin esto, un
+                campo vacío lo atrapa el navegador con su propio globo («Completa
+                este campo»), que se cierra solo y no queda enlazado al campo:
+                la validación de abajo, que sí deja el mensaje escrito y
+                relacionado por aria-describedby, nunca llegaba a ejecutarse en
+                el caso más frecuente. Los tipos y los mínimos se siguen
+                comprobando con el esquema, que es más estricto. */}
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               {modo === "signup" && (
                 <>
                   <div className="space-y-2">
