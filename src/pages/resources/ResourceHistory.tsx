@@ -200,11 +200,19 @@ export default function ResourceHistory() {
 
             return (
               <div key={r.id} className="glass-card rounded-xl overflow-hidden">
-                <div
-                  className="p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                  onClick={() => setExpanded(isExpanded ? null : r.id)}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                {/* La fila ya no es un <div> con onClick. Antes el encabezado no
+                    recibia el foco y el interruptor tenia `checked` sin manejador:
+                    con el teclado no se podia abrir un recurso ni cambiar su
+                    visibilidad, aunque el interruptor pareciera responder.
+                    Son dos controles independientes, asi que no pueden anidarse. */}
+                <div className="p-4 flex items-center justify-between gap-3 hover:bg-muted/30 transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isExpanded ? null : r.id)}
+                    aria-expanded={isExpanded}
+                    aria-controls={`recurso-${r.id}`}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  >
                     <Icon className="h-5 w-5 text-primary shrink-0" />
                     <div className="min-w-0">
                       <p className="font-medium text-foreground truncate">{r.title}</p>
@@ -215,21 +223,34 @@ export default function ResourceHistory() {
                         {" · "}{new Date(r.created_at).toLocaleDateString("es-CO")}
                       </p>
                     </div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-2 shrink-0">
-                    <div
-                      className="flex items-center gap-1"
-                      onClick={(e) => { e.stopPropagation(); togglePublic(r.id, r.is_public); }}
-                    >
+                    <div className="flex items-center gap-1">
                       {r.is_public ? <Eye className="h-3.5 w-3.5 text-primary" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
-                      <Switch checked={r.is_public} className="scale-75" />
+                      <Switch
+                        checked={r.is_public}
+                        onCheckedChange={() => togglePublic(r.id, r.is_public)}
+                        aria-label={`Compartir «${r.title}» con otros docentes`}
+                        className="scale-75"
+                      />
                     </div>
-                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {/* Mismo efecto que el boton del titulo. Se mantiene
+                        clicable, pero fuera del recorrido de tabulacion para no
+                        repetir la parada de teclado. */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-hidden="true"
+                      onClick={() => setExpanded(isExpanded ? null : r.id)}
+                      className="text-muted-foreground"
+                    >
+                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
                   </div>
                 </div>
 
                 {isExpanded && (
-                  <div className="border-t border-border p-4 space-y-3">
+                  <div id={`recurso-${r.id}`} className="border-t border-border p-4 space-y-3">
                     <div className="flex gap-2 flex-wrap">
                       {r.resource_type === "slides" ? (
                         <>
