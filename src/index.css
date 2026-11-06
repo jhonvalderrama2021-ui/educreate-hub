@@ -66,8 +66,16 @@
     --popover: 230 20% 12%;
     --popover-foreground: 0 0% 95%;
 
-    --primary: 252 60% 65%;
-    --primary-foreground: 0 0% 100%;
+    /* El mismo morado se usa de dos maneras opuestas: como fondo de boton
+       (52 usos de bg-primary y 67 del degradado) y como color de texto
+       (140 usos de text-primary). A 65% el texto blanco sobre el boton daba
+       3,92:1, y oscurecer el morado arreglaba el boton rompiendo el texto.
+       La salida es subirlo a 67%, que deja el texto en 5,27:1 sobre el fondo
+       y 4,82:1 sobre la tarjeta, y poner encima texto oscuro en vez de
+       blanco: 5,07:1 sobre el boton y 5,07:1 / 6,84:1 en los extremos del
+       degradado. */
+    --primary: 252 60% 67%;
+    --primary-foreground: 252 60% 14%;
 
     --secondary: 250 20% 18%;
     --secondary-foreground: 252 60% 75%;
@@ -87,19 +95,22 @@
     /* Igual que en claro: el contorno de los campos sube a 42% para
        alcanzar el 3:1 de WCAG 1.4.11 (a 20% daba 1,39:1). */
     --input: 230 15% 42%;
-    --ring: 252 60% 65%;
+    --ring: 252 60% 67%;
 
     --sidebar-background: 230 20% 10%;
     --sidebar-foreground: 0 0% 90%;
-    --sidebar-primary: 252 60% 65%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    /* El menu lateral repite el par del boton, asi que se corrige igual. */
+    --sidebar-primary: 252 60% 67%;
+    --sidebar-primary-foreground: 252 60% 14%;
     --sidebar-accent: 252 30% 18%;
     --sidebar-accent-foreground: 252 60% 75%;
     --sidebar-border: 230 15% 20%;
-    --sidebar-ring: 252 60% 65%;
+    --sidebar-ring: 252 60% 67%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(252 60% 65%), hsl(270 60% 70%));
-    --gradient-hero: linear-gradient(160deg, hsl(252 60% 65% / 0.1), hsl(270 60% 70% / 0.05), transparent);
+    /* Los extremos acompanan a --primary para que el texto oscuro mantenga
+       su contraste a lo largo de todo el degradado. */
+    --gradient-primary: linear-gradient(135deg, hsl(252 60% 67%), hsl(270 60% 72%));
+    --gradient-hero: linear-gradient(160deg, hsl(252 60% 67% / 0.1), hsl(270 60% 72% / 0.05), transparent);
   }
 }
 
