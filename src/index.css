@@ -22,7 +22,10 @@
     --secondary-foreground: 252 56% 40%;
 
     --muted: 240 20% 96%;
-    --muted-foreground: 230 10% 50%;
+    /* 46% y no 50%: a 50% el texto secundario daba 4,43:1 sobre blanco y
+       3,99:1 sobre la superficie atenuada, por debajo del 4,5:1 que pide
+       WCAG 2.1 AA. A 46% queda en 5,08:1 y 4,58:1. */
+    --muted-foreground: 230 10% 46%;
 
     --accent: 252 80% 96%;
     --accent-foreground: 252 56% 40%;
@@ -31,7 +34,11 @@
     --destructive-foreground: 0 0% 100%;
 
     --border: 240 12% 91%;
-    --input: 240 12% 91%;
+    /* El contorno de los campos se separa de --border: a 91% daba 1,25:1
+       contra el fondo y WCAG 2.1 AA pide 3:1 para los controles (1.4.11).
+       --border se queda claro porque sus 119 usos son divisores y contornos
+       decorativos, que ese criterio no cubre. */
+    --input: 240 12% 62%;
     --ring: 252 56% 57%;
 
     --radius: 0.75rem;
@@ -66,7 +73,9 @@
     --secondary-foreground: 252 60% 75%;
 
     --muted: 230 15% 16%;
-    --muted-foreground: 230 10% 55%;
+    /* 58% y no 55%: sobre la superficie atenuada daba 4,16:1. A 58% son
+       4,63:1 sobre esa superficie y 5,22:1 sobre la tarjeta. */
+    --muted-foreground: 230 10% 58%;
 
     --accent: 252 30% 18%;
     --accent-foreground: 252 60% 75%;
@@ -75,7 +84,9 @@
     --destructive-foreground: 0 0% 100%;
 
     --border: 230 15% 20%;
-    --input: 230 15% 20%;
+    /* Igual que en claro: el contorno de los campos sube a 42% para
+       alcanzar el 3:1 de WCAG 1.4.11 (a 20% daba 1,39:1). */
+    --input: 230 15% 42%;
     --ring: 252 60% 65%;
 
     --sidebar-background: 230 20% 10%;
