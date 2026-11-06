@@ -13,6 +13,7 @@ import {
   Search, Pencil, UserCheck, UserX, MailCheck, MailWarning, Loader2, Download,
 } from "lucide-react";
 import { descargarExcel } from "@/lib/export-excel";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Gestión de usuarios del panel de administración.
@@ -71,7 +72,7 @@ export function GestorUsuarios() {
   const cargar = async () => {
     setCargando(true);
     const { data, error } = await supabase.rpc("admin_listar_usuarios");
-    if (error) toast.error("Error al cargar los usuarios");
+    if (error) avisarError(error, "No se pudo cargar la lista de usuarios");
     setUsuarios((data || []) as UsuarioAdmin[]);
     setCargando(false);
   };
@@ -82,7 +83,7 @@ export function GestorUsuarios() {
     // El rol vive en una tabla aparte, con una fila por usuario: se reemplaza.
     await supabase.from("user_roles").delete().eq("user_id", id);
     const { error } = await supabase.from("user_roles").insert([{ user_id: id, role: rol }]);
-    if (error) return toast.error("Error al cambiar el rol");
+    if (error) return avisarError(error, "No se pudo cambiar el rol del usuario");
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol } : u)));
     toast.success("Rol actualizado");
   };
@@ -98,7 +99,7 @@ export function GestorUsuarios() {
     const { error } = await supabase.rpc("admin_cambiar_estado_usuario", {
       p_id: u.id, p_activo: !u.activo,
     });
-    if (error) return toast.error(error.message || "No se pudo cambiar el estado");
+    if (error) return avisarError(error, "No se pudo cambiar el estado de la cuenta");
 
     setUsuarios((prev) => prev.map((x) => (x.id === u.id ? { ...x, activo: !u.activo } : x)));
     toast.success(desactivando ? "Usuario desactivado" : "Usuario reactivado");
@@ -110,7 +111,7 @@ export function GestorUsuarios() {
       p_id: editando.id, p_nombre: nombre, p_usuario: usuario,
     });
     if (error) {
-      toast.error(error.message || "No se pudo guardar");
+      avisarError(error, "No se pudo guardar el cambio");
       return;
     }
 

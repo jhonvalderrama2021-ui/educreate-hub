@@ -16,6 +16,7 @@ import { GraduationCap, Plus, KeyRound, Users, BookOpen, RefreshCw } from "lucid
 import { toast } from "sonner";
 import { generateAccessCode, type MiniCourse } from "@/lib/courses-types";
 import { CampoObservacion } from "@/components/CampoObservacion";
+import { avisarError } from "@/lib/errores";
 
 export default function CoursesList() {
   const { user } = useAuth();
@@ -103,7 +104,7 @@ export default function CoursesList() {
       setName(""); setDescription(""); setGrado(""); setGrupo(""); setCode(generateAccessCode());
       navigate(`/resources/courses/${data.id}`);
     } catch (e: any) {
-      toast.error(e.message || "Error al crear curso");
+      avisarError(e, "No se pudo crear el curso");
     } finally { setSaving(false); }
   };
 
@@ -120,7 +121,7 @@ export default function CoursesList() {
       setOpenJoin(false); setJoinCode("");
       navigate(`/resources/courses/${data}/student`);
     } catch (e: any) {
-      toast.error(e.message || "Clave inválida");
+      avisarError(e, "No se pudo unir al curso");
     } finally { setSaving(false); }
   };
 

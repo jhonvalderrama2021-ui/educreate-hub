@@ -25,6 +25,7 @@ import { PanelEstudiantesCurso } from "@/components/PanelEstudiantesCurso";
 import { RevisarEntregas } from "@/components/RevisarEntregas";
 import { ConexionesDelCurso } from "@/components/ConexionesDelCurso";
 import { BotsDelCurso } from "@/components/BotsDelCurso";
+import { avisarError } from "@/lib/errores";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -107,14 +108,14 @@ export default function CourseDetailTeacher() {
   const removeResource = async (id: string) => {
     if (!confirm("¿Quitar este recurso del curso?")) return;
     const { error } = await supabase.from("course_resources").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return avisarError(error, "No se pudo quitar el recurso del curso");
     toast.success("Recurso eliminado");
     qc.invalidateQueries({ queryKey: ["course_resources", courseId] });
   };
 
   const updateCourse = async (patch: Partial<MiniCourse>) => {
     const { error } = await supabase.from("mini_courses").update(patch).eq("id", courseId!);
-    if (error) { toast.error(error.message); return; }
+    if (error) { avisarError(error, "No se pudo actualizar el curso"); return; }
     toast.success("Curso actualizado");
     qc.invalidateQueries({ queryKey: ["mini_course", courseId] });
   };
@@ -122,7 +123,7 @@ export default function CourseDetailTeacher() {
   const deleteCourse = async () => {
     if (!confirm("Esto eliminará el curso y todas sus inscripciones, recursos y entregas. ¿Continuar?")) return;
     const { error } = await supabase.from("mini_courses").delete().eq("id", courseId!);
-    if (error) { toast.error(error.message); return; }
+    if (error) { avisarError(error, "No se pudo eliminar el curso"); return; }
     toast.success("Curso eliminado");
     navigate("/resources/courses");
   };
@@ -328,7 +329,7 @@ function ResourceConfigButton({ resource, onSaved }: { resource: CourseResource;
       instrucciones_entrega: r.instrucciones_entrega?.trim() || null,
       entrega_hasta: r.entrega_hasta,
     }).eq("id", resource.id);
-    if (error) return toast.error(error.message);
+    if (error) return avisarError(error, "No se pudo guardar la configuración del recurso");
     toast.success("Configuración guardada");
     onSaved(); setOpen(false);
   };
@@ -471,7 +472,7 @@ function ManualEnrollButton({ courseId, onAdded }: { courseId: string; onAdded: 
       toast.success("Estudiante inscrito");
       setEmail(""); setOpen(false); onAdded();
     } catch (e: any) {
-      toast.error(e.message || "Error al inscribir");
+      avisarError(e, "No se pudo inscribir al estudiante");
     } finally { setSaving(false); }
   };
 
@@ -519,7 +520,7 @@ function BotonDuplicarGrupo({ curso, recursos }: { curso: MiniCourse; recursos: 
       p_clave: clave.trim().toUpperCase(),
     });
     setDuplicando(false);
-    if (error) return toast.error(error.message || "No se pudo duplicar");
+    if (error) return avisarError(error, "No se pudo duplicar el curso");
 
     toast.success("Curso duplicado");
     qc.invalidateQueries({ queryKey: ["mini_courses_own"] });

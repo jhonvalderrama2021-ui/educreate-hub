@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { MessageSquare, Download, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 interface Observacion {
   id: string;
@@ -52,7 +53,7 @@ export function PanelObservaciones() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      toast.error("No se pudieron cargar las observaciones");
+      avisarError(error, "No se pudieron cargar las observaciones");
       setCargando(false);
       return;
     }
@@ -77,7 +78,7 @@ export function PanelObservaciones() {
     const { error } = await supabase
       .from("observaciones_piloto").update({ atendida }).eq("id", id);
     if (error) {
-      toast.error("No se pudo actualizar");
+      avisarError(error, "No se pudo marcar la observación");
       cargar();
     }
   };

@@ -8,6 +8,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { FileText, Loader2, KeyRound, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { avisarError } from "@/lib/errores";
+import {
+  erroresDeZod, propsDeCampo, idDelError, enfocarPrimerError,
+  type ErroresDeCampo,
+} from "@/lib/formularios";
 
 const esquema = z.object({
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
@@ -28,6 +33,9 @@ export default function RestablecerClave() {
   const [confirmar, setConfirmar] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [enlaceValido, setEnlaceValido] = useState<boolean | null>(null);
+  const [errores, setErrores] = useState<ErroresDeCampo>({});
+  const limpiar = (campo: string) =>
+    setErrores((previos) => (previos[campo] ? { ...previos, [campo]: "" } : previos));
 
   useEffect(() => {
     // El enlace del correo genera un evento de recuperación. Si el usuario
@@ -45,16 +53,24 @@ export default function RestablecerClave() {
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const revision = esquema.safeParse({ password, confirmar });
+    if (!revision.success) {
+      const fallos = erroresDeZod(revision.error);
+      setErrores(fallos);
+      enfocarPrimerError(fallos, ["password", "confirmar"]);
+      return;
+    }
+    setErrores({});
     setGuardando(true);
+
     try {
-      const datos = esquema.parse({ password, confirmar });
-      const { error } = await supabase.auth.updateUser({ password: datos.password });
+      const { error } = await supabase.auth.updateUser({ password: revision.data.password });
       if (error) throw error;
       toast.success("Contraseña actualizada. Ya puedes usarla para entrar.");
       navigate("/resources");
-    } catch (err: any) {
-      if (err instanceof z.ZodError) toast.error(err.errors[0].message);
-      else toast.error(err.message || "No se pudo actualizar la contraseña");
+    } catch (err: unknown) {
+      avisarError(err, "No se pudo actualizar la contraseña");
     } finally {
       setGuardando(false);
     }
@@ -102,29 +118,47 @@ export default function RestablecerClave() {
                 </p>
                 <form onSubmit={guardar} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="password">Contraseña nueva</Label>
+                    <Label htmlFor="password">
+                      Contraseña nueva <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="password"
                       type="password"
                       placeholder="••••••••"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => { setPassword(e.target.value); limpiar("password"); }}
                       required
                       minLength={6}
                       autoFocus
+                      autoComplete="new-password"
+                      {...propsDeCampo("password", errores)}
                     />
+                    {errores.password && (
+                      <p id={idDelError("password")} role="alert" className="text-sm text-destructive">
+                        {errores.password}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmar">Repetir contraseña</Label>
+                    <Label htmlFor="confirmar">
+                      Repetir contraseña <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="confirmar"
                       type="password"
                       placeholder="••••••••"
                       value={confirmar}
-                      onChange={(e) => setConfirmar(e.target.value)}
+                      onChange={(e) => { setConfirmar(e.target.value); limpiar("confirmar"); }}
                       required
                       minLength={6}
+                      autoComplete="new-password"
+                      {...propsDeCampo("confirmar", errores)}
                     />
+                    {errores.confirmar && (
+                      <p id={idDelError("confirmar")} role="alert" className="text-sm text-destructive">
+                        {errores.confirmar}
+                      </p>
+                    )}
                   </div>
                   <Button type="submit" className="w-full gradient-primary" size="lg" disabled={guardando}>
                     {guardando && <Loader2 className="h-4 w-4 animate-spin mr-2" />}

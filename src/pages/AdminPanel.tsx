@@ -26,6 +26,7 @@ import {
 import { toast } from "sonner";
 import { PanelObservaciones } from "@/components/PanelObservaciones";
 import { GestorImagenesAyuda } from "@/components/GestorImagenesAyuda";
+import { avisarError } from "@/lib/errores";
 
 // Es la fila que devuelve admin_listar_usuarios. El tipo completo, con el
 // correo confirmado y el ultimo acceso, vive en GestorUsuarios; aqui solo
@@ -76,7 +77,7 @@ export default function AdminPanel() {
     // Misma consulta que usa GestorUsuarios: las tarjetas de resumen y la
     // lista deben contar lo mismo.
     const { data, error } = await supabase.rpc("admin_listar_usuarios");
-    if (error) toast.error("Error al cargar usuarios");
+    if (error) avisarError(error, "No se pudo cargar la lista de usuarios");
     setUsers((data || []) as UsuarioResumen[]);
     setLoadingUsers(false);
   };
@@ -99,8 +100,11 @@ export default function AdminPanel() {
       body: { apiKey: trimmed },
     });
 
-    if (error || (data as any)?.error) {
-      toast.error("Error al guardar la API Key");
+    // La función devuelve su fallo dentro del cuerpo, no como error de red,
+    // así que hay que mirar los dos sitios.
+    const fallo = (data as { error?: string } | null)?.error;
+    if (error || fallo) {
+      avisarError(error ?? fallo, "No se pudo guardar la clave de inteligencia artificial");
     } else {
       toast.success("API Key de OpenAI guardada correctamente");
       setKeyConfigured(true);

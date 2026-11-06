@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Puzzle, Sparkles, Loader2, Upload, Download, Save, RefreshCcw, Eye, EyeOff } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
+import { avisarError } from "@/lib/errores";
 
 export interface CrosswordClue {
   number: number;
@@ -139,7 +140,7 @@ export default function Crossword() {
       setRecursoId(guardado);
       toast.success(guardado ? "Crucigrama generado y guardado" : "Crucigrama generado");
     } catch (e: any) {
-      toast.error(e.message || "Error al generar");
+      avisarError(e, "No se pudo generar el crucigrama");
     } finally {
       setGenerating(false);
     }
@@ -174,7 +175,7 @@ export default function Crossword() {
 
   const handleSave = async () => {
     const id = await persistir(content, recursoId);
-    if (!id) return toast.error("Error al guardar");
+    if (!id) return avisarError(null, "No se pudo guardar el crucigrama");
     setRecursoId(id);
     toast.success(recursoId ? "Cambios guardados" : "Guardado en historial");
   };
@@ -193,7 +194,7 @@ export default function Crossword() {
         .maybeSingle();
       if (cancelado) return;
       if (error || !data) {
-        toast.error("No se encontró ese recurso");
+        avisarError(null, "No se encontró ese crucigrama");
         setSearchParams({}, { replace: true });
         return;
       }

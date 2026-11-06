@@ -31,6 +31,7 @@ import {
   ClipboardList, Table2, FileCheck, FileEdit, Server, Cloud,
   GraduationCap, BookMarked, Beaker, AlertCircle, Pencil, Presentation, Palette, FilePlus,
 } from "lucide-react";
+import { avisarError } from "@/lib/errores";
 
 // Ojo: esta lista es solo para el titulo y el icono. Quien puede generar
 // cada uno lo decide src/lib/permisos.ts, y lo hace cumplir el servidor.
@@ -289,7 +290,7 @@ export default function GenerateResource() {
         .maybeSingle();
       if (cancelado) return;
       if (error || !data) {
-        toast.error("No se encontró ese recurso");
+        avisarError(null, "No se encontró ese recurso");
         setSearchParams({ type: typeParam }, { replace: true });
         return;
       }
@@ -332,7 +333,7 @@ export default function GenerateResource() {
       // al docente que el recurso se generaría a partir de él.
       setUploadedFile(null);
       setFileText("");
-      toast.error(e.message || "No se pudo procesar el archivo", { duration: 12000 });
+      avisarError(e, "No se pudo procesar el archivo", { duration: 12000 });
     } finally {
       setExtractingFile(false);
     }
@@ -490,7 +491,7 @@ export default function GenerateResource() {
       // sigue en pantalla y ya está guardado, así que no se pierde nada.
       limpiarFormulario();
     } catch (e: any) {
-      toast.error(e.message || "Error al generar el recurso");
+      avisarError(e, "No se pudo generar el recurso");
     } finally {
       setGenerating(false);
     }
@@ -570,7 +571,7 @@ export default function GenerateResource() {
       setRecursoId(id);
       toast.success(recursoId ? "Cambios guardados" : "Recurso guardado en tu historial");
     } else {
-      toast.error("No se pudo guardar el recurso");
+      avisarError(null, "No se pudo guardar el recurso");
     }
     setSaving(false);
   };
@@ -1142,7 +1143,7 @@ export default function GenerateResource() {
           tituloOriginal={title || generatedContent?.title || ""}
           onGuardar={async (contenido, nuevoTitulo) => {
             const id = await persistirRecurso(contenido, recursoId, nuevoTitulo);
-            if (!id) { toast.error("No se pudieron guardar los cambios"); return false; }
+            if (!id) { avisarError(null, "No se pudieron guardar los cambios"); return false; }
             setRecursoId(id);
             setTitle(nuevoTitulo);
             setGeneratedContent(contenido);

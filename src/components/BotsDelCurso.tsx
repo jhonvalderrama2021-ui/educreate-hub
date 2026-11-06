@@ -15,6 +15,7 @@ import {
 import { Bot, Plus, Trash2, Pencil, MessageSquare, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Los bots que el docente pone a disposición de su curso.
@@ -132,7 +133,7 @@ export function BotsDelCurso({ courseId }: Props) {
       setAbierto(false);
       qc.invalidateQueries({ queryKey: clave });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo guardar");
+      avisarError(e, "No se pudo guardar el bot del curso");
     } finally {
       setGuardando(false);
     }
@@ -145,7 +146,7 @@ export function BotsDelCurso({ courseId }: Props) {
       `Los estudiantes de este curso dejarán de verlo.`,
     )) return;
     const { error } = await supabase.from("course_bots").delete().eq("id", cb.id);
-    if (error) { toast.error("No se pudo quitar"); return; }
+    if (error) { avisarError(error, "No se pudo quitar el bot del curso"); return; }
     toast.success("Bot quitado del curso");
     qc.invalidateQueries({ queryKey: clave });
   };

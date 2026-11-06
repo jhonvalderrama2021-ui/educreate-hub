@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { BookOpen, Sparkles, Loader2, Download, Save, RefreshCcw } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { HistorialModulo, type RecursoHistorial } from "@/components/HistorialModulo";
+import { avisarError } from "@/lib/errores";
 
 export interface StoryChapter {
   title: string;
@@ -77,7 +78,7 @@ export default function Story() {
       setRecursoId(guardado);
       toast.success(guardado ? "Cuento generado y guardado" : "Cuento generado");
     } catch (e: any) {
-      toast.error(e.message || "Error al generar");
+      avisarError(e, "No se pudo generar el cuento");
     } finally {
       setGenerating(false);
     }
@@ -112,7 +113,7 @@ export default function Story() {
 
   const handleSave = async () => {
     const id = await persistir(content, recursoId);
-    if (!id) return toast.error("Error al guardar");
+    if (!id) return avisarError(null, "No se pudo guardar el cuento");
     setRecursoId(id);
     toast.success(recursoId ? "Cambios guardados" : "Guardado en historial");
   };
@@ -131,7 +132,7 @@ export default function Story() {
         .maybeSingle();
       if (cancelado) return;
       if (error || !data) {
-        toast.error("No se encontró ese recurso");
+        avisarError(null, "No se encontró ese cuento");
         setSearchParams({}, { replace: true });
         return;
       }

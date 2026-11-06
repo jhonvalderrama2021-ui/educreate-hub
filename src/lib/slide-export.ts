@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { SlideRenderer } from "@/components/slides/SlideRenderer";
 import { DEFAULT_THEME, type StructuredSlide, type SlideTheme } from "@/lib/slide-types";
 import { supabase } from "@/integrations/supabase/client";
+import { avisarError } from "@/lib/errores";
 
 const SLIDE_W = 1280;
 const SLIDE_H = 720;
@@ -235,7 +236,7 @@ async function descargar(
     toast.success(`${extension.toUpperCase()} descargado`, { id: aviso });
   } catch (e: any) {
     console.error(`${extension} export error:`, e);
-    toast.error(`Error al exportar ${extension.toUpperCase()}: ${e.message}`, { id: aviso });
+    avisarError(e, `No se pudo exportar a ${extension.toUpperCase()}`);
   }
 }
 

@@ -10,6 +10,7 @@ import {
   FileText, Download, Loader2, CheckCircle2, AlertTriangle, Inbox,
 } from "lucide-react";
 import { tamanoLegible } from "@/components/EntregaDeTarea";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Entregas con archivo que ha recibido el docente, para revisarlas y poner
@@ -78,7 +79,7 @@ export function RevisarEntregas({
     const { data, error } = await supabase.storage
       .from("entregas-tareas")
       .createSignedUrl(e.archivo_ruta, 60);
-    if (error || !data) return toast.error("No se pudo abrir el archivo");
+    if (error || !data) return avisarError(error, "No se pudo abrir el archivo de la entrega");
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -100,7 +101,7 @@ export function RevisarEntregas({
     }).eq("id", e.id);
     setGuardando(null);
 
-    if (error) return toast.error(error.message || "No se pudo calificar");
+    if (error) return avisarError(error, "No se pudo guardar la calificación");
     qc.invalidateQueries({ queryKey: clave });
     qc.invalidateQueries({ queryKey: ["submissions_course", courseId] });
     qc.invalidateQueries({ queryKey: ["report_subs", courseId] });

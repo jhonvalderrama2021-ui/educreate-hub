@@ -12,6 +12,7 @@ import {
   Table2, Presentation, Puzzle, BookText, HelpCircle, BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 /** Etiqueta e icono por tipo de recurso, para agrupar la lista. */
 const TIPOS: Record<string, { label: string; icon: any }> = {
@@ -103,7 +104,7 @@ export default function AddCourseResource() {
       qc.invalidateQueries({ queryKey: ["course_resources", courseId] });
       qc.invalidateQueries({ queryKey: ["course_resources_ids", courseId] });
     } catch (e: any) {
-      toast.error(e.message);
+      avisarError(e, "No se pudo agregar el recurso al curso");
     } finally { setAdding(null); }
   };
 

@@ -9,6 +9,11 @@ import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, ShieldCheck, Save, Loader2, Download, AlertTriangle, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
+import {
+  propsDeCampo, idDelError, enfocarPrimerError,
+  type ErroresDeCampo,
+} from "@/lib/formularios";
 
 /**
  * "Mis datos" — mecanismo para que el titular ejerza los derechos que le
@@ -31,6 +36,10 @@ export default function MisDatos() {
   const [claveNueva, setClaveNueva] = useState("");
   const [claveConfirmar, setClaveConfirmar] = useState("");
   const [cambiandoClave, setCambiandoClave] = useState(false);
+  /** Errores de validación junto al campo, en vez de una notificación flotante. */
+  const [errores, setErrores] = useState<ErroresDeCampo>({});
+  const limpiar = (campo: string) =>
+    setErrores((previos) => (previos[campo] ? { ...previos, [campo]: "" } : previos));
 
   useEffect(() => {
     if (!authLoading && !user) navigate("/auth");
@@ -85,20 +94,23 @@ export default function MisDatos() {
       .eq("id", user.id);
     setGuardando(false);
 
-    if (error) toast.error("No se pudieron guardar los cambios");
+    if (error) avisarError(error, "No se pudieron guardar tus datos");
     else toast.success("Datos actualizados");
   };
 
   const cambiarCorreo = async () => {
     const correo = correoNuevo.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
-      toast.error("Escribe un correo electrónico válido");
+      setErrores({ correoNuevo: "Escribe un correo electrónico válido, con arroba y dominio." });
+      enfocarPrimerError({ correoNuevo: "x" }, ["correoNuevo"]);
       return;
     }
     if (correo === user?.email?.toLowerCase()) {
-      toast.error("Ese ya es tu correo actual");
+      setErrores({ correoNuevo: "Ese ya es tu correo actual. Escribe uno distinto." });
+      enfocarPrimerError({ correoNuevo: "x" }, ["correoNuevo"]);
       return;
     }
+    setErrores({});
     setCambiandoCorreo(true);
     const { error } = await supabase.auth.updateUser(
       { email: correo },
@@ -107,7 +119,7 @@ export default function MisDatos() {
     setCambiandoCorreo(false);
 
     if (error) {
-      toast.error(error.message || "No se pudo iniciar el cambio de correo");
+      avisarError(error, "No se pudo iniciar el cambio de correo");
       return;
     }
     setCorreoNuevo("");
@@ -119,19 +131,22 @@ export default function MisDatos() {
 
   const cambiarClave = async () => {
     if (claveNueva.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+      setErrores({ claveNueva: "La contraseña debe tener al menos 6 caracteres." });
+      enfocarPrimerError({ claveNueva: "x" }, ["claveNueva"]);
       return;
     }
     if (claveNueva !== claveConfirmar) {
-      toast.error("Las contraseñas no coinciden");
+      setErrores({ claveConfirmar: "Las dos contraseñas no coinciden. Vuelve a escribirlas." });
+      enfocarPrimerError({ claveConfirmar: "x" }, ["claveConfirmar"]);
       return;
     }
+    setErrores({});
     setCambiandoClave(true);
     const { error } = await supabase.auth.updateUser({ password: claveNueva });
     setCambiandoClave(false);
 
     if (error) {
-      toast.error(error.message || "No se pudo actualizar la contraseña");
+      avisarError(error, "No se pudo actualizar la contraseña");
       return;
     }
     setClaveNueva("");
@@ -284,8 +299,15 @@ export default function MisDatos() {
               type="email"
               placeholder="nuevo@correo.com"
               value={correoNuevo}
-              onChange={(e) => setCorreoNuevo(e.target.value)}
+              onChange={(e) => { setCorreoNuevo(e.target.value); limpiar("correoNuevo"); }}
+              autoComplete="email"
+              {...propsDeCampo("correoNuevo", errores)}
             />
+            {errores.correoNuevo && (
+              <p id={idDelError("correoNuevo")} role="alert" className="text-sm text-destructive">
+                {errores.correoNuevo}
+              </p>
+            )}
           </div>
           <Button onClick={cambiarCorreo} disabled={cambiandoCorreo} size="sm" variant="outline">
             {cambiandoCorreo ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
@@ -307,9 +329,16 @@ export default function MisDatos() {
                 type="password"
                 placeholder="••••••••"
                 value={claveNueva}
-                onChange={(e) => setClaveNueva(e.target.value)}
+                onChange={(e) => { setClaveNueva(e.target.value); limpiar("claveNueva"); }}
                 minLength={6}
+                autoComplete="new-password"
+                {...propsDeCampo("claveNueva", errores)}
               />
+              {errores.claveNueva && (
+                <p id={idDelError("claveNueva")} role="alert" className="text-sm text-destructive">
+                  {errores.claveNueva}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="claveConfirmar">Repetir contraseña nueva</Label>
@@ -318,9 +347,16 @@ export default function MisDatos() {
                 type="password"
                 placeholder="••••••••"
                 value={claveConfirmar}
-                onChange={(e) => setClaveConfirmar(e.target.value)}
+                onChange={(e) => { setClaveConfirmar(e.target.value); limpiar("claveConfirmar"); }}
                 minLength={6}
+                autoComplete="new-password"
+                {...propsDeCampo("claveConfirmar", errores)}
               />
+              {errores.claveConfirmar && (
+                <p id={idDelError("claveConfirmar")} role="alert" className="text-sm text-destructive">
+                  {errores.claveConfirmar}
+                </p>
+              )}
             </div>
           </div>
           <Button onClick={cambiarClave} disabled={cambiandoClave} size="sm" variant="outline">

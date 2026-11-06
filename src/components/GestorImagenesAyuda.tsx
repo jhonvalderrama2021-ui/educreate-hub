@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ImagePlus, Trash2, Loader2, Image as IconoImagen } from "lucide-react";
 import { toast } from "sonner";
 import { SECCIONES_AYUDA } from "@/lib/ayuda-secciones";
+import { avisarError } from "@/lib/errores";
 
 interface ImagenAyuda {
   id: string;
@@ -40,7 +41,7 @@ export function GestorImagenesAyuda() {
     setCargando(true);
     const { data, error } = await supabase
       .from("ayuda_imagenes").select("*").order("seccion").order("orden");
-    if (error) toast.error("No se pudieron cargar las imágenes");
+    if (error) avisarError(error, "No se pudieron cargar las imágenes de la ayuda");
     setImagenes(data || []);
     setCargando(false);
   };
@@ -66,7 +67,7 @@ export function GestorImagenesAyuda() {
 
     if (errorSubida) {
       setSubiendo(false);
-      toast.error("No se pudo subir la imagen");
+      avisarError(errorSubida, "No se pudo subir la imagen");
       return;
     }
 
@@ -79,7 +80,7 @@ export function GestorImagenesAyuda() {
     if (error) {
       // Si falla el registro, se retira el archivo para no dejar huérfanos
       await supabase.storage.from(BUCKET).remove([ruta]);
-      toast.error("No se pudo registrar la imagen");
+      avisarError(error, "No se pudo registrar la imagen en la ayuda");
       return;
     }
 
@@ -93,7 +94,7 @@ export function GestorImagenesAyuda() {
     await supabase.storage.from(BUCKET).remove([imagen.ruta]);
     const { error } = await supabase
       .from("ayuda_imagenes").delete().eq("id", imagen.id);
-    if (error) { toast.error("No se pudo eliminar"); return; }
+    if (error) { avisarError(error, "No se pudo eliminar la imagen"); return; }
     toast.success("Imagen eliminada");
     cargar();
   };

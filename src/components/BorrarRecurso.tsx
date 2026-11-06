@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Borrar un recurso del historial de su módulo.
@@ -94,7 +95,7 @@ export function BorrarRecurso({ recursoId, titulo, onBorrado, claveCache, modo =
       onBorrado?.(recursoId);
       qc.invalidateQueries({ queryKey: claveCache });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+      avisarError(e, "No se pudo eliminar el recurso");
     } finally {
       setBorrando(false);
     }
