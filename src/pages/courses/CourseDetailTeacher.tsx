@@ -26,6 +26,7 @@ import { RevisarEntregas } from "@/components/RevisarEntregas";
 import { ConexionesDelCurso } from "@/components/ConexionesDelCurso";
 import { BotsDelCurso } from "@/components/BotsDelCurso";
 import { avisarError } from "@/lib/errores";
+import { Explicacion } from "@/components/Explicacion";
 
 const TYPE_ICON: Record<string, any> = {
   icfes: FileCheck, quiz: FileCheck, workshop: FileEdit,
@@ -344,23 +345,53 @@ function ResourceConfigButton({ resource, onSaved }: { resource: CourseResource;
         {isExam ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Mostrar nota al estudiante</Label>
+              <Label className="flex items-center gap-1.5">
+                Mostrar nota al estudiante
+                <Explicacion titulo="mostrar la nota">
+                <p>Si está activo, el estudiante ve su calificación apenas termina.</p>
+                <p>Desactívalo si prefieres revisar antes y comentarla en clase.</p>
+              </Explicacion>
+              </Label>
               <Switch checked={r.show_grade} onCheckedChange={(v) => setR({ ...r, show_grade: v })} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Mostrar retroalimentación</Label>
+              <Label className="flex items-center gap-1.5">
+                Mostrar retroalimentación
+                <Explicacion titulo="la retroalimentación">
+                <p>Muestra al estudiante cuáles respondió bien y cuáles no, con la explicación de cada una.</p>
+                <p>Desactívalo si vas a repetir la misma evaluación con otro grupo.</p>
+              </Explicacion>
+              </Label>
               <Switch checked={r.show_feedback} onCheckedChange={(v) => setR({ ...r, show_feedback: v })} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Orden aleatorio de preguntas</Label>
+              <Label className="flex items-center gap-1.5">
+                Orden aleatorio de preguntas
+                <Explicacion titulo="el orden aleatorio">
+                <p>Cada estudiante recibe las preguntas en distinto orden, lo que dificulta copiarse.</p>
+                <p>Las opciones de cada pregunta no cambian de orden, solo las preguntas.</p>
+              </Explicacion>
+              </Label>
               <Switch checked={r.shuffle_questions} onCheckedChange={(v) => setR({ ...r, shuffle_questions: v })} />
             </div>
             <div className="space-y-2">
-              <Label>Número de intentos</Label>
+              <Label className="flex items-center gap-1.5">
+                Número de intentos
+                <Explicacion titulo="el número de intentos">
+                <p>Cuántas veces puede presentar el estudiante. Se guarda la mejor nota.</p>
+                <p>Con 1 intento no hay segunda oportunidad: úsalo solo en evaluaciones formales.</p>
+              </Explicacion>
+              </Label>
               <Input type="number" min={1} value={r.max_attempts} onChange={(e) => setR({ ...r, max_attempts: parseInt(e.target.value) || 1 })} />
             </div>
             <div className="space-y-2">
-              <Label>Tiempo límite (minutos, vacío = sin límite)</Label>
+              <Label className="flex items-center gap-1.5">
+                Tiempo límite (minutos, vacío = sin límite)
+                <Explicacion titulo="el tiempo límite">
+                <p>El conteo empieza cuando el estudiante abre la actividad, no cuando tú la publicas.</p>
+                <p>Déjalo vacío para que no haya reloj.</p>
+              </Explicacion>
+              </Label>
               <Input type="number" min={0} value={r.time_limit_minutes ?? ""} onChange={(e) => setR({ ...r, time_limit_minutes: e.target.value ? parseInt(e.target.value) : null })} />
             </div>
             <div className="grid grid-cols-2 gap-2">

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import {
   History, Download, Trash2, Eye, EyeOff, ChevronDown, ChevronUp, Pencil,
   FileCheck, HelpCircle, FileEdit, BookOpen, ClipboardList, Table2, Presentation, Puzzle, BookText,
+  Search,
 } from "lucide-react";
 import { ResourceContentViewer } from "@/components/ResourceContentViewer";
 import { ExportOptionsDialog } from "@/components/ExportOptionsDialog";
@@ -20,6 +21,13 @@ import { CampoObservacion } from "@/components/CampoObservacion";
 import { rutaDelRecurso } from "@/lib/ruta-modulo";
 import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
 import { avisarError } from "@/lib/errores";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { leerRecientes, guardarReciente, olvidarRecientes } from "@/lib/busquedas-recientes";
+import { normalizar } from "@/lib/buscar-ayuda";
+
+/** Clave del historial de busquedas en el navegador. */
+const CLAVE_BUSQUEDAS = "nexprofe:busquedas:historial";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -56,6 +64,18 @@ export default function ResourceHistory() {
   const [asignaturasSel, setAsignaturasSel] = useState<string[]>([]);
   const [gradosSel, setGradosSel] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState("");
+  /** Últimas búsquedas, para no reescribir lo mismo cada semana. */
+  const [recientes, setRecientes] = useState<string[]>(() => leerRecientes(CLAVE_BUSQUEDAS));
+
+  // Se guarda cuando el docente deja de escribir, no en cada tecla: si no,
+  // el historial se llenaría de "f", "fr", "fra"…
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (busqueda.trim().length >= 2) setRecientes(guardarReciente(CLAVE_BUSQUEDAS, busqueda));
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [busqueda]);
   const [exportTarget, setExportTarget] = useState<{ resource: Resource; format: "pdf" | "docx" } | null>(null);
 
   // Cached query — instantly shows previous data when navigating back
@@ -98,14 +118,19 @@ export default function ResourceHistory() {
   const opcionesAsignatura = opcionesDe(allResources, (r) => r.subject);
   const opcionesGrado = opcionesDe(allResources, (r) => r.grade, (g) => `Grado ${g}`);
 
-  const hayFiltros = tipos.length > 0 || asignaturasSel.length > 0 || gradosSel.length > 0;
+  const hayFiltros =
+    tipos.length > 0 || asignaturasSel.length > 0 || gradosSel.length > 0 || busqueda.trim() !== "";
 
   // Sin nada marcado no se filtra: la lista muestra todo, que es lo que
   // espera quien abre la pantalla por primera vez.
+  const texto = normalizar(busqueda);
   const resources = allResources.filter((r) =>
     (tipos.length === 0 || tipos.includes(r.resource_type)) &&
     (asignaturasSel.length === 0 || (r.subject && asignaturasSel.includes(r.subject))) &&
-    (gradosSel.length === 0 || (r.grade && gradosSel.includes(r.grade))));
+    (gradosSel.length === 0 || (r.grade && gradosSel.includes(r.grade))) &&
+    (texto === "" || normalizar(
+      `${r.title} ${r.subject ?? ""} ${r.grade ?? ""} ${TYPE_LABELS[r.resource_type]?.label ?? r.resource_type}`,
+    ).includes(texto)));
 
   // Only show full-screen spinner on first load (no cache yet)
   const loading = isLoading && allResources.length === 0;
@@ -146,6 +171,55 @@ export default function ResourceHistory() {
         </div>
       </div>
 
+      {/* Búsqueda por texto. Los filtros de arriba solo sirven si el docente
+          recuerda la asignatura o el grado; quien busca "fracciones" no tenía
+          por dónde empezar. La lista de recientes evita reescribir lo mismo. */}
+      <div className="space-y-1.5">
+        <Label htmlFor="buscar-recurso" className="sr-only">
+          Buscar entre tus recursos
+        </Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            id="buscar-recurso"
+            type="search"
+            list="busquedas-recientes"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Busca por título, asignatura, grado o módulo…"
+            className="pl-9"
+            autoComplete="off"
+          />
+          {/* Sugerencias nativas: funcionan con teclado y en el móvil sin
+              componente extra, y el navegador las anuncia al lector de pantalla. */}
+          <datalist id="busquedas-recientes">
+            {recientes.map((r) => <option key={r} value={r} />)}
+          </datalist>
+        </div>
+        {recientes.length > 0 && !busqueda && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Búsquedas recientes:</span>
+            {recientes.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setBusqueda(r)}
+                className="text-xs rounded-full border border-border px-2 py-0.5 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {r}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => { olvidarRecientes(CLAVE_BUSQUEDAS); setRecientes([]); }}
+              className="text-xs text-muted-foreground underline hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+            >
+              Borrar
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <FiltroMultiple
           etiqueta="Módulo"
@@ -172,7 +246,7 @@ export default function ResourceHistory() {
         {hayFiltros && (
           <Button
             variant="ghost" size="sm"
-            onClick={() => { setTipos([]); setAsignaturasSel([]); setGradosSel([]); }}
+            onClick={() => { setTipos([]); setAsignaturasSel([]); setGradosSel([]); setBusqueda(""); }}
           >
             Limpiar filtros
           </Button>
@@ -190,7 +264,21 @@ export default function ResourceHistory() {
       ) : resources.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <History className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p>No hay recursos guardados</p>
+          {/* Distinguir "no tienes nada" de "tu filtro no encontró nada" evita
+              que el docente crea que perdió sus recursos. */}
+          {hayFiltros ? (
+            <>
+              <p>Ningún recurso coincide con lo que buscas.</p>
+              <Button
+                variant="link" size="sm"
+                onClick={() => { setTipos([]); setAsignaturasSel([]); setGradosSel([]); setBusqueda(""); }}
+              >
+                Quitar los filtros y ver todo
+              </Button>
+            </>
+          ) : (
+            <p>Todavía no has guardado ningún recurso.</p>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
