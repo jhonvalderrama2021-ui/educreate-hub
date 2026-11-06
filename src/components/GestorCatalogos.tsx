@@ -11,6 +11,7 @@ import { Plus, Pencil, Eye, EyeOff, Trash2, Loader2, Check, X } from "lucide-rea
 import {
   ETIQUETA_CATALOGO, RESPALDO, type EntradaCatalogo, type TipoCatalogo,
 } from "@/lib/catalogos";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Mantenimiento de los catálogos de los formularios de generación.
@@ -102,7 +103,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
       creado_por: user?.id ?? null,
     });
     setAgregando(false);
-    if (error) return toast.error("No se pudo agregar");
+    if (error) return avisarError(error, "No se pudo agregar la opción al catálogo");
     setNuevo("");
     refrescar();
     toast.success(`${ETIQUETA_CATALOGO[tipo].singular} agregada`);
@@ -112,7 +113,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
     const valor = textoEdicion.trim();
     if (!valor) return;
     const { error } = await supabase.from("catalogos").update({ valor }).eq("id", id);
-    if (error) return toast.error("No se pudo guardar");
+    if (error) return avisarError(error, "No se pudo guardar el cambio en el catálogo");
     setEditandoId(null);
     refrescar();
     toast.success("Actualizado");
@@ -121,7 +122,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
   const alternarActivo = async (e: EntradaCatalogo) => {
     const { error } = await supabase
       .from("catalogos").update({ activo: !e.activo }).eq("id", e.id);
-    if (error) return toast.error("No se pudo cambiar");
+    if (error) return avisarError(error, "No se pudo cambiar el estado de la opción");
     refrescar();
     toast.success(e.activo ? "Oculta para los docentes" : "Visible de nuevo");
   };
@@ -133,7 +134,7 @@ function ListaCatalogo({ tipo }: { tipo: TipoCatalogo }) {
       "recurso conserva su sentido y puedes volver a mostrarla cuando quieras."
     )) return;
     const { error } = await supabase.from("catalogos").delete().eq("id", e.id);
-    if (error) return toast.error("No se pudo eliminar");
+    if (error) return avisarError(error, "No se pudo eliminar la opción del catálogo");
     refrescar();
     toast.success("Eliminada");
   };

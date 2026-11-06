@@ -11,6 +11,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { FileText, Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { avisarError } from "@/lib/errores";
+import {
+  erroresDeZod, propsDeCampo, idDelError, enfocarPrimerError,
+  type ErroresDeCampo,
+} from "@/lib/formularios";
 
 const loginSchema = z.object({
   email: z.string().trim().email("Correo electrónico inválido"),
@@ -51,6 +56,11 @@ export default function Auth() {
   const [role, setRole] = useState<"docente" | "estudiante">("estudiante");
   const [dataConsent, setDataConsent] = useState(false);
   const [loading, setLoading] = useState(false);
+  /** Errores de validación por campo, para pintarlos junto a cada uno. */
+  const [errores, setErrores] = useState<ErroresDeCampo>({});
+  /** Al escribir en un campo se borra su error: corregirlo no debe seguir en rojo. */
+  const limpiar = (campo: string) =>
+    setErrores((previos) => (previos[campo] ? { ...previos, [campo]: "" } : previos));
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
 
@@ -58,8 +68,35 @@ export default function Auth() {
     if (!authLoading && user) navigate("/resources");
   }, [user, authLoading, navigate]);
 
+  // Al cambiar entre acceder, registrarse y recuperar, los errores del modo
+  // anterior dejan de tener sentido y marcarian campos que ya no se ven.
+  useEffect(() => { setErrores({}); }, [modo]);
+
+  /** Orden visual de los campos, para llevar el foco al primero que falle. */
+  const ORDEN_CAMPOS = ["username", "name", "email", "password", "confirmPassword", "dataConsent"];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // La validación se resuelve antes de tocar el servidor, y sus errores se
+    // muestran junto a cada campo en lugar de en una notificación que tapa
+    // uno solo y se va sola.
+    const esquema = modo === "recuperar" ? recuperarSchema : isLogin ? loginSchema : signupSchema;
+    const valores =
+      modo === "recuperar"
+        ? { email }
+        : isLogin
+        ? { email, password }
+        : { username, name, email, password, confirmPassword, role, dataConsent };
+
+    const revision = esquema.safeParse(valores);
+    if (!revision.success) {
+      const fallos = erroresDeZod(revision.error);
+      setErrores(fallos);
+      enfocarPrimerError(fallos, ORDEN_CAMPOS);
+      return;
+    }
+    setErrores({});
     setLoading(true);
 
     try {
@@ -104,12 +141,15 @@ export default function Auth() {
         if (error) throw error;
         toast.success("Cuenta creada. Revisa tu correo para confirmar.");
       }
-    } catch (err: any) {
-      if (err instanceof z.ZodError) {
-        toast.error(err.errors[0].message);
-      } else {
-        toast.error(err.message || "Ocurrió un error");
-      }
+    } catch (err: unknown) {
+      avisarError(
+        err,
+        modo === "recuperar"
+          ? "No se pudo enviar el enlace de recuperación"
+          : isLogin
+          ? "No se pudo iniciar sesión"
+          : "No se pudo crear la cuenta",
+      );
     } finally {
       setLoading(false);
     }
@@ -149,47 +189,76 @@ export default function Auth() {
               {modo === "signup" && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="username">Nombre de usuario</Label>
+                    <Label htmlFor="username">
+                      Nombre de usuario <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="username"
                       placeholder="mi_usuario"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => { setUsername(e.target.value); limpiar("username"); }}
                       required
                       maxLength={50}
+                      autoComplete="username"
+                      {...propsDeCampo("username", errores)}
                     />
+                    {errores.username && (
+                      <p id={idDelError("username")} role="alert" className="text-sm text-destructive">
+                        {errores.username}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nombre completo</Label>
+                    <Label htmlFor="name">
+                      Nombre completo <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="name"
                       placeholder="Tu nombre"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => { setName(e.target.value); limpiar("name"); }}
                       required
                       maxLength={100}
+                      autoComplete="name"
+                      {...propsDeCampo("name", errores)}
                     />
+                    {errores.name && (
+                      <p id={idDelError("name")} role="alert" className="text-sm text-destructive">
+                        {errores.name}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
+                <Label htmlFor="email">
+                  Correo electrónico <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="email"
                   type="email"
                   placeholder="correo@ejemplo.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); limpiar("email"); }}
                   required
                   maxLength={255}
+                  autoComplete="email"
+                  {...propsDeCampo("email", errores)}
                 />
+                {errores.email && (
+                  <p id={idDelError("email")} role="alert" className="text-sm text-destructive">
+                    {errores.email}
+                  </p>
+                )}
               </div>
 
               {modo !== "recuperar" && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Contraseña</Label>
+                    <Label htmlFor="password">
+                      Contraseña <span className="text-destructive">*</span>
+                    </Label>
                     {isLogin && (
                       <button
                         type="button"
@@ -205,26 +274,42 @@ export default function Auth() {
                     type="password"
                     placeholder="••••••••"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => { setPassword(e.target.value); limpiar("password"); }}
                     required
                     minLength={6}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    {...propsDeCampo("password", errores)}
                   />
+                  {errores.password && (
+                    <p id={idDelError("password")} role="alert" className="text-sm text-destructive">
+                      {errores.password}
+                    </p>
+                  )}
                 </div>
               )}
 
               {modo === "signup" && (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Repetir contraseña</Label>
+                    <Label htmlFor="confirmPassword">
+                      Repetir contraseña <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="confirmPassword"
                       type="password"
                       placeholder="••••••••"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => { setConfirmPassword(e.target.value); limpiar("confirmPassword"); }}
                       required
                       minLength={6}
+                      autoComplete="new-password"
+                      {...propsDeCampo("confirmPassword", errores)}
                     />
+                    {errores.confirmPassword && (
+                      <p id={idDelError("confirmPassword")} role="alert" className="text-sm text-destructive">
+                        {errores.confirmPassword}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-3">
@@ -249,7 +334,8 @@ export default function Auth() {
                     <Checkbox
                       id="dataConsent"
                       checked={dataConsent}
-                      onCheckedChange={(checked) => setDataConsent(checked === true)}
+                      onCheckedChange={(checked) => { setDataConsent(checked === true); limpiar("dataConsent"); }}
+                      {...propsDeCampo("dataConsent", errores)}
                     />
                     <Label htmlFor="dataConsent" className="text-sm font-normal leading-snug cursor-pointer text-muted-foreground">
                       Autorizo el tratamiento de mis datos personales conforme a la{" "}
@@ -264,6 +350,11 @@ export default function Auth() {
                       y a la Ley 1581 de 2012.
                     </Label>
                   </div>
+                  {errores.dataConsent && (
+                    <p id={idDelError("dataConsent")} role="alert" className="text-sm text-destructive">
+                      {errores.dataConsent}
+                    </p>
+                  )}
                 </>
               )}
 

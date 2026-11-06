@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Bot, Plus, Trash2, MessageCircle, Sparkles, Pencil, FileText } from "lucide-react";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { GestorDocumentosBot } from "@/components/GestorDocumentosBot";
+import { avisarError } from "@/lib/errores";
 
 interface BotItem {
   id: string;
@@ -45,7 +46,7 @@ export default function BotList() {
       .select("*")
       .eq("user_id", user!.id)
       .order("created_at", { ascending: false });
-    if (error) toast.error("Error al cargar bots");
+    if (error) avisarError(error, "No se pudieron cargar tus bots");
     setBots(data || []);
 
     // Cuantos documentos tiene cada bot, para el distintivo de la tarjeta
@@ -104,7 +105,7 @@ export default function BotList() {
   const handleDelete = async (id: string) => {
     if (!confirm("¿Eliminar este bot y todas sus conversaciones?")) return;
     const { error } = await supabase.from("bots").delete().eq("id", id);
-    if (error) toast.error("Error al eliminar");
+    if (error) avisarError(error, "No se pudo eliminar el bot");
     else {
       setBots((prev) => prev.filter((b) => b.id !== id));
       toast.success("Bot eliminado");

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageSquarePlus, Loader2, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Campo para que el docente deje observaciones sobre el módulo en el que está
@@ -47,7 +48,7 @@ export function CampoObservacion({
     setEnviando(false);
 
     if (error) {
-      toast.error("No se pudo guardar la observación. Intenta de nuevo.");
+      avisarError(error, "No se pudo guardar tu observación");
       return;
     }
     setTexto("");

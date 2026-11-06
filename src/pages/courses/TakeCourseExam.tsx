@@ -8,6 +8,7 @@ import { ArrowLeft, Clock, CheckCircle2, XCircle, FileText, ToggleLeft, Puzzle }
 import { CrosswordGrid } from "@/components/games/CrosswordGrid";
 import type { CrosswordContent } from "@/pages/resources/Crossword";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 interface SafeQuestion {
   type: "multiple_choice" | "true_false";
@@ -194,7 +195,7 @@ export default function TakeCourseExam() {
       setResult(res as any);
       toast.success("Respuestas enviadas");
     } catch (e: any) {
-      toast.error(e?.message || "Error al enviar");
+      avisarError(e, "No se pudieron enviar tus respuestas");
     } finally {
       setSubmitting(false);
     }

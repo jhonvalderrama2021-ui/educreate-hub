@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Bot, ArrowLeft, Send, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { avisarError } from "@/lib/errores";
 
 interface Message {
   id: string;
@@ -68,7 +69,7 @@ export default function BotChat() {
       .eq("id", botId!)
       .maybeSingle();
     if (error || !data) {
-      toast.error("Bot no encontrado");
+      avisarError(error, "No se encontró ese bot");
       navigate(volverA);
       return;
     }
@@ -121,7 +122,7 @@ export default function BotChat() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (e: any) {
-      toast.error(e.message || "Error al enviar mensaje");
+      avisarError(e, "No se pudo enviar el mensaje");
       setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
     } finally {
       setSending(false);

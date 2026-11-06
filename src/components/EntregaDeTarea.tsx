@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import {
   Upload, FileText, CheckCircle2, Clock, Download, Trash2, Loader2, AlertTriangle,
 } from "lucide-react";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Entrega de una tarea con archivo.
@@ -147,7 +148,7 @@ export function EntregaDeTarea({
       qc.invalidateQueries({ queryKey: ["my_submissions", courseId] });
       toast.success("Trabajo entregado");
     } catch (e: any) {
-      toast.error(e?.message || "No se pudo subir el archivo");
+      avisarError(e, "No se pudo subir el archivo");
     } finally {
       setSubiendo(false);
     }
@@ -160,7 +161,7 @@ export function EntregaDeTarea({
     const { data, error } = await supabase.storage
       .from("entregas-tareas")
       .createSignedUrl(entrega.archivo_ruta, 60);
-    if (error || !data) return toast.error("No se pudo abrir el archivo");
+    if (error || !data) return avisarError(error, "No se pudo abrir el archivo");
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -170,7 +171,7 @@ export function EntregaDeTarea({
     const { error } = await supabase.from("resource_submissions")
       .update({ archivo_ruta: null, archivo_nombre: null, archivo_tamano: null })
       .eq("id", entrega.id);
-    if (error) return toast.error("No se pudo quitar");
+    if (error) return avisarError(error, "No se pudo quitar tu entrega");
     await supabase.storage.from("entregas-tareas").remove([entrega.archivo_ruta]);
     qc.invalidateQueries({ queryKey: clave });
     toast.success("Entrega retirada");

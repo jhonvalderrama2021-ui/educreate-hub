@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { avisarError } from "@/lib/errores";
 
 type NoteColor = "primary" | "destructive" | "amber" | "emerald" | "sky";
 
@@ -58,7 +59,7 @@ export function CalendarPopover() {
       .eq("user_id", user.id)
       .order("date", { ascending: true });
     if (error) {
-      toast.error("No se pudieron cargar las notas");
+      avisarError(error, "No se pudieron cargar tus notas del calendario");
     } else {
       setNotes((data as CalendarNote[]) || []);
     }
@@ -99,7 +100,7 @@ export function CalendarPopover() {
     });
     setSaving(false);
     if (error) {
-      toast.error("Error al guardar la nota");
+      avisarError(error, "No se pudo guardar la nota");
       return;
     }
     toast.success("Nota agregada");
@@ -112,7 +113,7 @@ export function CalendarPopover() {
   const handleDelete = async (id: string) => {
     const { error } = await supabase.from("calendar_notes").delete().eq("id", id);
     if (error) {
-      toast.error("Error al eliminar");
+      avisarError(error, "No se pudo eliminar la nota");
       return;
     }
     toast.success("Nota eliminada");

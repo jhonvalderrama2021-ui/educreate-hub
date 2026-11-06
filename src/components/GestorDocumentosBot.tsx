@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   FileText, Upload, Trash2, Loader2, CheckCircle2, AlertCircle,
 } from "lucide-react";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Documentos que sirven de fuente a un bot.
@@ -41,7 +42,7 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
       .select("*")
       .eq("bot_id", botId)
       .order("created_at", { ascending: false });
-    if (error) toast.error("Error al cargar los documentos");
+    if (error) avisarError(error, "No se pudieron cargar los documentos del bot");
     setDocumentos((data || []) as DocumentoBot[]);
     setCargando(false);
   };
@@ -82,7 +83,7 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
     } catch (e: any) {
       // El error del PDF escaneado —el caso más común— ya trae la explicación
       // completa para el docente, así que basta con mostrarlo tal cual.
-      toast.error(e?.message || "No se pudo procesar el documento");
+      avisarError(e, "No se pudo procesar el documento");
     } finally {
       setProcesando(null);
     }
@@ -94,7 +95,7 @@ export function GestorDocumentosBot({ botId }: { botId: string }) {
       "El bot dejará de responder a partir de ese documento."
     )) return;
     const { error } = await supabase.from("bot_documentos").delete().eq("id", d.id);
-    if (error) return toast.error("No se pudo eliminar");
+    if (error) return avisarError(error, "No se pudo eliminar el documento");
     setDocumentos((prev) => prev.filter((x) => x.id !== d.id));
     toast.success("Documento eliminado");
   };

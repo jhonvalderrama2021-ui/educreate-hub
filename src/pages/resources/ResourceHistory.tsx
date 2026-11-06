@@ -19,6 +19,7 @@ import { BorrarRecurso } from "@/components/BorrarRecurso";
 import { CampoObservacion } from "@/components/CampoObservacion";
 import { rutaDelRecurso } from "@/lib/ruta-modulo";
 import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
+import { avisarError } from "@/lib/errores";
 
 const TYPE_LABELS: Record<string, { label: string; icon: any }> = {
   icfes: { label: "Examen ICFES", icon: FileCheck },
@@ -118,7 +119,7 @@ export default function ResourceHistory() {
       .update({ is_public: !isPublic })
       .eq("id", id);
     if (error) {
-      toast.error("Error al actualizar");
+      avisarError(error, "No se pudo cambiar la visibilidad del recurso");
       queryClient.invalidateQueries({ queryKey: RESOURCES_QK(user?.id) });
     }
   };

@@ -11,6 +11,7 @@ import { FiltroMultiple, opcionesDe } from "@/components/FiltroMultiple";
 import { toast } from "sonner";
 import { Search, Coins, Plus, Loader2, History, Download } from "lucide-react";
 import { descargarExcel, type ValorCelda } from "@/lib/export-excel";
+import { avisarError } from "@/lib/errores";
 
 /**
  * Tokens de generación, desde el panel de administración.
@@ -221,7 +222,7 @@ function DialogoAmpliar({ saldo, onCerrar, onHecho }: {
       p_user: saldo.user_id, p_tokens: n, p_motivo: motivo.trim() || undefined,
     });
     setGuardando(false);
-    if (error) return toast.error(error.message || "No se pudo ampliar");
+    if (error) return avisarError(error, "No se pudo ampliar el límite de generación");
     toast.success(`${n} tokens añadidos solo para hoy`);
     onHecho(); onCerrar();
   };
@@ -234,7 +235,7 @@ function DialogoAmpliar({ saldo, onCerrar, onHecho }: {
       p_user: saldo.user_id, p_limite: n,
     });
     setGuardando(false);
-    if (error) return toast.error(error.message || "No se pudo cambiar");
+    if (error) return avisarError(error, "No se pudo cambiar el límite diario");
     toast.success(`Ahora recibe ${n} tokens cada día`);
     onHecho(); onCerrar();
   };
